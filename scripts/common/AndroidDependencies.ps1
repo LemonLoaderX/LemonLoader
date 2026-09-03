@@ -16,15 +16,20 @@ function Get-AndroidDependencies {
         "AndroidApiLevel",
         "AndroidDotnetRuntimeVersion",
         "AndroidDotnetRuntimeRevision",
+        "AndroidDotnetRuntimeRepositoryUrl",
         "AndroidDotnetRuntimeArtifactUrl",
         "AndroidDotnetRuntimeArtifactSha256",
         "AndroidDobbyRevision",
+        "AndroidDobbyRepositoryUrl",
         "AndroidIl2CppInteropVersion",
         "AndroidIl2CppInteropRevision",
+        "AndroidIl2CppInteropRepositoryUrl",
         "AndroidHarmonyXVersion",
         "AndroidHarmonyXRevision",
+        "AndroidHarmonyXRepositoryUrl",
         "AndroidMonoModVersion",
-        "AndroidMonoModRevision")) {
+        "AndroidMonoModRevision",
+        "AndroidMonoModRepositoryUrl")) {
         if ([string]::IsNullOrWhiteSpace([string]$properties.$name)) {
             throw "Android dependency manifest property '$name' is missing."
         }
@@ -44,14 +49,36 @@ function Get-AndroidDependencies {
     if ([string]$properties.AndroidDotnetRuntimeArtifactSha256 -notmatch '^[0-9a-f]{64}$') {
         throw "AndroidDotnetRuntimeArtifactSha256 is not a SHA-256 value."
     }
-    $artifactUri = $null
-    if (-not [Uri]::TryCreate(
-        [string]$properties.AndroidDotnetRuntimeArtifactUrl,
-        [UriKind]::Absolute,
-        [ref]$artifactUri) -or
-        $artifactUri.Scheme -ne "https") {
-        throw "AndroidDotnetRuntimeArtifactUrl must be an absolute HTTPS URL."
+    foreach ($name in @(
+        "AndroidDotnetRuntimeRepositoryUrl",
+        "AndroidDotnetRuntimeArtifactUrl",
+        "AndroidDobbyRepositoryUrl",
+        "AndroidIl2CppInteropRepositoryUrl",
+        "AndroidHarmonyXRepositoryUrl",
+        "AndroidMonoModRepositoryUrl")) {
+        $uri = $null
+        if (-not [Uri]::TryCreate(
+            [string]$properties.$name,
+            [UriKind]::Absolute,
+            [ref]$uri) -or
+            $uri.Scheme -ne "https") {
+            throw "$name must be an absolute HTTPS URL."
+        }
     }
 
     return $properties
+}
+
+function Get-AndroidDependencySourceRoot {
+    param(
+        [Parameter(Mandatory)]
+        [ValidateSet("Dobby", "Il2CppInterop", "HarmonyX", "MonoMod", "runtime")]
+        [string]$Name,
+
+        [string]$RepositoryRoot = [IO.Path]::GetFullPath(
+            (Join-Path $PSScriptRoot "..\.."))
+    )
+
+    return [IO.Path]::GetFullPath(
+        (Join-Path $RepositoryRoot ".dependencies\$Name"))
 }

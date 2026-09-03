@@ -119,7 +119,8 @@ foreach ($path in @($AndroidNdkLinuxRoot, $AndroidSdkLinuxRoot, $JavaHomeLinux))
 }
 
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $SourceRoot = Join-Path $repositoryRoot "..\dependencies\dotnet-runtime"
+    $SourceRoot = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name runtime
 }
 $SourceRoot = [System.IO.Path]::GetFullPath($SourceRoot)
 if (-not (Test-Path -LiteralPath (Join-Path $SourceRoot ".git"))) {

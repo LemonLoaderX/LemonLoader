@@ -34,16 +34,16 @@ if ([string]::IsNullOrWhiteSpace($ManagedRuntimeRevision)) {
 $managedRuntimeBackendId = "coreclr"
 $dependencySourceRoots = [ordered]@{
     Dobby = if ([string]::IsNullOrWhiteSpace($DobbySourceRoot)) {
-        Join-Path $repositoryRoot "..\dependencies\Dobby"
+        Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name Dobby
     } else { $DobbySourceRoot }
     Il2CppInterop = if ([string]::IsNullOrWhiteSpace($Il2CppInteropSourceRoot)) {
-        Join-Path $repositoryRoot "..\dependencies\Il2CppInterop"
+        Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name Il2CppInterop
     } else { $Il2CppInteropSourceRoot }
     HarmonyX = if ([string]::IsNullOrWhiteSpace($HarmonyXSourceRoot)) {
-        Join-Path $repositoryRoot "..\dependencies\HarmonyX"
+        Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name HarmonyX
     } else { $HarmonyXSourceRoot }
     MonoMod = if ([string]::IsNullOrWhiteSpace($MonoModSourceRoot)) {
-        Join-Path $repositoryRoot "..\dependencies\MonoMod"
+        Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name MonoMod
     } else { $MonoModSourceRoot }
 }
 

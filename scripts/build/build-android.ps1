@@ -41,7 +41,7 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
 
 if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
     $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1")
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
+    if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
         throw "Resolving the Android CoreCLR runtime artifact failed."
     }
     $CoreClrRuntimePackRoot = ($CoreClrRuntimePackRoot | Select-Object -Last 1).Trim()

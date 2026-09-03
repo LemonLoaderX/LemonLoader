@@ -22,6 +22,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
+. (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 if ([string]::IsNullOrWhiteSpace($InteropInputPath)) {
     $InteropInputPath = Join-Path $repositoryRoot "Output\InteropInput"
 }
@@ -190,8 +191,10 @@ $generatorArguments = @(
 $generatorArguments += @("--unity", $unityAssemblies)
 
 if ([string]::IsNullOrWhiteSpace($Il2CppInteropCliProject)) {
-    $Il2CppInteropCliProject = Join-Path $repositoryRoot `
-        "..\dependencies\Il2CppInterop\Il2CppInterop.CLI\Il2CppInterop.CLI.csproj"
+    $interopSource = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name Il2CppInterop
+    $Il2CppInteropCliProject = Join-Path $interopSource `
+        "Il2CppInterop.CLI\Il2CppInterop.CLI.csproj"
 }
 $sourceCli = [System.IO.Path]::GetFullPath($Il2CppInteropCliProject)
 if (-not (Test-Path -LiteralPath $sourceCli -PathType Leaf)) {

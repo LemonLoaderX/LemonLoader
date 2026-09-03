@@ -74,9 +74,9 @@ foreach ($tool in @($cmake, $ninja)) {
     }
 }
 
-$workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot ".."))
 if ([string]::IsNullOrWhiteSpace($DobbySourceRoot)) {
-    $DobbySourceRoot = Join-Path $workspaceRoot "dependencies\Dobby"
+    $DobbySourceRoot = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name Dobby
 }
 $dobbyRoot = [System.IO.Path]::GetFullPath($DobbySourceRoot)
 if (-not (Test-Path -LiteralPath (Join-Path $dobbyRoot ".git"))) {

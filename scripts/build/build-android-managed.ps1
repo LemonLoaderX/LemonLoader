@@ -33,7 +33,8 @@ $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic
 & (Join-Path $PSScriptRoot "build-android-harmonyx.ps1") -SourceRoot $HarmonyXSourceRoot
 
 if ([string]::IsNullOrWhiteSpace($Il2CppInteropSourceRoot)) {
-    $Il2CppInteropSourceRoot = Join-Path $repositoryRoot "..\dependencies\Il2CppInterop"
+    $Il2CppInteropSourceRoot = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name Il2CppInterop
 }
 $Il2CppInteropSourceRoot = [System.IO.Path]::GetFullPath($Il2CppInteropSourceRoot)
 $interopHarmonyProject = Join-Path $Il2CppInteropSourceRoot `

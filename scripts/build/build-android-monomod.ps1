@@ -16,7 +16,8 @@ if ([string]::IsNullOrWhiteSpace($SourceRevision)) {
     $SourceRevision = [string]$dependencies.AndroidMonoModRevision
 }
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $SourceRoot = Join-Path $repositoryRoot "..\dependencies\MonoMod"
+    $SourceRoot = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name MonoMod
 }
 $SourceRoot = [IO.Path]::GetFullPath($SourceRoot)
 $commonRoot = Join-Path $SourceRoot "MonoMod.Common"

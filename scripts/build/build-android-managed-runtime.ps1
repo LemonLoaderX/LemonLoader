@@ -30,6 +30,3 @@ if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256)) {
     $parameters.ExpectedSha256 = $ExpectedSha256
 }
 & (Join-Path $PSScriptRoot "build-android-real-coreclr.ps1") @parameters
-if ($LASTEXITCODE -ne 0) {
-    throw "The Android CoreCLR runtime build failed with exit code $LASTEXITCODE."
-}

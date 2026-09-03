@@ -16,7 +16,8 @@ if ([string]::IsNullOrWhiteSpace($SourceRevision)) {
     $SourceRevision = [string]$dependencies.AndroidHarmonyXRevision
 }
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
-    $SourceRoot = Join-Path $repositoryRoot "..\dependencies\HarmonyX"
+    $SourceRoot = Get-AndroidDependencySourceRoot `
+        -RepositoryRoot $repositoryRoot -Name HarmonyX
 }
 $SourceRoot = [IO.Path]::GetFullPath($SourceRoot)
 if (-not (Test-Path -LiteralPath (Join-Path $SourceRoot ".git"))) {

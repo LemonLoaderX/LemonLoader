@@ -40,9 +40,6 @@ if ([string]::IsNullOrWhiteSpace($RuntimeRevision)) {
 if (-not $SkipToolchainPreparation) {
     & (Join-Path $PSScriptRoot "prepare-android-coreclr-toolchain.ps1") `
         -Distribution $Distribution
-    if ($LASTEXITCODE -ne 0) {
-        throw "Preparing the isolated Android CoreCLR toolchain failed."
-    }
 }
 
 $parameters = @{
@@ -66,6 +63,3 @@ if (-not [string]::IsNullOrWhiteSpace($ExpectedSha256)) {
     $parameters.ExpectedSha256 = $ExpectedSha256
 }
 & (Join-Path $PSScriptRoot "build-android-full-coreclr-pack.ps1") @parameters
-if ($LASTEXITCODE -ne 0) {
-    throw "Building the source-complete Android CoreCLR runtime pack failed."
-}
