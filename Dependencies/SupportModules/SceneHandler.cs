@@ -3,6 +3,9 @@ using UnityEngine.SceneManagement;
 using System.Collections.Generic;
 using HarmonyLib;
 using System.Reflection;
+#if ANDROID
+using Il2CppInterop.Runtime;
+#endif
 
 #pragma warning disable CA2013
 
@@ -18,6 +21,9 @@ namespace MelonLoader.Support
         }
 
         private static Queue<SceneInitEvent> scenesLoaded = new Queue<SceneInitEvent>();
+#if ANDROID
+        private static bool sceneNameWarningLogged;
+#endif
 
         internal static void Init(MethodInfo sceneLoaded, MethodInfo sceneUnloaded)
         {
@@ -47,14 +53,18 @@ namespace MelonLoader.Support
 
         private static void OnSceneLoad(Scene scene, LoadSceneMode mode)
         {
+#if !ANDROID
             if (Main.obj == null)
                 SM_Component.Create();
+#endif
 
             if (ReferenceEquals(scene, null))
                 return;
 
-            Main.Interface.OnSceneWasLoaded(scene.buildIndex, scene.name);
-            scenesLoaded.Enqueue(new SceneInitEvent { buildIndex = scene.buildIndex, name = scene.name });
+            int buildIndex = GetBuildIndex(scene);
+            string sceneName = GetSceneName(scene);
+            Main.Interface.OnSceneWasLoaded(buildIndex, sceneName);
+            scenesLoaded.Enqueue(new SceneInitEvent { buildIndex = buildIndex, name = sceneName });
         }
 
         private static void OnSceneUnload(Scene scene)
@@ -62,7 +72,41 @@ namespace MelonLoader.Support
             if (ReferenceEquals(scene, null))
                 return;
 
-            Main.Interface.OnSceneWasUnloaded(scene.buildIndex, scene.name);
+            Main.Interface.OnSceneWasUnloaded(GetBuildIndex(scene), GetSceneName(scene));
+        }
+
+        private static string GetSceneName(Scene scene)
+        {
+#if ANDROID
+            try
+            {
+                return scene.name;
+            }
+            catch (MissingIl2CppInternalCallException)
+            {
+                if (!sceneNameWarningLogged)
+                {
+                    sceneNameWarningLogged = true;
+                    MelonLogger.Warning(
+                        "Scene names are unavailable in this game's stripped Unity runtime; " +
+                        "Android scene lifecycle events will use an empty name.");
+                }
+                return string.Empty;
+            }
+#else
+            return scene.name;
+#endif
+        }
+
+        private static int GetBuildIndex(Scene scene)
+        {
+#if ANDROID
+            // Stripped Android interop assemblies may omit Scene.buildIndex.
+            // Preserve lifecycle delivery with an explicit unknown index.
+            return -1;
+#else
+            return scene.buildIndex;
+#endif
         }
 
         internal static void OnUpdate()

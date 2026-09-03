@@ -41,6 +41,11 @@ namespace MelonLoader.Preferences.IO
             }
             catch (Exception ex)
             {
+#if ANDROID
+                if (MelonLoader.Utils.AndroidThreadResourceDiagnostics.IsThreadCreationFailure(ex))
+                    MelonLoader.Utils.AndroidThreadResourceDiagnostics.LogOnce(
+                        "FileSystemWatcher startup");
+#endif
                 MelonLogger.Warning("FileSystemWatcher Exception: " + ex.ToString());
                 ShouldDisableFileWatcherFunctionality = true;
                 FileWatcher = null;

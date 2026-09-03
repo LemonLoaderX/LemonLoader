@@ -5,7 +5,7 @@
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <OutputPath>$(MLOutDir)/MelonLoader/Dependencies/SupportModules</OutputPath>
         <DebugType>embedded</DebugType>
-        <DefineConstants>SM_Il2Cpp</DefineConstants>
+        <DefineConstants>$(DefineConstants);SM_Il2Cpp</DefineConstants>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
     <ItemGroup>
@@ -34,9 +34,12 @@
         <PackageReference Include="AssetRipper.Primitives" Version="$(AssetRipperVersion)" ExcludeAssets="Runtime" />
         <PackageReference Include="HarmonyX" Version="$(HarmonyXVersion)" ExcludeAssets="Runtime" />
         <PackageReference Include="Iced" Version="$(IcedVersion)" ExcludeAssets="Runtime" />
-        <PackageReference Include="Il2CppInterop.Common" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" />
-        <PackageReference Include="Il2CppInterop.Runtime" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" />
-        <PackageReference Include="Il2CppInterop.HarmonySupport" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" />
+        <PackageReference Include="Il2CppInterop.Common" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" Condition="'$(Il2CppInteropSourceRoot)' == ''" />
+        <PackageReference Include="Il2CppInterop.Runtime" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" Condition="'$(Il2CppInteropSourceRoot)' == ''" />
+        <PackageReference Include="Il2CppInterop.HarmonySupport" Version="$(Il2CppInteropVersion)" ExcludeAssets="Runtime" Condition="'$(Il2CppInteropSourceRoot)' == ''" />
+        <ProjectReference Include="$(Il2CppInteropSourceRoot)\Il2CppInterop.Common\Il2CppInterop.Common.csproj" Private="false" Condition="'$(Il2CppInteropSourceRoot)' != ''" />
+        <ProjectReference Include="$(Il2CppInteropSourceRoot)\Il2CppInterop.Runtime\Il2CppInterop.Runtime.csproj" Private="false" Condition="'$(Il2CppInteropSourceRoot)' != ''" />
+        <ProjectReference Include="$(Il2CppInteropSourceRoot)\Il2CppInterop.HarmonySupport\Il2CppInterop.HarmonySupport.csproj" Private="false" Condition="'$(Il2CppInteropSourceRoot)' != ''" />
         <PackageReference Include="Mono.Cecil" Version="$(MonoCecilVersion)" ExcludeAssets="Runtime" />
         <PackageReference Include="MonoMod.RuntimeDetour" Version="$(MonoModVersion)" ExcludeAssets="Runtime" />
         <PackageReference Include="MonoMod.Utils" Version="$(MonoModVersion)" ExcludeAssets="Runtime" />

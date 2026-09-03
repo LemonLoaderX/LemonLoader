@@ -34,7 +34,9 @@ namespace MelonLoader.Support
             Main.component = (SM_Component)Main.obj.AddComponent(typeof(SM_Component));
 #endif
 
+#if !ANDROID
             ComponentSiblingFix.SetAsLastSibling(Main.obj.transform);
+#endif
         }
 
         private void ProcessCoroutineQueue()
@@ -59,7 +61,9 @@ namespace MelonLoader.Support
             if ((Main.component == null) || (Main.component != this))
                 return;
 
+#if !ANDROID
             ComponentSiblingFix.SetAsLastSibling(transform);
+#endif
             Main.Interface.OnApplicationLateStart();
         }
 
@@ -74,8 +78,9 @@ namespace MelonLoader.Support
                 return;
 
             isQuitting = false;
+#if !ANDROID
             ComponentSiblingFix.SetAsLastSibling(transform);
-
+#endif
             SceneHandler.OnUpdate();
             Main.Interface.Update();
         }

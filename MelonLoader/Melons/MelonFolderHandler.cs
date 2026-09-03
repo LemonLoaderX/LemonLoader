@@ -78,7 +78,9 @@ public static class MelonFolderHandler
         // Scan Base Folders
         FindSubFolders(ScanType.UserLibs, MelonEnvironment.UserLibsDirectory, true, ref _userLibDirs, ref _pluginDirs, ref _modDirs);
         FindSubFolders(ScanType.Plugins, MelonEnvironment.PluginsDirectory, true, ref _userLibDirs, ref _pluginDirs, ref _modDirs);
-        FindSubFolders(ScanType.Mods, MelonEnvironment.ModsDirectory, true, ref _userLibDirs, ref _pluginDirs, ref _modDirs);
+        // Mods are recursively discoverable without requiring MelonLoader's
+        // legacy subfolder manifest at the first directory level.
+        FindSubFolders(ScanType.Mods, MelonEnvironment.ModsDirectory, false, ref _userLibDirs, ref _pluginDirs, ref _modDirs);
 
         // Add Directories to Resolver
         foreach (string directory in _userLibDirs)

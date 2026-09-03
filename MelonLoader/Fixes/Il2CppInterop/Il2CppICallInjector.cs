@@ -46,7 +46,12 @@ namespace MelonLoader.Fixes.Il2CppInterop
                 if (_generateNativeToManagedTrampoline == null)
                     throw new Exception("Failed to get Il2CppDetourMethodPatcher.GenerateNativeToManagedTrampoline");
 
-                string gameAssemblyName = "GameAssembly";
+                string gameAssemblyName =
+#if ANDROID
+                    "libil2cpp.so";
+#else
+                    "GameAssembly";
+#endif
                 NativeLibrary gameAssemblyLib = NativeLibrary.Load(gameAssemblyName);
                 if (gameAssemblyLib == null)
                     throw new Exception($"Failed to load {gameAssemblyName} Native Library");

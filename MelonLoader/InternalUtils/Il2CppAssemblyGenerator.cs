@@ -18,6 +18,26 @@ namespace MelonLoader.InternalUtils
             if (MelonEnvironment.IsMonoRuntime)
                 return true;
 
+#if ANDROID
+            if (!Directory.Exists(MelonEnvironment.Il2CppAssembliesDirectory))
+            {
+                MelonLogger.Error("Pre-generated Android Il2Cpp assemblies were not found.");
+                return false;
+            }
+
+            string[] interopAssemblies = Directory.GetFiles(
+                MelonEnvironment.Il2CppAssembliesDirectory,
+                "*.dll",
+                SearchOption.TopDirectoryOnly);
+            if (interopAssemblies.Length == 0)
+            {
+                MelonLogger.Error("The Android Il2Cpp assembly directory is empty.");
+                return false;
+            }
+
+            MelonLogger.MsgDirect($"Using {interopAssemblies.Length} pre-generated Android Il2Cpp assemblies.");
+            return true;
+#else
             MelonLogger.MsgDirect("Loading Il2CppAssemblyGenerator...");
             var module = MelonModule.Load(moduleInfo);
             if (module == null)
@@ -50,6 +70,7 @@ namespace MelonLoader.InternalUtils
             }
 
             return ret is 0;
+#endif
         }
     }
 }

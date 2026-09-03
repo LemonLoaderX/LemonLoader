@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using MelonLoader.Utils;
 using System.IO;
 using MelonLoader.InternalUtils;
+using HarmonyLib.Public.Patching;
 
 [assembly: MelonLoader.PatchShield]
 
@@ -41,19 +42,31 @@ namespace MelonLoader.Support
             }
 
             UnityMappers.RegisterMappers();
+#if !ANDROID
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
                 System.Runtime.InteropServices.NativeLibrary.SetDllImportResolver(typeof(Il2CppInteropRuntime).Assembly,
                     MacOsIl2CppInteropLibraryResolver);
             }
+#endif
 
+            var unityVersion = new Version(
+                InternalUtils.UnityInformationHandler.EngineVersion.Major,
+                InternalUtils.UnityInformationHandler.EngineVersion.Minor,
+                InternalUtils.UnityInformationHandler.EngineVersion.Build);
             Il2CppInteropRuntime runtime = Il2CppInteropRuntime.Create(new()
             {
                 DetourProvider = new MelonDetourProvider(),
-                UnityVersion = new Version(
-                    InternalUtils.UnityInformationHandler.EngineVersion.Major,
-                    InternalUtils.UnityInformationHandler.EngineVersion.Minor,
-                    InternalUtils.UnityInformationHandler.EngineVersion.Build)
+#if ANDROID
+                IsAndroid = true,
+                InjectionTargetResolver = target =>
+                    BootstrapInterop.Library.ResolveArm64Il2CppInjectionTarget(
+                        (uint)target,
+                        (uint)unityVersion.Major,
+                        (uint)unityVersion.Minor,
+                        (uint)unityVersion.Build),
+#endif
+                UnityVersion = unityVersion
             }).AddLogger(new InteropLogger())
               .AddHarmonySupport();
 
@@ -61,9 +74,22 @@ namespace MelonLoader.Support
             Interface.SetInteropSupportInterface(Interop);
             runtime.Start();
 
+#if ANDROID
+            // Il2CppInterop must inspect wrapper methods before Harmony calls GetMethodBody.
+            PatchManager.ResolvePatcher -= ManagedMethodPatcher.TryResolve;
+            PatchManager.ResolvePatcher -= NativeDetourMethodPatcher.TryResolve;
+            PatchManager.ResolvePatcher += ManagedMethodPatcher.TryResolve;
+            PatchManager.ResolvePatcher += NativeDetourMethodPatcher.TryResolve;
+#endif
+
             if (!LoaderConfig.Current.UnityEngine.DisableConsoleLogCleaner)
                 ConsoleCleaner();
 
+#if ANDROID
+            AndroidLifecycle.Init();
+            MonoEnumeratorWrapper.Register();
+            SM_Component.Create();
+#else
             MonoEnumeratorWrapper.Register();
 
             GetSceneManagerMethods(out MethodInfo sceneLoaded,
@@ -76,6 +102,7 @@ namespace MelonLoader.Support
             }
             else
                 SceneHandler.Init(sceneLoaded, sceneUnloaded);
+#endif
 
             return new SupportModule_To();
         }
@@ -194,10 +221,26 @@ namespace MelonLoader.Support
 
     internal sealed class MelonDetourProvider : IDetourProvider
     {
+        private static readonly MethodInfo GetValueTypeReturnSize =
+            typeof(IDetourProvider).Assembly
+                .GetType("Il2CppInterop.Runtime.Injection.ValueTypeReturnRegistry", false)
+                ?.GetMethod(
+                    "GetReturnSize",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { typeof(Delegate) },
+                    null);
+
         public IDetour Create<TDelegate>(nint original, TDelegate target) where TDelegate : Delegate
         {
-            return new MelonDetour(original, target);
+            var returnSize = GetRegisteredReturnSize(target);
+            return new MelonDetour(original, target, returnSize);
         }
+
+        private static int GetRegisteredReturnSize(Delegate target) =>
+            GetValueTypeReturnSize?.Invoke(null, new object[] { target }) is int returnSize
+                ? returnSize
+                : 0;
 
         private sealed class MelonDetour : IDetour
         {
@@ -205,7 +248,9 @@ namespace MelonLoader.Support
             private nint _originalPtr;
             
             private Delegate _target;
+            private IntPtr _managedTargetPtr;
             private IntPtr _targetPtr;
+            private readonly int _returnSize;
             
             private GCHandle _pin;
 
@@ -217,14 +262,24 @@ namespace MelonLoader.Support
             public nint Detour => _targetPtr;
             public nint OriginalTrampoline => _originalPtr;
             
-            public MelonDetour(nint detourFrom, Delegate target)
+            public MelonDetour(nint detourFrom, Delegate target, int returnSize)
             {
                 _detourFrom = detourFrom;
                 _target = target;
+                _returnSize = returnSize;
                 _pin = GCHandle.Alloc(_target);
 
                 // We have to apply immediately because we're gonna be asked for a trampoline right away
-                Apply();
+                try
+                {
+                    Apply();
+                }
+                catch
+                {
+                    if (_pin.IsAllocated)
+                        _pin.Free();
+                    throw;
+                }
             }
 
             public unsafe void Apply()
@@ -233,15 +288,48 @@ namespace MelonLoader.Support
                     return;
 
                 //_targetPtr = Marshal.GetFunctionPointerForDelegate(_target);
-                _targetPtr = CoreClrDelegateFixer.GetFixedPointerForDelegate(_target);
+                _managedTargetPtr = CoreClrDelegateFixer.GetFixedPointerForDelegate(_target);
+                _targetPtr = CreateAndroidArm64ValueReturnAdapter(_managedTargetPtr, _returnSize);
                 
                 var addr = _detourFrom;
                 nint addrPtr = (nint)(&addr);
                 
                 BootstrapInterop.NativeHookAttachDirect(addrPtr, _targetPtr);
+                if (addr == IntPtr.Zero)
+                {
+#if ANDROID
+                    if (_targetPtr != _managedTargetPtr)
+                        BootstrapInterop.Library.DestroyArm64ValueReturnAdapter(_targetPtr);
+#endif
+                    CoreClrDelegateFixer.Unpin(_target.Method);
+                    _targetPtr = IntPtr.Zero;
+                    _managedTargetPtr = IntPtr.Zero;
+                    throw new InvalidOperationException("The native IL2CPP detour could not be installed.");
+                }
                 NativeStackWalk.RegisterHookAddr((ulong)addrPtr, $"Il2CppInterop detour of 0x{addrPtr:X} -> 0x{_targetPtr:X}");
 
                 _originalPtr = addr;
+            }
+
+            private static IntPtr CreateAndroidArm64ValueReturnAdapter(IntPtr target, int returnSize)
+            {
+#if ANDROID
+                if (returnSize <= 0)
+                    return target;
+                if (returnSize > 16)
+                    return target;
+
+                IntPtr adapter = BootstrapInterop.Library.CreateArm64ValueReturnAdapter(
+                    target,
+                    checked((uint)returnSize));
+                if (adapter == IntPtr.Zero)
+                    throw new InvalidOperationException(
+                        $"Failed to create an ARM64 value-return adapter for a {returnSize}-byte value");
+
+                return adapter;
+#else
+                return target;
+#endif
             }
 
             public unsafe void Dispose()
@@ -256,7 +344,15 @@ namespace MelonLoader.Support
                 NativeStackWalk.UnregisterHookAddr((ulong)addrPtr);
                 CoreClrDelegateFixer.Unpin(_target.Method);
 
+#if ANDROID
+                if (_targetPtr != _managedTargetPtr)
+                {
+                    BootstrapInterop.Library.DestroyArm64ValueReturnAdapter(_targetPtr);
+                }
+#endif
+
                 _targetPtr = IntPtr.Zero;
+                _managedTargetPtr = IntPtr.Zero;
                 _originalPtr = IntPtr.Zero;
                 
                 if (_pin.IsAllocated)
@@ -282,6 +378,9 @@ namespace MelonLoader.Support
             Func<TState, Exception, string> formatter)
         {
             string formattedTxt = formatter(state, exception);
+            if (exception != null)
+                formattedTxt += Environment.NewLine + exception;
+
             switch (logLevel)
             {
                 case LogLevel.Debug:

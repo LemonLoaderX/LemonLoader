@@ -1,8 +1,13 @@
 using System.Runtime.InteropServices;
 using Tomlet.Attributes;
 
-#if BOOTSTRAP
+#if BOOTSTRAP || ANDROID
+using System;
+using System.IO;
 using Tomlet;
+#endif
+
+#if BOOTSTRAP
 using MelonLoader.Bootstrap.Utils;
 using System.Diagnostics.CodeAnalysis;
 #endif
@@ -28,7 +33,9 @@ public class LoaderConfig
     internal static void Initialize()
     {
         var customBaseDir = ArgParser.GetValue("melonloader.basedir");
-        var baseDir = Path.GetDirectoryName(Environment.ProcessPath)!;
+        var baseDir = Environment.GetEnvironmentVariable("MELONLOADER_BASE_DIR");
+        if (string.IsNullOrWhiteSpace(baseDir))
+            baseDir = Path.GetDirectoryName(Environment.ProcessPath)!;
 
 #if OSX
         baseDir = GetParentDirectory(baseDir, 3);
@@ -37,6 +44,29 @@ public class LoaderConfig
         if (Directory.Exists(customBaseDir))
             baseDir = Path.GetFullPath(customBaseDir);
 
+        LoadFile(baseDir);
+
+        CoreConfig.Initialize(baseDir);
+        ConsoleConfig.Initialize();
+        LogsConfig.Initialize();
+        MonoDebugServerConfig.Initialize();
+        UnityEngineConfig.Initialize();
+    }
+#endif
+
+#if ANDROID
+    internal static void InitializeAndroid()
+    {
+        string baseDir = Environment.GetEnvironmentVariable("MELONLOADER_BASE_DIR")
+            ?? throw new InvalidOperationException("MELONLOADER_BASE_DIR is not set");
+        LoadFile(baseDir);
+        Current.Loader.BaseDirectory = baseDir;
+    }
+#endif
+
+#if BOOTSTRAP || ANDROID
+    private static void LoadFile(string baseDir)
+    {
         var userDataFolder = Path.Combine(baseDir, "UserData");
         if (!Directory.Exists(userDataFolder))
             Directory.CreateDirectory(userDataFolder);
@@ -57,11 +87,6 @@ public class LoaderConfig
         else
             TrySaveFile(path);
 
-        CoreConfig.Initialize(baseDir);
-        ConsoleConfig.Initialize();
-        LogsConfig.Initialize();
-        MonoDebugServerConfig.Initialize();
-        UnityEngineConfig.Initialize();
     }
 
     private static void TrySaveFile(string path)
@@ -88,13 +113,21 @@ public class LoaderConfig
     [TomlProperty("loader")]
     public CoreConfig Loader { get; internal set; } = new();
 
+#if ANDROID
+    [TomlNonSerialized]
+#else
     [TomlProperty("console")]
+#endif
     public ConsoleConfig Console { get; internal set; } = new();
 
     [TomlProperty("logs")]
     public LogsConfig Logs { get; internal set; } = new();
 
+#if ANDROID
+    [TomlNonSerialized]
+#else
     [TomlProperty("mono_debug_server")]
+#endif
     public MonoDebugServerConfig MonoDebugServer { get; internal set; } = new();
 
     [TomlProperty("unityengine")]
@@ -151,7 +184,11 @@ public class LoaderConfig
         public string BaseDirectory { get; internal set; } = null!;
 
         // Technically, this will always return false, but it's still a config ¯\_(ツ)_/¯
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("disable")]
+#endif
         [TomlPrecedingComment("Disables MelonLoader. Equivalent to the '--no-mods' launch option")]
         public bool Disable { get; internal set; }
 
@@ -188,10 +225,14 @@ public class LoaderConfig
         public bool DisableSubFolderLoad { get; internal set; }
 
         [TomlProperty("disable_subfolder_manifest")]
-        [TomlPrecedingComment("Disables the requirement of needing a manifest json inside a Melon Subfolder for it to be loaded. Equivalent to the '--melonloader.nosfmanifest' launch option")]
+        [TomlPrecedingComment("Disables the requirement of needing a manifest json inside a Plugin or UserLib subfolder for it to be loaded. Mod subfolders are discovered recursively without a manifest. Equivalent to the '--melonloader.nosfmanifest' launch option")]
         public bool DisableSubFolderManifest { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("hostfxr_path_override")]
+#endif
         [TomlPrecedingComment("Manually defines the HostFXR path to use for DotNet Initialization. Equivalent to the '--melonloader.hostfxr' launch option")]
         public string HostFXRPathOverride { get; internal set; } = "";
 
@@ -349,7 +390,7 @@ public class LoaderConfig
         private const string MonoPathSeparatorDescription =
 #if WINDOWS
             "semicolon (;)";
-#elif LINUX || OSX
+#elif LINUX || OSX || ANDROID
             "colon (:)";
 #endif
         
@@ -361,35 +402,67 @@ public class LoaderConfig
         [TomlPrecedingComment("Disables the console log cleaner (only applies to Il2Cpp games). Equivalent to the '--melonloader.disableunityclc' launch option")]
         public bool DisableConsoleLogCleaner { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("mono_search_path_override")]
+#endif
         [TomlPrecedingComment($"A {MonoPathSeparatorDescription} separated list of paths that Mono will prioritise to seek mscorlib and core libraries before the Managed folder and Melon's included set of core libraries. Equivalent to the '--melonloader.monosearchpathoverride' launch option")]
         public string MonoSearchPathOverride { get; internal set; } = "";
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("mono_bleeding_edge_environment_patches")]
+#endif
         [TomlPrecedingComment("Forces MonoBleedingEdge to utilize included Environment Patches. Equivalent to the '--melonloader.mbepatch' launch option")]
         public bool MBEPatch { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("force_offline_generation")]
+#endif
         [TomlPrecedingComment("Forces the Il2Cpp Assembly Generator to run without contacting the remote API. Equivalent to the '--melonloader.agfoffline' launch option")]
         public bool ForceOfflineGeneration { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("force_generator_regex")]
+#endif
         [TomlPrecedingComment("Forces the Il2Cpp Assembly Generator to use the specified regex. Equivalent to the '--melonloader.agfregex' launch option")]
         public string ForceGeneratorRegex { get; internal set; } = "";
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("force_il2cpp_dumper_version")]
+#endif
         [TomlPrecedingComment("Forces the Il2Cpp Assembly Generator to use the specified Il2Cpp dumper version. Equivalent to the '--melonloader.agfvdumper' launch option")]
         public string ForceIl2CppDumperVersion { get; internal set; } = "";
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("force_regeneration")]
+#endif
         [TomlPrecedingComment("Forces the Il2Cpp Assembly Generator to always regenerate assemblies. Equivalent to the '--melonloader.agfregenerate' launch option")]
         public bool ForceRegeneration { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("enable_cpp2il_call_analyzer")]
+#endif
         [TomlPrecedingComment("Enables the CallAnalyzer processor for Cpp2IL. Equivalent to the '--cpp2il.callanalyzer' launch option")]
         public bool EnableCpp2ILCallAnalyzer { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("enable_cpp2il_native_method_detector")]
+#endif
         [TomlPrecedingComment("Enables the NativeMethodDetector processor for Cpp2IL. Equivalent to the '--cpp2il.nativemethoddetector' launch option")]
         public bool EnableCpp2ILNativeMethodDetector { get; internal set; }
     }

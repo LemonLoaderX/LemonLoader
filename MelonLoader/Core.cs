@@ -29,11 +29,23 @@ namespace MelonLoader
         {
             // The config should be set before running anything else due to static constructors depending on it
             // Don't ask me how this works, because I don't know either. -slxdy
+#if ANDROID
+            LoaderConfig.InitializeAndroid();
+            BootstrapInterop.Library.ConfigureLogging(
+                LoaderConfig.Current.Logs.MaxLogs,
+                LoaderConfig.Current.Loader.CapturePlayerLogs);
+#else
             var config = new LoaderConfig();
             BootstrapInterop.Library.GetLoaderConfig(ref config);
             LoaderConfig.Current = config;
+#endif
 
             MelonLaunchOptions.Load();
+
+#if ANDROID
+            Java.JNI.Initialize(BootstrapInterop.Library.GetJavaVM());
+            APKAssetManager.Initialize();
+#endif
 
 #if NET35
             // Disabled for now because of issues
@@ -53,6 +65,19 @@ namespace MelonLoader
 
             Assertions.LemonAssertMapping.Setup();
             HarmonyLogger.Setup();
+
+#if ANDROID && NET6_0_OR_GREATER
+            string managedRuntimeBackend =
+                Environment.GetEnvironmentVariable("MELONLOADER_MANAGED_RUNTIME_BACKEND");
+            if (managedRuntimeBackend == "coreclr" ||
+                (managedRuntimeBackend == null && Type.GetType("Mono.Runtime") == null))
+            {
+                // MonoMod 22 only recognizes JIT layouts through .NET 6. Its probe can
+                // recursively enter DetourHelper.Runtime while loading Process support
+                // on Android. Unknown JITs already use this no-JIT-hook fallback.
+                DetourHelper.Runtime = new DetourRuntimeNETCorePlatform();
+            }
+#endif
 
 #if !WINDOWS && !NET6_0_OR_GREATER
             // Using Process.Start can run Console..cctor
@@ -126,7 +151,9 @@ namespace MelonLoader
             // if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             //  NativeStackWalk.LogNativeStackTrace();
 
+#if !ANDROID
             Fixes.Dotnet.DotnetAssemblyLoadContextFix.Install();
+#endif
             Fixes.Dotnet.DotnetModHandlerRedirectionFix.Install();
 #endif
 
@@ -139,20 +166,27 @@ namespace MelonLoader
 
 #if NET6_0_OR_GREATER
 
+#if ANDROID
+            Fixes.Il2CppInterop.AndroidIl2CppInteropFix.Install();
+#endif
             Fixes.AsmResolver.AsmResolverUtf8StringConcatFix.Install();
             Fixes.Il2CppInterop.Il2CppInteropUnmangleMethodNameFix.Install();
-
-            Fixes.Il2CppInterop.Il2CppInteropExceptionLog.Install();
 
 #if OSX
             Fixes.Dotnet.NativeLibraryFix.Install();
 #endif
 
+#if !ANDROID
             Fixes.Il2CppInterop.Il2CppInteropFixes.Install();
+#endif
             //Fixes.Il2CppInterop.Il2CppInteropIl2CppObjectBaseFix.Install();
+#if LINUX || OSX
             Fixes.Il2CppInterop.Il2CppInteropInjectorHelpersSetupFix.Install();
+#endif
             Fixes.Il2CppInterop.Il2CppInteropGetFieldDefaultValueFix.Install();
+#if !ANDROID
             Fixes.Il2CppInterop.Il2CppICallInjector.Install();
+#endif
 
 #endif
 
@@ -210,21 +244,28 @@ namespace MelonLoader
             if (!SupportModule.Setup())
                 return false;
 
+#if !ANDROID
             MelonDebug.Msg("Invoking AddUnityDebugLog");
             AddUnityDebugLog();
+#endif
 
 #if NET6_0_OR_GREATER
             RegisterTypeInIl2Cpp.SetReady();
             RegisterTypeInIl2CppWithInterfaces.SetReady();
 #endif
 
+            FinishApplicationStart();
+
+            return true;
+        }
+
+        internal static void FinishApplicationStart()
+        {
             MelonDebug.Msg("Invoking MelonHarmonyInit");
             MelonEvents.MelonHarmonyInit.Invoke();
 
             MelonDebug.Msg("Invoking OnApplicationStart");
             MelonEvents.OnApplicationStart.Invoke();
-
-            return true;
         }
         
         internal static string GetVersionString()
@@ -248,7 +289,12 @@ namespace MelonLoader
             MelonLogger.MsgDirect("------------------------------");
             var typeString = MelonUtils.IsGameIl2Cpp() ? "Il2cpp" : MelonUtils.IsOldMono() ? "Mono" : "MonoBleedingEdge";
             MelonLogger.MsgDirect($"Game Type: {typeString}");
-            var archString = MelonUtils.IsGame32Bit() ? "x86" : "x64";
+            var archString =
+#if ANDROID
+                "arm64";
+#else
+                MelonUtils.IsGame32Bit() ? "x86" : "x64";
+#endif
             MelonLogger.MsgDirect($"Game Arch: {archString}");
             MelonLogger.MsgDirect("------------------------------");
             MelonLogger.MsgDirect("Command-Line: ");
@@ -274,8 +320,10 @@ namespace MelonLoader
             bHapticsManager.Disconnect();
 
 #if NET6_0_OR_GREATER
+#if !ANDROID
             Fixes.Il2CppInterop.Il2CppInteropFixes.Shutdown();
             Fixes.Il2CppInterop.Il2CppICallInjector.Shutdown();
+#endif
 #endif
 
             Thread.Sleep(200);

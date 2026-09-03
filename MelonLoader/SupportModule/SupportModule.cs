@@ -57,7 +57,7 @@ namespace MelonLoader
                 }
                 catch (Exception ex)
                 {
-                    MelonDebug.Error($"Support Module [{enumerator.Current.FileName}] threw an Exception: {ex}");
+                    MelonLogger.Error($"Support Module [{enumerator.Current.FileName}] threw an Exception: {ex}");
                     continue;
                 }
             }

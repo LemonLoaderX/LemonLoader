@@ -108,109 +108,95 @@ namespace MelonLoader.Preferences.IO
                 ? $"'{key}'"
                 : $"\"{key}\"";
 
+        private static bool IsNullOrWhiteSpace(string value) =>
+            string.IsNullOrEmpty(value) || value.Trim().Length == 0;
+
+        private TomlTable GetCategoryTable(string category, bool create)
+        {
+            if (IsNullOrWhiteSpace(category))
+                return null;
+
+            TomlTable current = document;
+            foreach (string part in category.Split('.'))
+            {
+                if (IsNullOrWhiteSpace(part))
+                    return null;
+
+                if (!current.ContainsKey(part))
+                {
+                    if (!create)
+                        return null;
+                    current.PutValue(part, new TomlTable());
+                }
+
+                try
+                {
+                    current = current.GetSubTable(part);
+                }
+                catch (TomlTypeMismatchException)
+                {
+                    return null;
+                }
+                catch (TomlNoSuchValueException)
+                {
+                    return null;
+                }
+            }
+
+            return current;
+        }
+
         internal void InsertIntoDocument(string category, string key, TomlValue value, bool should_inline = false)
         {
-            if (!document.ContainsKey(category))
-                document.PutValue(category, new TomlTable());
-            
-            try
-            {
-                var categoryTable = document.GetSubTable(category);
-                categoryTable.ForceNoInline = !should_inline;
-                categoryTable.PutValue(QuoteKey(key), value);
-            }
-            catch (TomlTypeMismatchException)
-            {
-                //Ignore
-            }
-            catch (TomlNoSuchValueException)
-            {
-                //Ignore
-            }
+            var categoryTable = GetCategoryTable(category, true);
+            if (categoryTable == null)
+                return;
+
+            categoryTable.ForceNoInline = !should_inline;
+            categoryTable.PutValue(QuoteKey(key), value);
         }
 
         internal bool RemoveEntryFromDocument(string category, string key)
         {
-            if (!document.ContainsKey(category))
+            var categoryTable = GetCategoryTable(category, false);
+            if (categoryTable == null)
                 return false;
-
-            try
-            {
-                var categoryTable = document.GetSubTable(category);
-                return categoryTable.Entries.Remove(key);
-            }
-            catch (TomlTypeMismatchException)
-            {
-                return false;
-            }
-            catch (TomlNoSuchValueException)
-            {
-                return false;
-            }
+            return categoryTable.Entries.Remove(key);
         }
 
         internal bool RemoveCategoryFromDocument(string category)
         {
-            if (!document.ContainsKey(category))
+            if (IsNullOrWhiteSpace(category))
                 return false;
-            try
-            {
-                return document.Entries.Remove(category);
-            }
-            catch (TomlTypeMismatchException)
-            {
+
+            string[] parts = category.Split('.');
+            TomlTable parent = parts.Length == 1
+                ? document
+                : GetCategoryTable(string.Join(".", parts, 0, parts.Length - 1), false);
+            if (parent == null)
                 return false;
-            }
-            catch (TomlNoSuchValueException)
-            {
-                return false;
-            }
+            return parent.Entries.Remove(parts[^1]);
         }
 
         internal bool RenameEntryInDocument(string category, string key, string newKey)
         {
-            if (!document.ContainsKey(category))
+            var categoryTable = GetCategoryTable(category, false);
+            if (categoryTable == null)
+                return false;
+            if (!categoryTable.Entries.ContainsKey(key) || categoryTable.Entries.ContainsKey(newKey))
                 return false;
 
-            try
-            {
-                var categoryTable = document.GetSubTable(category);
-                if (!categoryTable.Entries.ContainsKey(key) || categoryTable.Entries.ContainsKey(newKey))
-                    return false;
-
-                TomlValue value = categoryTable.Entries[key];
-                categoryTable.Entries.Remove(key);
-                categoryTable.Entries.Add(newKey, value);
-                return true;
-            }
-            catch (TomlTypeMismatchException)
-            {
-                return false;
-            }
-            catch (TomlNoSuchValueException)
-            {
-                return false;
-            }
+            TomlValue value = categoryTable.Entries[key];
+            categoryTable.Entries.Remove(key);
+            categoryTable.Entries.Add(newKey, value);
+            return true;
         }
 
         internal TomlTable TryGetCategoryTable(string category)
         {
             lock (document)
             {
-                try
-                {
-                    return document.GetSubTable(category);
-                }
-                catch (TomlTypeMismatchException)
-                {
-                    //Ignore
-                }
-                catch (TomlNoSuchValueException)
-                {
-                    //Ignore
-                }
-
-                return null;
+                return GetCategoryTable(category, false);
             }
         }
 
@@ -218,20 +204,17 @@ namespace MelonLoader.Preferences.IO
         {
             lock (document)
             {
+                var categoryTable = GetCategoryTable(entry.Category.Identifier, false);
+                if (categoryTable == null)
+                    return;
+
                 try
                 {
-                    var categoryTable = document.GetSubTable(entry.Category.Identifier);
                     var value = categoryTable.GetValue(QuoteKey(entry.Identifier));
                     entry.Load(value);
                 }
-                catch (TomlTypeMismatchException)
-                {
-                    //Ignore
-                }
-                catch (TomlNoSuchValueException)
-                {
-                    //Ignore
-                }
+                catch (TomlTypeMismatchException) { }
+                catch (TomlNoSuchValueException) { }
             }
         }
     }
