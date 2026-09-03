@@ -45,6 +45,7 @@ qualified. Automated startup does not replace manual application acceptance.
 - broaden private Unity version and application coverage;
 - validate physical 16 KiB-page devices;
 - expand deployment rollback and recovery fault injection;
+- remove checkout-path and line-ending dependence from compiled artifact hashes;
 - upstream loader-neutral dependency fixes where maintainers accept them;
 - validate a second loader adapter before extracting generic APK tooling APIs.
 

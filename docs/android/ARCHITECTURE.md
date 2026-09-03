@@ -3,7 +3,7 @@
 The port keeps Android-specific behavior behind a small platform layer while
 preserving the stable desktop implementation. It targets Android API 23+,
 ARM64 IL2CPP, deterministic desktop-generated Interop assemblies, and
-reproducible NDK r27d builds. APK patching, signing, Mono games, and 32-bit ABIs
+pinned NDK r27d builds. APK patching, signing, Mono games, and 32-bit ABIs
 remain outside the LemonLoader runtime repository.
 
 ## Startup sequence
