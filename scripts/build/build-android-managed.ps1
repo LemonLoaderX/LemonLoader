@@ -23,10 +23,8 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
 }
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
-$dependencies = & {
-    . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
-    Get-AndroidDependencies -RepositoryRoot $repositoryRoot
-}
+. (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
+$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic-arm64"
 
 & (Join-Path $PSScriptRoot "build-android-monomod.ps1") -SourceRoot $MonoModSourceRoot

@@ -90,7 +90,7 @@ try {
         $client.Timeout = [TimeSpan]::FromMinutes(10)
         try {
             $response = $client.GetAsync($resolvedArtifactUri).GetAwaiter().GetResult()
-            $response.EnsureSuccessStatusCode()
+            [void]$response.EnsureSuccessStatusCode()
             $input = $response.Content.ReadAsStream()
             try {
                 $output = [IO.File]::Create($download)

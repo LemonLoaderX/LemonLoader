@@ -55,24 +55,32 @@ try {
         $false)
     $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 
-    $resolved = (& $resolver `
+    $resolveOutput = @(& $resolver `
         -ArchivePath $archivePath `
         -CacheRoot $cacheRoot `
         -RuntimeVersion $runtimeVersion `
         -RuntimeRevision $runtimeRevision `
-        -ExpectedSha256 $archiveHash | Select-Object -Last 1).Trim()
+        -ExpectedSha256 $archiveHash)
+    if ($resolveOutput.Count -ne 1 -or $resolveOutput[0] -isnot [string]) {
+        throw "The resolver wrote unexpected pipeline output."
+    }
+    $resolved = $resolveOutput[0].Trim()
     if (-not (Test-Path -LiteralPath (Join-Path $resolved "native\libcoreclr.so") -PathType Leaf)) {
         throw "The resolver did not publish the synthetic runtime pack."
     }
 
     Set-Content -LiteralPath (Join-Path $resolved "native\libcoreclr.so") `
         -Value "tampered" -Encoding Ascii -NoNewline
-    $repaired = (& $resolver `
+    $repairOutput = @(& $resolver `
         -ArchivePath $archivePath `
         -CacheRoot $cacheRoot `
         -RuntimeVersion $runtimeVersion `
         -RuntimeRevision $runtimeRevision `
-        -ExpectedSha256 $archiveHash | Select-Object -Last 1).Trim()
+        -ExpectedSha256 $archiveHash)
+    if ($repairOutput.Count -ne 1 -or $repairOutput[0] -isnot [string]) {
+        throw "The resolver wrote unexpected pipeline output while repairing the cache."
+    }
+    $repaired = $repairOutput[0].Trim()
     $repairedHash = (Get-FileHash -LiteralPath (Join-Path $repaired "native\libcoreclr.so") `
         -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($repairedHash -cne $engineHash) {
