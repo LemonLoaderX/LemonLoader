@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <AndroidNdkRevision>27.3.13750724</AndroidNdkRevision>
+    <AndroidApiLevel>23</AndroidApiLevel>
+
+    <AndroidDotnetRuntimeVersion>10.0.13</AndroidDotnetRuntimeVersion>
+    <AndroidDotnetRuntimeRevision>437631999af1b7c3af90aabba545e6437b6e58a0</AndroidDotnetRuntimeRevision>
+    <AndroidDotnetRuntimeArtifactUrl>https://github.com/LemonLoaderX/runtime/releases/download/android-coreclr-10.0.13/dotnet-runtime-10.0.13-android-arm64.zip</AndroidDotnetRuntimeArtifactUrl>
+    <AndroidDotnetRuntimeArtifactSha256>2411e80bf54ac6c0ab0bec256914c9730e80ad564f5b6a6a1e028713e01e5f0f</AndroidDotnetRuntimeArtifactSha256>
+
+    <AndroidDobbyRevision>9f9746e949cb5af9ca651f3ccc3f0ec616138000</AndroidDobbyRevision>
+    <AndroidIl2CppInteropVersion>1.5.1-ci.845</AndroidIl2CppInteropVersion>
+    <AndroidIl2CppInteropRevision>4531d76051d0c7eea6ff874f5e42d4b372ddbc5c</AndroidIl2CppInteropRevision>
+    <AndroidHarmonyXVersion>2.10.2</AndroidHarmonyXVersion>
+    <AndroidHarmonyXRevision>7850b7941cfb6401a94bec21468a5f916b5b91b9</AndroidHarmonyXRevision>
+    <AndroidMonoModVersion>22.7.31.1</AndroidMonoModVersion>
+    <AndroidMonoModRevision>775b72657bf80af0982811929c42690babebdc31</AndroidMonoModRevision>
+  </PropertyGroup>
+</Project>

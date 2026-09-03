@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RuntimeIdentifier>linux-bionic-arm64</RuntimeIdentifier>
+        <EnableDefaultItems>false</EnableDefaultItems>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageDownload Include="Microsoft.NETCore.App.Runtime.linux-bionic-arm64"
+                         Version="[$(AndroidDotnetRuntimeVersion)]" />
+    </ItemGroup>
+</Project>
