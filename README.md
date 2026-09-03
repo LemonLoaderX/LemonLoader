@@ -58,6 +58,7 @@ From this repository:
 ```powershell
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
+pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
 ```
 
@@ -69,11 +70,14 @@ Output/Releases/LemonLoader-Android-arm64.zip
 
 Build scripts validate dependency identity, architecture, Android imports,
 required exports, 16 KiB ELF alignment, and release manifests before publishing
-the archive.
+the archive. Source forks are checked out at their manifest revisions below the
+ignored `.dependencies/` directory; CoreCLR remains a versioned release artifact
+unless runtime development is explicitly requested.
 
 ## Documentation
 
 - [Android overview](docs/android/README.md)
+- [Current status](docs/android/STATUS.md)
 - [Architecture](docs/android/ARCHITECTURE.md)
 - [Building](docs/android/BUILDING.md)
 - [Runtime](docs/android/RUNTIME.md)

@@ -154,9 +154,9 @@ the adapter falls back to the application's internal files directory.
 | RID, ABI, API, and constants | `Directory.Build.Android.props` |
 | Native bootstrap and CoreCLR startup | `MelonLoader.Bootstrap/Platforms/Android/Native` |
 | Managed Android environment | `MelonLoader/JNI`, `MelonLoader/Utils` |
-| Il2Cpp Android ABI and injection compatibility | `dependencies/Il2CppInterop` in the workspace |
-| MonoMod .NET 10 compatibility | `dependencies/MonoMod` in the workspace |
-| HarmonyX .NET 9+ emit compatibility | `dependencies/HarmonyX` in the workspace |
+| Il2Cpp Android ABI and injection compatibility | Maintained Il2CppInterop fork resolved under `.dependencies/` |
+| MonoMod .NET 10 compatibility | Maintained MonoMod fork resolved under `.dependencies/` |
+| HarmonyX .NET 9+ emit compatibility | Maintained HarmonyX fork resolved under `.dependencies/` |
 | Unity lifecycle adaptation | `Dependencies/SupportModules/Il2Cpp` |
 | Build orchestration | `scripts/build` |
 | APK contract | `docs/android/ARTIFACTS.md` |

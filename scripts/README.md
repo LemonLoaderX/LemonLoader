@@ -7,6 +7,7 @@ without scanning one flat directory.
 
 | Script | Purpose |
 | --- | --- |
+| `setup-android-dependencies.ps1` | Resolve maintained source forks at their manifest revisions |
 | `build/build-android.ps1` | Full CoreCLR Android orchestration |
 | `build/build-android-ndk-bootstrap.ps1` | Build the pure NDK `libmain.so` |
 | `build/build-android-managed.ps1` | Build the Android managed host and Il2Cpp support module |

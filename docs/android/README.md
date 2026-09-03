@@ -6,6 +6,7 @@ later, hosted by a private .NET 10 CoreCLR runtime.
 
 ## Documentation map
 
+- [Current status](STATUS.md): verified capabilities and remaining qualification.
 - [Architecture](ARCHITECTURE.md): startup sequence, module ownership, and hard
   invariants.
 - [Building](BUILDING.md): prerequisites, dependency inputs, and outputs.
@@ -49,6 +50,7 @@ MonoVM, Android Mono games, and 32-bit ABIs are outside the supported target.
 ```powershell
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
+pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
 ```
 

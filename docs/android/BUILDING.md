@@ -17,8 +17,15 @@ duplicated in command defaults or documentation.
 ## Source dependencies
 
 The build needs the maintained Dobby, Il2CppInterop, HarmonyX, and MonoMod source
-forks. A LemonLoaderX workspace checkout provides their conventional sibling
-paths. Standalone builds may pass the corresponding `-SourceRoot` parameters.
+forks. Resolve their URLs and revisions from the product manifest with:
+
+```powershell
+pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
+```
+
+The script refuses to replace a checkout with local changes and places managed
+sources below the ignored `.dependencies/` directory. Builds may instead pass
+the corresponding `-SourceRoot` parameters for reviewed external checkouts.
 
 MonoMod.Common is a MonoMod submodule and must be initialized at the gitlink
 revision. Modified dependency binaries are never accepted without their
@@ -43,9 +50,10 @@ runtime-provenance.json
 Rebuilding CoreCLR is a separate maintainer action:
 
 ```powershell
+pwsh -NoProfile -File scripts/setup-android-dependencies.ps1 -IncludeRuntime
 pwsh -NoProfile -File scripts/build/build-android-managed-runtime.ps1 `
     -AndroidNdkRoot "<android-ndk-r27d>" `
-    -SourceRoot "<runtime-fork>"
+    -SourceRoot .dependencies/runtime
 ```
 
 The runtime build uses Linux directly or WSL from Windows and derives its cache
@@ -57,6 +65,7 @@ JDK, SDK, PATH, registry, or global package sources.
 ```powershell
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
+pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
 ```
 

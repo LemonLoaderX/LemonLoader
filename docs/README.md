@@ -10,6 +10,7 @@ keeping it mergeable with desktop upstream.
 | Document | Audience | Purpose |
 | --- | --- | --- |
 | [Project overview](../README.md) | Everyone | Supported target, repository responsibilities, and build entry point |
+| [Current status](android/STATUS.md) | Everyone | Verified capabilities, support boundary, and remaining qualification work |
 | [Contributing](../CONTRIBUTING.md) | Contributors | Change ownership, validation, and commit expectations |
 | [Android overview](android/README.md) | Everyone | Scope, support matrix, repository model, and documentation map |
 | [Architecture](android/ARCHITECTURE.md) | Runtime developers | Startup sequence, runtime layout, and hard invariants |
@@ -43,7 +44,7 @@ keeping it mergeable with desktop upstream.
 ## Repository guides
 
 - [Script catalog](../scripts/README.md)
-- The managed compatibility patcher is maintained in the adjacent
+- The managed compatibility patcher is maintained in the separate
   `LemonLoader.Patcher` repository.
 - [Test projects](../tests/README.md)
 - [Android build support](../build/android/README.md)
