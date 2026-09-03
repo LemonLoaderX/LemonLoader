@@ -88,7 +88,9 @@ It also asserts that the game process stays alive, rejects a stale `Latest.log`,
 checks the pure NDK/backend markers, and archives `Latest.log` and logcat under
 `Output/DeviceSmoke`. When Android blocks external `/proc/<pid>/maps` or
 `run-as`, the Smoke Mod supplies same-process map, symbol, engine-hash, and
-runtime-identity evidence instead of weakening the assertion.
+runtime-identity evidence instead of weakening the assertion. Known framework
+startup failures in Harmony's local-builder initialization also fail the smoke
+test even when later lifecycle markers are present.
 
 After a logging or preference change, pull the app's MelonLoader base directory
 and run the parity contract against the same launch:

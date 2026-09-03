@@ -257,6 +257,13 @@ if (-not $latestLog.Contains(
         [StringComparison]::Ordinal)) {
     throw "The verified managed runtime backend marker was not found in '$latestLogPath'."
 }
+foreach ($frameworkFailure in @(
+    "Failed to patch virtual void MonoMod.RuntimeDetour.DetourContext::Dispose()",
+    "The type initializer for 'HarmonyLib.Internal.Util.EmitterExtensions' threw an exception")) {
+    if ($latestLog.Contains($frameworkFailure, [StringComparison]::Ordinal)) {
+        throw "Framework startup failure '$frameworkFailure' was found in '$latestLogPath'."
+    }
+}
 
 if (-not [string]::IsNullOrWhiteSpace($SmokeModPath)) {
     $runtimeIdentityMarker =

@@ -27,6 +27,7 @@ if ((int)(target.Invoke(null, [2]) ?? -1) != 6)
 
 ResolverPrecedenceProbe.Run();
 DynamicDelegateProbe.Run();
+LocalBuilderProbe.Run();
 
 Console.WriteLine("HARMONY_CORECLR_PROBE_PASS");
 
@@ -111,5 +112,44 @@ internal static class DynamicDelegateProbe
         {
             AssemblyLoadContext.Default.Resolving -= ResolveDynamicAssembly;
         }
+    }
+}
+
+internal static class LocalBuilderProbe
+{
+    internal static void Run()
+    {
+        var assembly = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName("LocalBuilderProbeAssembly"),
+            AssemblyBuilderAccess.Run);
+        var module = assembly.DefineDynamicModule("LocalBuilderProbeAssembly");
+        var typeBuilder = module.DefineType(
+            "LocalBuilderTarget",
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Abstract);
+        var methodBuilder = typeBuilder.DefineMethod(
+            "AddOne",
+            MethodAttributes.Public | MethodAttributes.Static,
+            typeof(int),
+            [typeof(int)]);
+        var il = methodBuilder.GetILGenerator();
+        il.DeclareLocal(typeof(int));
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Stloc_0);
+        il.Emit(OpCodes.Ldloc_0);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Add);
+        il.Emit(OpCodes.Ret);
+
+        var target = typeBuilder.CreateType().GetMethod("AddOne")
+            ?? throw new InvalidOperationException("LocalBuilder probe target was not created.");
+        var postfix = typeof(ProbeTarget).GetMethod(
+            nameof(ProbeTarget.DoubleResult),
+            BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("LocalBuilder probe postfix was not found.");
+        new Harmony("LemonLoader.HarmonyLocalBuilderProbe").Patch(
+            target,
+            postfix: new HarmonyMethod(postfix));
+        if ((int)(target.Invoke(null, [2]) ?? -1) != 6)
+            throw new InvalidOperationException("Harmony did not patch a method with local variables.");
     }
 }
