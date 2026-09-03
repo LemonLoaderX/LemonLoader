@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <AssemblyName>AndroidSmokeMod</AssemblyName>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Reference Include="MelonLoader">
+            <HintPath>$(MelonLoaderAssemblyPath)</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+    <Target Name="ValidateMelonLoaderAssembly" BeforeTargets="ResolveReferences">
+        <Error Condition="'$(MelonLoaderAssemblyPath)' == '' Or !Exists('$(MelonLoaderAssemblyPath)')"
+               Text="Set MelonLoaderAssemblyPath to a built Android MelonLoader.dll." />
+    </Target>
+</Project>

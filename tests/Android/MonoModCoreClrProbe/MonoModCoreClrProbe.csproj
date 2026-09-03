@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="MonoMod.RuntimeDetour">
+      <HintPath>$(MonoModBuildRoot)\MonoMod.RuntimeDetour.dll</HintPath>
+    </Reference>
+    <Reference Include="MonoMod.Utils">
+      <HintPath>$(MonoModBuildRoot)\MonoMod.Utils.dll</HintPath>
+    </Reference>
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+  </ItemGroup>
+</Project>
