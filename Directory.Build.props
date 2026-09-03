@@ -1,4 +1,5 @@
 <Project>
+	<Import Project="eng/AndroidDependencies.props" />
 	<!--
 		Project
 	-->
@@ -88,7 +89,7 @@
 	<!--
 		Platform Constants
 	-->
-    <PropertyGroup Condition="'$(RuntimeIdentifier.StartsWith(`linux-`))' == 'true'">
+	<PropertyGroup Condition="'$(RuntimeIdentifier.StartsWith(`linux-`))' == 'true' And '$(RuntimeIdentifier.StartsWith(`linux-bionic-`))' == 'false'">
         <DefineConstants>$(DefineConstants);LINUX</DefineConstants>
         <LibPrefix>lib</LibPrefix>
         <LibExt>.a</LibExt>
@@ -127,4 +128,7 @@
     <Target Name="SymbolsConvert" Condition="'$(TargetFramework)' == 'net35'" AfterTargets="AfterBuild">
         <PortablePdbToMdb AssemblyPath="$(TargetPath)" />
     </Target>
+
+	<Import Project="Directory.Build.Android.props"
+	        Condition="Exists('Directory.Build.Android.props') And '$(RuntimeIdentifier.StartsWith(`linux-bionic-`))' == 'true'" />
 </Project>

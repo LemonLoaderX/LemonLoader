@@ -1,0 +1,16 @@
+<Project>
+    <PropertyGroup>
+        <SolutionDir Condition="'$(SolutionDir)' == ''">$(MSBuildThisFileDirectory)</SolutionDir>
+        <Platforms>arm64</Platforms>
+        <RuntimeIdentifiers>linux-bionic-arm64</RuntimeIdentifiers>
+        <PlatformTarget>arm64</PlatformTarget>
+        <DefineConstants>$(DefineConstants);ANDROID;ARM64</DefineConstants>
+        <LibPrefix>lib</LibPrefix>
+        <LibExt>.a</LibExt>
+        <RollForward>LatestMajor</RollForward>
+
+        <AndroidApiLevel Condition="'$(AndroidApiLevel)' == ''">23</AndroidApiLevel>
+        <AndroidNdkRoot Condition="'$(AndroidNdkRoot)' == ''">$(ANDROID_NDK_ROOT)</AndroidNdkRoot>
+        <AndroidNdkRoot Condition="'$(AndroidNdkRoot)' == ''">$(ANDROID_NDK_HOME)</AndroidNdkRoot>
+    </PropertyGroup>
+</Project>
