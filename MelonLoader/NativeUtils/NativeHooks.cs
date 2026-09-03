@@ -136,6 +136,8 @@ namespace MelonLoader.NativeUtils
 
             IntPtr trampoline = _targetHandle;
             BootstrapInterop.NativeHookAttach((IntPtr)(&trampoline), _detourHandle);
+            if (trampoline == IntPtr.Zero)
+                throw new InvalidOperationException("The native hook could not be installed.");
 
             _trampolineHandle = trampoline;
             _trampoline = (T)Marshal.GetDelegateForFunctionPointer(_trampolineHandle, typeof(T));

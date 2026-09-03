@@ -63,6 +63,11 @@ namespace MelonLoader
                 name += ".so";
 
             return dlopen(name, RTLD_NOW);
+#elif ANDROID
+            if (!Path.HasExtension(name))
+                name += ".so";
+
+            return dlopen(name, RTLD_NOW);
 #elif OSX
             if (!Path.HasExtension(name))
                 name += ".dylib";
@@ -75,7 +80,7 @@ namespace MelonLoader
         {
 #if WINDOWS
             return GetProcAddress(hModule, lpProcName);
-#elif LINUX || OSX
+#elif LINUX || OSX || ANDROID
             return dlsym(hModule, lpProcName);
 #endif
         }
@@ -103,6 +108,14 @@ namespace MelonLoader
         protected static extern IntPtr dlsym(IntPtr handle, string symbol);
 
         const int RTLD_NOW = 2; // for dlopen's flags
+#elif ANDROID
+        [DllImport("libdl.so")]
+        protected static extern IntPtr dlopen(string filename, int flags);
+
+        [DllImport("libdl.so")]
+        protected static extern IntPtr dlsym(IntPtr handle, string symbol);
+
+        const int RTLD_NOW = 2;
 #endif
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]

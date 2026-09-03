@@ -268,27 +268,62 @@ namespace MelonLoader
         {
             strippedMsg ??= msg;
 
+#if ANDROID
+            fixed (char* msgPtr = msg)
+            fixed (char* sectionPtr = section)
+            fixed (char* strippedMsgPtr = strippedMsg)
+            {
+                if (section == null)
+                {
+                    BootstrapInterop.Library.LogMsg(&msgColor, msgPtr, msg.Length, null, null, 0, strippedMsgPtr, strippedMsg.Length);
+                    return;
+                }
+
+                BootstrapInterop.Library.LogMsg(&msgColor, msgPtr, msg.Length, &sectionColor, sectionPtr, section.Length, strippedMsgPtr, strippedMsg.Length);
+            }
+#else
             if (section == null)
             {
                 BootstrapInterop.Library.LogMsg(&msgColor, msg, msg.Length, null, null, 0, strippedMsg, strippedMsg.Length);
                 return;
             }
             BootstrapInterop.Library.LogMsg(&msgColor, msg, msg.Length, &sectionColor, section, section.Length, strippedMsg, strippedMsg.Length);
+#endif
         }
 
-        internal static void PassLogError(string msg, string section, bool warning)
+        internal static unsafe void PassLogError(string msg, string section, bool warning)
         {
+#if ANDROID
+            fixed (char* msgPtr = msg)
+            fixed (char* sectionPtr = section)
+            {
+                if (section == null)
+                {
+                    BootstrapInterop.Library.LogError(msgPtr, msg.Length, null, 0, warning);
+                    return;
+                }
+
+                BootstrapInterop.Library.LogError(msgPtr, msg.Length, sectionPtr, section.Length, warning);
+            }
+#else
             if (section == null)
             {
                 BootstrapInterop.Library.LogError(msg, msg.Length, null, 0, warning);
                 return;
             }
             BootstrapInterop.Library.LogError(msg, msg.Length, section, section.Length, warning);
+#endif
         }
 
         internal static unsafe void PassLogMelonInfo(ColorARGB nameColor, string name, string info)
         {
+#if ANDROID
+            fixed (char* namePtr = name)
+            fixed (char* infoPtr = info)
+                BootstrapInterop.Library.LogMelonInfo(&nameColor, namePtr, name.Length, infoPtr, info.Length);
+#else
             BootstrapInterop.Library.LogMelonInfo(&nameColor, name, name.Length, info, info.Length);
+#endif
         }
 
         [Obsolete("Log is obsolete. Please use Msg instead. This will be removed in a future update.", true)]

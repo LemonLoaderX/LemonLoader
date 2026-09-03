@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 
 #if NET6_0_OR_GREATER
@@ -8,7 +9,7 @@ using MelonLoader.CoreClrUtils;
 
 namespace MelonLoader.InternalUtils;
 
-internal static unsafe class BootstrapInterop
+public static unsafe class BootstrapInterop
 {
     internal static BootstrapLibrary Library { get; private set; }
 
@@ -52,7 +53,7 @@ internal static unsafe class BootstrapInterop
 
     public static void NativeHookAttach(nint target, nint detour)
     {
-#if NET6_0_OR_GREATER
+#if NET6_0_OR_GREATER && !ANDROID
         // SanityCheckDetour is able to wrap and fix the bad method in a delegate where possible, so we pass the detour by ref.
         // Herp: Wine/Proton are missing the PssCaptureSnapshot export from kernel32.dll so we skip CoreClrDelegateFixer.SanityCheckDetour under that runtime
         if (!MelonUtils.IsUnderWineOrSteamProton()
@@ -96,7 +97,7 @@ internal static unsafe class BootstrapInterop
         }
         catch (Exception ex)
         {
-            return ex.ToString();
+            return GetExceptionText(ex);
         }
 
         try
@@ -106,23 +107,72 @@ internal static unsafe class BootstrapInterop
         }
         catch (Exception ex)
         {
-            MelonLogger.Error("Failed to initialize MelonLoader");
-            return ex.ToString();
+            TryLogManagedFailure("Failed to initialize MelonLoader", ex);
+            return GetExceptionText(ex);
         }
     }
 
-    internal static void Start()
+    internal static int Start()
     {
         try
         {
-            Core.Start();
+            return Core.Start() ? 0 : 1;
         }
         catch (Exception ex)
         {
-            MelonLogger.Error("Failed to start MelonLoader");
-            MelonLogger.Error(ex);
-
-            throw new("Error at start");
+            TryLogManagedFailure("Failed to start MelonLoader", ex);
+            return 1;
         }
     }
+
+    private static string GetExceptionText(Exception exception)
+    {
+        try
+        {
+            return exception.ToString();
+        }
+        catch
+        {
+            return exception.GetType().FullName ?? "Managed exception";
+        }
+    }
+
+    private static void TryLogManagedFailure(string context, Exception exception)
+    {
+        try
+        {
+            MelonLogger.Error(context);
+            MelonLogger.Error(exception);
+            return;
+        }
+        catch
+        {
+        }
+
+#if ANDROID
+        try
+        {
+            byte[] message = Encoding.UTF8.GetBytes(context + ":\n" + GetExceptionText(exception));
+            fixed (byte* messagePointer = message)
+                Library.LogManagedException(messagePointer, message.Length);
+        }
+        catch
+        {
+            // A failure reporter must never escape the managed start callback.
+        }
+#else
+        try
+        {
+            Console.Error.WriteLine(context + ": " + GetExceptionText(exception));
+        }
+        catch
+        {
+        }
+#endif
+    }
+
+#if ANDROID
+    public static void DestroyArm64ValueReturnAdapter(nint adapter) =>
+        Library.DestroyArm64ValueReturnAdapter(adapter);
+#endif
 }
