@@ -148,6 +148,14 @@ if (-not (Test-Path -LiteralPath $builtLibrary -PathType Leaf)) {
 $outputLibrary = Join-Path $outputRoot "libmain.so"
 Copy-Item -LiteralPath $builtLibrary -Destination $outputLibrary -Force
 
+if ($Configuration -eq "Release") {
+    $llvmStrip = Get-AndroidNdkTool -AndroidNdkRoot $ndkRoot -Name "llvm-strip"
+    & $llvmStrip --strip-all $outputLibrary
+    if ($LASTEXITCODE -ne 0) {
+        throw "Stripping the Android Release bootstrap failed with exit code $LASTEXITCODE."
+    }
+}
+
 & (Join-Path $PSScriptRoot "verify-android-bootstrap.ps1") `
     -LibraryPath $outputLibrary `
     -AndroidNdkRoot $ndkRoot `

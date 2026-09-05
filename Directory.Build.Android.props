@@ -13,4 +13,9 @@
         <AndroidNdkRoot Condition="'$(AndroidNdkRoot)' == ''">$(ANDROID_NDK_ROOT)</AndroidNdkRoot>
         <AndroidNdkRoot Condition="'$(AndroidNdkRoot)' == ''">$(ANDROID_NDK_HOME)</AndroidNdkRoot>
     </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
+    </PropertyGroup>
 </Project>

@@ -61,10 +61,13 @@ try {
     New-Item -ItemType Directory -Force -Path $staging | Out-Null
     dotnet build $project `
         --configuration Release `
+        --no-incremental `
         --framework net5.0 `
         --output $staging `
         -p:Version=$Version `
-        -p:PackageVersion=$Version
+        -p:PackageVersion=$Version `
+        -p:DebugType=None `
+        -p:DebugSymbols=false
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Android MonoMod source fork failed with exit code $LASTEXITCODE."
     }
@@ -81,7 +84,7 @@ try {
         version = $Version
         sourceRevision = $SourceRevision
         commonRevision = $commonRevision
-        buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0"
+        buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0 -p:DebugType=None -p:DebugSymbols=false"
         utilsSha256 = $utilsHash
     } | ConvertTo-Json | Set-Content `
         -LiteralPath (Join-Path $staging "lemonloader-monomod.json") `

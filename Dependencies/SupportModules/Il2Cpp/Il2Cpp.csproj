@@ -4,7 +4,7 @@
         <RootNamespace>MelonLoader.Support</RootNamespace>
         <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
         <OutputPath>$(MLOutDir)/MelonLoader/Dependencies/SupportModules</OutputPath>
-        <DebugType>embedded</DebugType>
+        <DebugType Condition="'$(Configuration)' != 'Release' Or '$(RuntimeIdentifier)' != 'linux-bionic-arm64'">embedded</DebugType>
         <DefineConstants>$(DefineConstants);SM_Il2Cpp</DefineConstants>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>

@@ -206,6 +206,41 @@ if ($Configuration -eq "Release") {
         Remove-Item -Force
 }
 
+if ($Configuration -eq "Release") {
+    $sourceBuiltAssemblies = @(
+        (Join-Path $melonOutput "net6\MelonLoader.dll"),
+        (Join-Path $melonOutput "net6\MelonLoader.NativeHost.dll"),
+        (Join-Path $melonOutput "net6\Il2CppInterop.Common.dll"),
+        (Join-Path $melonOutput "net6\Il2CppInterop.HarmonySupport.dll"),
+        (Join-Path $melonOutput "net6\Il2CppInterop.Runtime.dll"),
+        (Join-Path $melonOutput "net6\0Harmony.dll"),
+        (Join-Path $melonOutput "net6\MonoMod.RuntimeDetour.dll"),
+        (Join-Path $melonOutput "net6\MonoMod.Utils.dll"),
+        (Join-Path $melonOutput "Dependencies\SupportModules\Il2Cpp.dll")
+    )
+    foreach ($assembly in $sourceBuiltAssemblies) {
+        if (-not (Test-Path -LiteralPath $assembly -PathType Leaf)) {
+            throw "The source-built Android assembly was not found at '$assembly'."
+        }
+        $stream = [IO.File]::OpenRead($assembly)
+        $peReader = $null
+        try {
+            $peReader = [System.Reflection.PortableExecutable.PEReader]::new($stream)
+            $privateDebugEntries = @($peReader.ReadDebugDirectory() | Where-Object {
+                $_.Type -eq [System.Reflection.PortableExecutable.DebugDirectoryEntryType]::CodeView -or
+                $_.Type -eq [System.Reflection.PortableExecutable.DebugDirectoryEntryType]::EmbeddedPortablePdb
+            })
+            if ($privateDebugEntries.Count -ne 0) {
+                throw "The Android Release assembly '$assembly' contains embedded or path-bearing debug data."
+            }
+        }
+        finally {
+            if ($null -ne $peReader) { $peReader.Dispose() }
+            $stream.Dispose()
+        }
+    }
+}
+
 $legacyInteropOutput = Join-Path $melonOutput "Il2CppAssemblies"
 if (Test-Path -LiteralPath $legacyInteropOutput) {
     Remove-Item -LiteralPath $legacyInteropOutput -Recurse -Force
@@ -300,6 +335,14 @@ foreach ($library in $nativeLibraries) {
 }
 
 $stagedBootstrap = Join-Path $nativeOutput "libmain.so"
+$bootstrapSections = (& $readElf -S $stagedBootstrap 2>&1) -join [Environment]::NewLine
+if ($LASTEXITCODE -ne 0) {
+    throw "llvm-readelf failed while reading '$stagedBootstrap' sections."
+}
+if ($Configuration -eq "Release" -and
+    $bootstrapSections -match '(?m)\.(?:debug_[A-Za-z0-9_.-]*|symtab|strtab)\b') {
+    throw "The Android Release bootstrap contains debug or static symbol sections."
+}
 $bootstrapDynamic = (& $readElf -d $stagedBootstrap 2>&1) -join [Environment]::NewLine
 if ($LASTEXITCODE -ne 0) {
     throw "llvm-readelf failed while reading '$stagedBootstrap' dynamic dependencies."

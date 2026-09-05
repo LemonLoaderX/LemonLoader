@@ -59,9 +59,12 @@ try {
     New-Item -ItemType Directory -Force -Path $staging | Out-Null
     dotnet build $project `
         --configuration Release `
+        --no-incremental `
         --framework netstandard2.0 `
         --output $staging `
-        -p:GeneratePackageOnBuild=false
+        -p:GeneratePackageOnBuild=false `
+        -p:DebugType=None `
+        -p:DebugSymbols=false
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Android HarmonyX source fork failed with exit code $LASTEXITCODE."
     }
@@ -74,7 +77,7 @@ try {
         formatVersion = 1
         version = $Version
         sourceRevision = $SourceRevision
-        buildCommand = "dotnet build Harmony/Harmony.csproj -c Release -f netstandard2.0"
+        buildCommand = "dotnet build Harmony/Harmony.csproj -c Release -f netstandard2.0 -p:DebugType=None -p:DebugSymbols=false"
         assemblySha256 = $assemblyHash
     } | ConvertTo-Json | Set-Content `
         -LiteralPath (Join-Path $staging "lemonloader-harmonyx.json") `

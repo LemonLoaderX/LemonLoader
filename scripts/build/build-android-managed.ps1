@@ -26,6 +26,8 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic-arm64"
+$debugType = if ($Configuration -eq "Release") { "None" } else { "Embedded" }
+$debugSymbols = if ($Configuration -eq "Release") { "false" } else { "true" }
 
 & (Join-Path $PSScriptRoot "build-android-monomod.ps1") -SourceRoot $MonoModSourceRoot
 & (Join-Path $PSScriptRoot "build-android-harmonyx.ps1") -SourceRoot $HarmonyXSourceRoot
@@ -41,7 +43,11 @@ if (-not (Test-Path -LiteralPath $interopHarmonyProject -PathType Leaf)) {
     throw "The modified Il2CppInterop source was not found at '$Il2CppInteropSourceRoot'."
 }
 
-dotnet build $interopHarmonyProject --configuration $Configuration
+dotnet build $interopHarmonyProject `
+    --configuration $Configuration `
+    --no-incremental `
+    "-p:DebugType=$debugType" `
+    "-p:DebugSymbols=$debugSymbols"
 if ($LASTEXITCODE -ne 0) {
     throw "The modified Il2CppInterop build failed with exit code $LASTEXITCODE."
 }
@@ -56,11 +62,14 @@ foreach ($relativeProject in $projects) {
 
     dotnet build $project `
         --configuration $Configuration `
+        --no-incremental `
         --runtime linux-bionic-arm64 `
         -p:ForceRID=linux-bionic-arm64 `
         -p:AndroidNdkRoot="$AndroidNdkRoot" `
         -p:Il2CppInteropSourceRoot="$Il2CppInteropSourceRoot" `
-        -p:MLOutDir="$outputDirectory"
+        -p:MLOutDir="$outputDirectory" `
+        "-p:DebugType=$debugType" `
+        "-p:DebugSymbols=$debugSymbols"
 
     if ($LASTEXITCODE -ne 0) {
         throw "Android managed build failed for '$relativeProject' with exit code $LASTEXITCODE."
@@ -103,11 +112,14 @@ if ($LASTEXITCODE -ne 0) {
     throw "The HarmonyX .NET 10 CoreCLR probe failed with exit code $LASTEXITCODE."
 }
 foreach ($interopAssembly in @(
-    "Il2CppInterop.Runtime",
-    "Il2CppInterop.HarmonySupport")) {
-    $source = Join-Path $interopBin "$interopAssembly\net6.0\$interopAssembly.dll"
+    @{ Name = "Il2CppInterop.Common"; Framework = "netstandard2.0" },
+    @{ Name = "Il2CppInterop.Runtime"; Framework = "net6.0" },
+    @{ Name = "Il2CppInterop.HarmonySupport"; Framework = "net6.0" })) {
+    $assemblyName = $interopAssembly.Name
+    $source = Join-Path $interopBin `
+        "$assemblyName\$($interopAssembly.Framework)\$assemblyName.dll"
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-        throw "The modified Il2CppInterop assembly was not found at '$source'."
+        throw "The modified $assemblyName assembly was not found at '$source'."
     }
     Copy-Item -LiteralPath $source -Destination $managedOutput -Force
 }
