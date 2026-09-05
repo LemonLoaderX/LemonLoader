@@ -23,6 +23,14 @@ if ($errors.Count) { $errors; exit 1 }
 The Android build adds ELF architecture, Android API, required export, Bionic
 symbol, and 16 KiB segment-alignment checks automatically.
 
+For native-hook changes, run the maintained Dobby far-target regression on both
+a native ARM64 device and any supported native-bridge emulator:
+
+```powershell
+pwsh -NoProfile -File <Dobby-source-root>/scripts/test-android-near-hook.ps1 `
+    -DeviceSerial <serial>
+```
+
 ### Managed compatibility tests
 
 ```powershell

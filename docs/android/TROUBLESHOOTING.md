@@ -63,6 +63,13 @@ Verify that the target address belongs to an executable `libil2cpp.so` segment,
 the selected Unity resolver matches the version family, and the returned
 trampoline is not published after a failed hook.
 
+An x86_64 Android emulator may run an ARM64 application through a native bridge.
+Such bridges can expose guest ARM code as readable, non-executable mappings and
+reserve the nearby guest address space with anonymous `PROT_NONE` mappings. The
+maintained Dobby fork uses one of those reservations only for a translated-code
+target. Run the fork's `scripts/test-android-near-hook.ps1` against the emulator
+to distinguish this layout from a method-resolution failure.
+
 ## APK resources disappear
 
 Do not fully extract and recompress an APK in a case-insensitive Windows
