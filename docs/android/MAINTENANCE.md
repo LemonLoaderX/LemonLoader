@@ -71,6 +71,8 @@ For every shipped `.so` or linked `.a`:
 
 - build from a clean, reachable source revision;
 - require path-mapped deterministic source builds and normalized release text;
+- isolate dependency builds from consuming-workspace MSBuild props and suppress
+  ambient CI repository metadata;
 - run dependency, managed, desktop, bootstrap, and payload tests appropriate to
   the changes;
 - verify the runtime artifact and release manifests;
