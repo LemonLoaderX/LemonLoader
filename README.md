@@ -48,7 +48,7 @@ runtime from its complete source fork is a separate maintainer workflow.
 Requirements:
 
 - PowerShell 7
-- .NET SDK 10
+- .NET SDK 10.0.204 (selected by `global.json`)
 - Android SDK with CMake and Ninja
 - Android NDK r27d
 - the source dependencies recorded in `eng/AndroidDependencies.props`
