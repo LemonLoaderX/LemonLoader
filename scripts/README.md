@@ -10,7 +10,7 @@ without scanning one flat directory.
 | `setup-android-dependencies.ps1` | Resolve maintained source forks at their manifest revisions |
 | `build/build-android.ps1` | Full CoreCLR Android orchestration |
 | `build/build-android-ndk-bootstrap.ps1` | Build the pure NDK `libmain.so` |
-| `build/build-android-managed.ps1` | Build the Android managed host and Il2Cpp support module |
+| `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
 | `build/stage-android-package.ps1` | Assemble and verify the unpacked APK payload |
 | `build/resolve-android-runtime-pack.ps1` | Download, verify, and cache the pinned CoreCLR artifact |
 | `build/build-android-managed-runtime.ps1` | Rebuild CoreCLR from the maintained runtime fork |
