@@ -343,6 +343,10 @@ if ($Configuration -eq "Release" -and
     $bootstrapSections -match '(?m)\.(?:debug_[A-Za-z0-9_.-]*|symtab|strtab)\b') {
     throw "The Android Release bootstrap contains debug or static symbol sections."
 }
+if ($Configuration -eq "Release" -and
+    $bootstrapSections -match '(?m)\.note\.gnu\.build-id\b') {
+    throw "The Android Release bootstrap contains a machine-dependent build ID."
+}
 $bootstrapDynamic = (& $readElf -d $stagedBootstrap 2>&1) -join [Environment]::NewLine
 if ($LASTEXITCODE -ne 0) {
     throw "llvm-readelf failed while reading '$stagedBootstrap' dynamic dependencies."

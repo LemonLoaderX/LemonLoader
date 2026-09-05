@@ -75,8 +75,9 @@ For every shipped `.so` or linked `.a`:
 - verify the runtime artifact and release manifests;
 - confirm the release contains no game assets, Mods, Interop output, logs,
   credentials, local paths, or full build provenance;
-- confirm the Release bootstrap has no DWARF or static symbol-table sections and
-  source-built managed assemblies contain no embedded or path-bearing debug data;
+- confirm the Release bootstrap has no DWARF, static symbol-table, or
+  machine-dependent build-ID sections and source-built managed assemblies contain
+  no embedded or path-bearing debug data;
 - patch a private test input through the released Patcher;
 - use replacement installation only for device regression;
 - distinguish automated startup evidence from manual application acceptance;

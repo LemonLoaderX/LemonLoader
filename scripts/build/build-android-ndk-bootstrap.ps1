@@ -154,6 +154,12 @@ if ($Configuration -eq "Release") {
     if ($LASTEXITCODE -ne 0) {
         throw "Stripping the Android Release bootstrap failed with exit code $LASTEXITCODE."
     }
+
+    $llvmObjCopy = Get-AndroidNdkTool -AndroidNdkRoot $ndkRoot -Name "llvm-objcopy"
+    & $llvmObjCopy --remove-section=.note.gnu.build-id $outputLibrary
+    if ($LASTEXITCODE -ne 0) {
+        throw "Removing the machine-dependent Android build ID failed with exit code $LASTEXITCODE."
+    }
 }
 
 & (Join-Path $PSScriptRoot "verify-android-bootstrap.ps1") `
