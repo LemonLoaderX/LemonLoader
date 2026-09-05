@@ -70,6 +70,7 @@ For every shipped `.so` or linked `.a`:
 ## Release checklist
 
 - build from a clean, reachable source revision;
+- require path-mapped deterministic source builds and normalized release text;
 - run dependency, managed, desktop, bootstrap, and payload tests appropriate to
   the changes;
 - verify the runtime artifact and release manifests;

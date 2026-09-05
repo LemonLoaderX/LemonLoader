@@ -66,6 +66,16 @@ function Copy-DirectoryContents {
         Copy-Item -Destination $Destination -Recurse -Force
 }
 
+function Copy-NormalizedTextFile {
+    param(
+        [Parameter(Mandatory)] [string]$Source,
+        [Parameter(Mandatory)] [string]$Destination
+    )
+
+    $text = [IO.File]::ReadAllText($Source).Replace("`r`n", "`n").Replace("`r", "`n")
+    [IO.File]::WriteAllText($Destination, $text, [Text.UTF8Encoding]::new($false))
+}
+
 $outputRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $repositoryRoot "Output\$Configuration\linux-bionic-arm64"))
 $packageRoot = [System.IO.Path]::GetFullPath((Join-Path $outputRoot "package"))
@@ -155,7 +165,9 @@ foreach ($legalFile in @("LICENSE.md", "NOTICE.txt")) {
     if (-not (Test-Path -LiteralPath $legalSource -PathType Leaf)) {
         throw "The release attribution file '$legalFile' is missing."
     }
-    Copy-Item -LiteralPath $legalSource -Destination (Join-Path $packageRoot $legalFile)
+    Copy-NormalizedTextFile `
+        -Source $legalSource `
+        -Destination (Join-Path $packageRoot $legalFile)
 }
 $dependencyLicenses = [ordered]@{
     "Dobby/LICENSE" = Join-Path $dependencySourceRoots.Dobby "LICENSE"
@@ -172,12 +184,13 @@ foreach ($license in $dependencyLicenses.GetEnumerator()) {
     }
     $licenseOutput = Join-Path $packageRoot ("licenses\" + $license.Key.Replace('/', '\'))
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $licenseOutput) | Out-Null
-    Copy-Item -LiteralPath $licenseSource -Destination $licenseOutput
+    Copy-NormalizedTextFile -Source $licenseSource -Destination $licenseOutput
 }
 $runtimeLegalOutput = Join-Path $packageRoot "licenses\dotnet-runtime"
 New-Item -ItemType Directory -Force -Path $runtimeLegalOutput | Out-Null
 foreach ($legalFile in @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT")) {
-    Copy-Item -LiteralPath (Join-Path $managedRuntimeBuildRoot $legalFile) `
+    Copy-NormalizedTextFile `
+        -Source (Join-Path $managedRuntimeBuildRoot $legalFile) `
         -Destination (Join-Path $runtimeLegalOutput $legalFile)
 }
 

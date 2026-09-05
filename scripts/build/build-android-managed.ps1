@@ -28,6 +28,7 @@ $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic-arm64"
 $debugType = if ($Configuration -eq "Release") { "None" } else { "Embedded" }
 $debugSymbols = if ($Configuration -eq "Release") { "false" } else { "true" }
+$loaderPathMap = "$repositoryRoot=/_/LemonLoader"
 
 & (Join-Path $PSScriptRoot "build-android-monomod.ps1") -SourceRoot $MonoModSourceRoot
 & (Join-Path $PSScriptRoot "build-android-harmonyx.ps1") -SourceRoot $HarmonyXSourceRoot
@@ -37,6 +38,7 @@ if ([string]::IsNullOrWhiteSpace($Il2CppInteropSourceRoot)) {
         -RepositoryRoot $repositoryRoot -Name Il2CppInterop
 }
 $Il2CppInteropSourceRoot = [System.IO.Path]::GetFullPath($Il2CppInteropSourceRoot)
+$interopPathMap = "$Il2CppInteropSourceRoot=/_/Il2CppInterop"
 $interopHarmonyProject = Join-Path $Il2CppInteropSourceRoot `
     "Il2CppInterop.HarmonySupport\Il2CppInterop.HarmonySupport.csproj"
 if (-not (Test-Path -LiteralPath $interopHarmonyProject -PathType Leaf)) {
@@ -47,7 +49,9 @@ dotnet build $interopHarmonyProject `
     --configuration $Configuration `
     --no-incremental `
     "-p:DebugType=$debugType" `
-    "-p:DebugSymbols=$debugSymbols"
+    "-p:DebugSymbols=$debugSymbols" `
+    -p:ContinuousIntegrationBuild=true `
+    "-p:PathMap=$interopPathMap"
 if ($LASTEXITCODE -ne 0) {
     throw "The modified Il2CppInterop build failed with exit code $LASTEXITCODE."
 }
@@ -69,7 +73,9 @@ foreach ($relativeProject in $projects) {
         -p:Il2CppInteropSourceRoot="$Il2CppInteropSourceRoot" `
         -p:MLOutDir="$outputDirectory" `
         "-p:DebugType=$debugType" `
-        "-p:DebugSymbols=$debugSymbols"
+        "-p:DebugSymbols=$debugSymbols" `
+        -p:ContinuousIntegrationBuild=true `
+        "-p:PathMap=$loaderPathMap"
 
     if ($LASTEXITCODE -ne 0) {
         throw "Android managed build failed for '$relativeProject' with exit code $LASTEXITCODE."

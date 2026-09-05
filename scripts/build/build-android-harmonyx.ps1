@@ -64,7 +64,9 @@ try {
         --output $staging `
         -p:GeneratePackageOnBuild=false `
         -p:DebugType=None `
-        -p:DebugSymbols=false
+        -p:DebugSymbols=false `
+        -p:ContinuousIntegrationBuild=true `
+        "-p:PathMap=$SourceRoot=/_/HarmonyX"
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Android HarmonyX source fork failed with exit code $LASTEXITCODE."
     }
@@ -77,7 +79,7 @@ try {
         formatVersion = 1
         version = $Version
         sourceRevision = $SourceRevision
-        buildCommand = "dotnet build Harmony/Harmony.csproj -c Release -f netstandard2.0 -p:DebugType=None -p:DebugSymbols=false"
+        buildCommand = "dotnet build Harmony/Harmony.csproj -c Release -f netstandard2.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:PathMap=<source>=/_/HarmonyX"
         assemblySha256 = $assemblyHash
     } | ConvertTo-Json | Set-Content `
         -LiteralPath (Join-Path $staging "lemonloader-harmonyx.json") `
