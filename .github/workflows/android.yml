@@ -131,24 +131,35 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out tagged release notes
+        uses: actions/checkout@v7
+
       - name: Download build
         uses: actions/download-artifact@v8
         with:
           name: LemonLoader-Android-arm64
           path: release-assets
 
-      - name: Create or update release
+      - name: Publish release from tagged notes
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" release-assets/* \
-              --repo "$GITHUB_REPOSITORY" --clobber
+          if draft=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft); then
+            if [[ "$draft" == false ]]; then
+              echo "Release $TAG is already public; leaving its assets and notes unchanged."
+              exit 0
+            fi
           else
-            gh release create "$TAG" release-assets/* \
-              --repo "$GITHUB_REPOSITORY" \
-              --verify-tag \
-              --title "LemonLoader $TAG" \
-              --notes "Android ARM64 preview with selectable .NET 11 Android (default) and Bionic CoreCLR runtimes. Requires Patcher 1.1.0 or later and Android API 24+. Android synchronous HTTP remains unsupported by design. See the repository documentation for limitations."
+            draft=missing
           fi
+          notes="docs/releases/$TAG.md"
+          test -s "$notes"
+          if [[ "$draft" == missing ]]; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --draft --title "LemonLoader $TAG" --notes-file "$notes"
+          fi
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
+          gh release upload "$TAG" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

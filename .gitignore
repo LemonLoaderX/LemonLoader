@@ -41,6 +41,7 @@ mono_crash.*
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+!/docs/releases/
 [Aa][Rr][Mm]/
 [Aa][Rr][Mm]64/
 bld/

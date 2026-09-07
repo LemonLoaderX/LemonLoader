@@ -76,6 +76,12 @@ For every shipped `.so` or linked `.a`:
 
 ## Release checklist
 
+Commit `docs/releases/<tag>.md` before tagging. The file contains the release
+body, not a duplicate title. Push the reviewed commit and version tag; the tag
+workflow owns draft creation, CI asset upload and publication. Do not also
+create a Release manually. Published assets are not replaced on workflow retries;
+use a new version for binary changes and edit notes only for prose corrections.
+
 - build from a clean, reachable source revision;
 - require path-mapped deterministic source builds and normalized release text;
 - isolate dependency builds from consuming-workspace MSBuild props and suppress
