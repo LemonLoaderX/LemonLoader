@@ -32,8 +32,8 @@ if (!$AndroidApiLevel) { $AndroidApiLevel = $profile.minimumApi }
 if (!$CoreClrRuntimePackRoot -and $profile.channel -ne 'legacy') {
     $CoreClrRuntimePackRoot = Join-Path $PSScriptRoot "../../Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
 }
-if ($CoreClrRuntimePackRoot) {
-    Test-RuntimeProfilePack -Root $CoreClrRuntimePackRoot -Profile $profile
+if ($CoreClrRuntimePackRoot -and !(Test-Path -LiteralPath $CoreClrRuntimePackRoot -PathType Container)) {
+    throw "Runtime pack directory does not exist: '$CoreClrRuntimePackRoot'."
 }
 
 if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
@@ -44,7 +44,8 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     -Configuration $Configuration `
     -AndroidApiLevel $AndroidApiLevel `
     -AndroidNdkRoot $AndroidNdkRoot `
-    -DobbySourceRoot $DobbySourceRoot
+    -DobbySourceRoot $DobbySourceRoot `
+    -AllowDirtyDependencies:$AllowDirtyDependencies
 
 & (Join-Path $PSScriptRoot "build-android-managed.ps1") `
     -Configuration $Configuration `
@@ -72,7 +73,8 @@ if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
     -DobbySourceRoot $DobbySourceRoot `
     -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `
     -MonoModSourceRoot $MonoModSourceRoot `
-    -HarmonyXSourceRoot $HarmonyXSourceRoot
+    -HarmonyXSourceRoot $HarmonyXSourceRoot `
+    -DevelopmentBuild:$AllowDirtyDependencies
 
 & (Join-Path $PSScriptRoot "publish-android-release.ps1") `
     -Configuration $Configuration

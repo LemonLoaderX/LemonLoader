@@ -28,6 +28,7 @@ if ($LASTEXITCODE -ne 0) {
 $version = ($versionOutput | Select-Object -Last 1).Trim()
 $releaseRoot = Join-Path $repositoryRoot "Output\Releases"
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($manifest.developmentBuild) { $releaseRoot = Join-Path $repositoryRoot 'Output/DevelopmentReleases' }
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
 $profile = Get-RuntimeProfile -Name $manifest.runtimeProfile
 if ($manifest.runtimeRid -cne $profile.rid) { throw 'Release profile and RID differ.' }
@@ -125,7 +126,7 @@ finally {
 }
 
 $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($profile.name -ceq (Get-RuntimeProfile).name) {
+if (!$manifest.developmentBuild -and $profile.name -ceq (Get-RuntimeProfile).name) {
     Copy-Item -LiteralPath $archivePath -Destination (Join-Path $releaseRoot 'LemonLoader-Android-arm64.zip') -Force
 }
 Write-Host "Published game-independent LemonLoader Release:"

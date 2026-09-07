@@ -121,30 +121,20 @@ $evidence = [System.IO.Path]::GetFullPath($OutputPath)
 New-Item -ItemType Directory -Force -Path $evidence | Out-Null
 $remote = "/data/local/tmp/lemonloader-coreclr-probe-$([Guid]::NewGuid().ToString('N'))"
 
-function Invoke-Adb {
-    param([Parameter(Mandatory)] [string[]]$Arguments)
-
-    $result = & $adb -s $Serial @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "adb $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-    return @($result)
-}
-
 try {
-    Invoke-Adb -Arguments @("shell", "mkdir", "-p", "$remote/dotnet", "$remote/probe") |
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "mkdir", "-p", "$remote/dotnet", "$remote/probe") |
         Out-Null
-    Invoke-Adb -Arguments @("push", "$runtime/.", "$remote/dotnet/") | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", "$runtime/.", "$remote/dotnet/") | Out-Null
     foreach ($file in @(
         "LemonLoader.CoreClrProbe.dll",
         "LemonLoader.CoreClrProbe.deps.json",
         "LemonLoader.CoreClrProbe.runtimeconfig.json")) {
-        Invoke-Adb -Arguments @("push", (Join-Path $probeOutput $file), "$remote/probe/$file") |
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", (Join-Path $probeOutput $file), "$remote/probe/$file") |
             Out-Null
     }
-    Invoke-Adb -Arguments @("push", $nativeOutput, "$remote/coreclr_probe") | Out-Null
-    Invoke-Adb -Arguments @("shell", "chmod", "700", "$remote/coreclr_probe") | Out-Null
-    Invoke-Adb -Arguments @("logcat", "-c") | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", $nativeOutput, "$remote/coreclr_probe") | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "chmod", "700", "$remote/coreclr_probe") | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("logcat", "-c") | Out-Null
 
     $shared = "$remote/dotnet/shared/Microsoft.NETCore.App/$runtimeVersion"
     $command =

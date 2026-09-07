@@ -1,7 +1,8 @@
 function Get-AndroidDependencies {
     param(
         [string]$RepositoryRoot = [IO.Path]::GetFullPath(
-            (Join-Path $PSScriptRoot "..\.."))
+            (Join-Path $PSScriptRoot "..\..")),
+        [switch]$IncludeLegacyRuntime
     )
 
     $manifestPath = Join-Path $RepositoryRoot "eng\AndroidDependencies.props"
@@ -30,6 +31,7 @@ function Get-AndroidDependencies {
         "AndroidMonoModVersion",
         "AndroidMonoModRevision",
         "AndroidMonoModRepositoryUrl")) {
+        if (!$IncludeLegacyRuntime -and $name.StartsWith('AndroidDotnetRuntime')) { continue }
         if ([string]::IsNullOrWhiteSpace([string]$properties.$name)) {
             throw "Android dependency manifest property '$name' is missing."
         }
@@ -41,12 +43,13 @@ function Get-AndroidDependencies {
         "AndroidIl2CppInteropRevision",
         "AndroidHarmonyXRevision",
         "AndroidMonoModRevision")) {
+        if (!$IncludeLegacyRuntime -and $name.StartsWith('AndroidDotnetRuntime')) { continue }
         if ([string]$properties.$name -notmatch '^[0-9a-f]{40}$') {
             throw "Android dependency manifest property '$name' is not a Git revision."
         }
     }
 
-    if ([string]$properties.AndroidDotnetRuntimeArtifactSha256 -notmatch '^[0-9a-f]{64}$') {
+    if ($IncludeLegacyRuntime -and [string]$properties.AndroidDotnetRuntimeArtifactSha256 -notmatch '^[0-9a-f]{64}$') {
         throw "AndroidDotnetRuntimeArtifactSha256 is not a SHA-256 value."
     }
     foreach ($name in @(
@@ -56,6 +59,7 @@ function Get-AndroidDependencies {
         "AndroidIl2CppInteropRepositoryUrl",
         "AndroidHarmonyXRepositoryUrl",
         "AndroidMonoModRepositoryUrl")) {
+        if (!$IncludeLegacyRuntime -and $name.StartsWith('AndroidDotnetRuntime')) { continue }
         $uri = $null
         if (-not [Uri]::TryCreate(
             [string]$properties.$name,

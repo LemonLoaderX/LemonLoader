@@ -31,17 +31,40 @@ try {
             @{path=[IO.Path]::GetRelativePath($pack,$_.FullName).Replace('\','/');sha256=(Get-FileHash $_.FullName).Hash.ToLowerInvariant()}
         }) | ConvertTo-Json | Set-Content "$pack/pack-files.json"
         Test-RuntimeProfilePack -Root $pack -Profile $profile
+        if ((Test-RuntimeProfilePack -Root $pack -Profile $profile -PassThru).runtimeRid -cne $profile.rid) { throw 'Verified identity was not returned.' }
+        $identity = Get-Content "$pack/runtime-provenance.json" -Raw | ConvertFrom-Json
+        $identity.sourceRevision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+        $identity | Add-Member -NotePropertyName developmentBuild -NotePropertyValue $true
+        $identity | ConvertTo-Json | Set-Content "$pack/runtime-provenance.json"
+        $inventory = Get-Content "$pack/pack-files.json" -Raw | ConvertFrom-Json
+        ($inventory | Where-Object path -eq 'runtime-provenance.json').sha256 = (Get-FileHash "$pack/runtime-provenance.json").Hash.ToLowerInvariant()
+        $inventory | ConvertTo-Json | Set-Content "$pack/pack-files.json"
+        Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
+        Test-RuntimeProfilePack -Root $pack -Profile $profile -Development
+        $import = Join-Path $PSScriptRoot '../build/import-runtime-pack.ps1'
+        $imported = Join-Path $root ('import-' + $profile.name)
+        $license = Join-Path $pack 'licenses/OpenSSL/LICENSE.txt'
+        Reject { & $import -RuntimeProfile $profile.name -SourceRoot $pack -Destination $imported -OpenSslLicense $license }
+        & $import -RuntimeProfile $profile.name -SourceRoot $pack -Destination $imported -OpenSslLicense $license -Development | Out-Null
+        Test-RuntimeProfilePack -Root $imported -Profile $profile -Development
+        Reject { Test-RuntimeProfilePack -Root $imported -Profile $profile }
+        $identity.sourceRevision = $profile.revision
+        $identity.developmentBuild = $false
+        $identity | ConvertTo-Json | Set-Content "$pack/runtime-provenance.json"
+        ($inventory | Where-Object path -eq 'runtime-provenance.json').sha256 = (Get-FileHash "$pack/runtime-provenance.json").Hash.ToLowerInvariant()
+        $inventory | ConvertTo-Json | Set-Content "$pack/pack-files.json"
         $other=if($profile.name -eq 'android'){$bionic}else{$android}
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $other }
         Set-Content "$pack/native/unlisted.so" 'unexpected'
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
         Remove-Item -LiteralPath "$pack/native/unlisted.so"
         Set-Content "$pack/managed/System.Net.Http.dll" 'corruption'
+        Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile -Development }
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
         Remove-Item -LiteralPath "$pack/managed/System.Net.Http.dll"
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
     }
-    Write-Host 'PASS: default, shared revision, RID mismatch, missing input, tampering and unexpected input'
+    Write-Host 'PASS: profile selection, development import isolation, identity, RID, missing/tampered/unexpected inputs'
 } finally {
     $allowed=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../Output/Tests'))+[IO.Path]::DirectorySeparatorChar
     if(!$root.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe test cleanup'}

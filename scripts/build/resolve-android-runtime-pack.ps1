@@ -12,7 +12,6 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
-$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 if (!$ArchivePath -and !$RuntimeVersion) {
     . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
     $profile = Get-RuntimeProfile -Name $RuntimeProfile
@@ -23,6 +22,7 @@ if (!$ArchivePath -and !$RuntimeVersion) {
         return
     }
 }
+$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot -IncludeLegacyRuntime
 $runtimeVersion = if ([string]::IsNullOrWhiteSpace($RuntimeVersion)) {
     [string]$dependencies.AndroidDotnetRuntimeVersion
 } else { $RuntimeVersion }

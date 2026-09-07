@@ -47,14 +47,21 @@ patch in LemonLoader or the Patcher.
 ## Updating CoreCLR
 
 The runtime repository has a separate lifecycle because a complete Android
-CoreCLR build is expensive. Start from an identified `release/10.0` upstream
-commit, replay only the documented Android CoreCLR patches, and build one ARM64
-runtime pack.
+CoreCLR build is expensive. Both active .NET 11 profiles use one reviewed
+upstream `main` commit from `eng/runtime-profiles.json`. Build Android ARM64 and
+Linux Bionic ARM64 from the same checkout with separate intermediates. The
+`release/10.0` fork is a frozen legacy fallback, not the default build input.
 
 Validate architecture, Bionic imports, host exports, cryptography files, helper
 DEX, 16 KiB ELF alignment, and the standalone embedding probe. Publish the pack
 with its SHA-256 and source revision, then update LemonLoader's dependency
 manifest. Normal loader builds consume that artifact and do not rebuild CoreCLR.
+
+Android uses the JNI crypto library and helper DEX; Bionic uses private OpenSSL
+libraries and attribution. Loader Preview 5 requires Patcher 1.1.0 or later.
+The Release `files[]` inventory protects the helper DEX at its fixed path;
+Patcher writes `coreClrCryptoDexSha256` only into the final APK payload after
+promoting the DEX to `classesN.dex`. Asset layout remains v8.
 
 ## Native dependency checks
 

@@ -17,15 +17,29 @@ function Get-RuntimeProfile {
     return $value
 }
 
+function Get-RuntimeProfileSelection {
+    param([string]$Name)
+
+    $names = if ($Name -eq 'all') { @('android', 'bionic') } else { @($Name) }
+    foreach ($selected in $names) {
+        Get-RuntimeProfile -Name $selected
+    }
+}
+
 function Test-RuntimeProfilePack {
-    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)]$Profile)
+    param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)]$Profile,
+        [switch]$PassThru, [switch]$Development)
     $provenance = Get-Content -LiteralPath (Join-Path $Root 'runtime-provenance.json') -Raw | ConvertFrom-Json
     $engine = Join-Path $Root 'native/libcoreclr.so'
+    $engineHash = (Get-FileHash -LiteralPath $engine).Hash.ToLowerInvariant()
+    if ($provenance.sourceRevision -notmatch '^[0-9a-f]{40}$' -or
+        (!$Development -and ($provenance.developmentBuild -or $provenance.sourceRevision -cne $Profile.revision))) {
+        throw 'Runtime source differs from the locked profile; explicit development mode is required.'
+    }
     if ($provenance.formatVersion -ne 2 -or $provenance.backend -cne 'coreclr' -or
         $provenance.hostingModel -cne 'coreclr-host-api' -or
         $provenance.runtimeVersion -cne $Profile.version -or
-        $provenance.sourceRevision -cne $Profile.revision -or
-        $provenance.engineSha256 -cne (Get-FileHash -LiteralPath $engine).Hash.ToLowerInvariant()) {
+        $provenance.engineSha256 -cne $engineHash) {
         throw 'Runtime pack identity does not match the selected profile.'
     }
     if ($Profile.channel -ne 'legacy' -and
@@ -58,8 +72,11 @@ function Test-RuntimeProfilePack {
         foreach ($file in $inventory) {
             if ($file.path -match '(^/|\\|:|(^|/)\.\.(/|$))' -or !$seen.Add($file.path)) { throw 'Unsafe pack inventory.' }
             $path = Join-Path $Root $file.path
-            if (!(Test-Path -LiteralPath $path -PathType Leaf) -or
-                (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant() -cne $file.sha256) {
+            if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Runtime pack file is missing: '$($file.path)'." }
+            $actualHash = if ($file.path -ceq 'native/libcoreclr.so') { $engineHash } else {
+                (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
+            }
+            if ($actualHash -cne $file.sha256) {
                 throw "Runtime pack integrity failed: '$($file.path)'."
             }
         }
@@ -71,4 +88,5 @@ function Test-RuntimeProfilePack {
             if (!$seen.Contains([IO.Path]::GetRelativePath($Root,$file.FullName).Replace('\','/'))) { throw 'Unlisted runtime pack file.' }
         }
     }
+    if ($PassThru) { return $provenance }
 }

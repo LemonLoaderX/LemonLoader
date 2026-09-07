@@ -1,3 +1,17 @@
+function ConvertTo-WslPath {
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$Distribution
+    )
+
+    $fullPath = [IO.Path]::GetFullPath($Path).Replace('\', '/')
+    $output = @(& wsl.exe -d $Distribution -- wslpath -a $fullPath 2>&1)
+    if ($LASTEXITCODE -ne 0 -or $output.Count -ne 1 -or !$output[0].StartsWith('/')) {
+        throw "Could not convert '$fullPath' for WSL distribution '$Distribution'."
+    }
+    return $output[0].Trim()
+}
+
 function Get-WslHome {
     param([Parameter(Mandatory)][string]$Distribution)
 

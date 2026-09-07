@@ -1,3 +1,17 @@
+function Invoke-AndroidAdb {
+    param(
+        [Parameter(Mandatory)][string]$Adb,
+        [Parameter(Mandatory)][string]$Serial,
+        [Parameter(Mandatory)][string[]]$Arguments
+    )
+
+    $output = @(& $Adb -s $Serial @Arguments 2>&1 | ForEach-Object { $_.ToString() })
+    if ($LASTEXITCODE -ne 0) {
+        throw "adb $($Arguments -join ' ') failed with exit code ${LASTEXITCODE}: $($output -join [Environment]::NewLine)"
+    }
+    return $output
+}
+
 function Get-AndroidNdkHostTag {
     if ($IsWindows) { return "windows-x86_64" }
     if ($IsLinux) { return "linux-x86_64" }

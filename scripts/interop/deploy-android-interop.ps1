@@ -19,16 +19,6 @@ $ErrorActionPreference = "Stop"
 $adb = Get-AndroidAdb -AndroidSdkRoot $AndroidSdkRoot
 $Serial = Resolve-AndroidDeviceSerial -Adb $adb -Serial $Serial
 
-function Invoke-Adb {
-    param([Parameter(Mandatory)][string[]]$Arguments)
-
-    $output = @(& $adb -s $Serial @Arguments 2>&1 | ForEach-Object { $_.ToString() })
-    if ($LASTEXITCODE -ne 0) {
-        throw "adb $($Arguments -join ' ') failed: $($output -join [Environment]::NewLine)"
-    }
-    return $output
-}
-
 $source = [System.IO.Path]::GetFullPath($InteropDirectory)
 $manifestPath = Join-Path $source "interop-manifest.json"
 if (-not (Test-Path -LiteralPath $source -PathType Container)) {
@@ -54,11 +44,11 @@ foreach ($assembly in $assemblies) {
     }
 }
 
-$deviceState = (@(Invoke-Adb -Arguments @("get-state")) -join "").Trim()
+$deviceState = (@(Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("get-state")) -join "").Trim()
 if ($deviceState -cne "device") {
     throw "ADB target $Serial is not ready."
 }
-$packagePath = Invoke-Adb -Arguments @("shell", "pm", "path", $PackageName)
+$packagePath = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "pm", "path", $PackageName)
 if (-not (($packagePath -join "`n") -match "package:")) {
     throw "Package is not installed on ${Serial}: $PackageName"
 }
@@ -72,13 +62,13 @@ $backup = [System.IO.Path]::GetFullPath($BackupDirectory)
 New-Item -ItemType Directory -Force -Path $backup | Out-Null
 
 $remote = "/sdcard/Android/data/$PackageName/files/MelonLoader/MelonLoader/Il2CppAssemblies"
-Invoke-Adb -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
-Invoke-Adb -Arguments @("pull", $remote, $backup) | Out-Null
+Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
+Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("pull", $remote, $backup) | Out-Null
 
 $sourceTree = Join-Path $source "."
-Invoke-Adb -Arguments @("push", $sourceTree, "$remote/") | Out-Null
+Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", $sourceTree, "$remote/") | Out-Null
 
-$remoteHashes = Invoke-Adb -Arguments @(
+$remoteHashes = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
     "exec-out", "sh", "-c", "cd '$remote' && sha256sum *.dll interop-manifest.json"
 )
 $hashesByName = @{}

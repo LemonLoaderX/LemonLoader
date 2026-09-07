@@ -8,7 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot "common\AndroidDependencies.ps1")
-$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot -IncludeLegacyRuntime:$IncludeRuntime
 if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
     $SourceRoot = Join-Path $repositoryRoot ".dependencies"
 }

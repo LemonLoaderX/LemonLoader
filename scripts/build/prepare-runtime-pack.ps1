@@ -9,13 +9,15 @@ param(
     [string]$Destination,
     [string]$Distribution='Ubuntu-24.04',
     [string]$LinuxAndroidSdkRoot,
-    [string]$LinuxJavaHome
+    [string]$LinuxJavaHome,
+    [switch]$Development
 )
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+. (Join-Path $PSScriptRoot '../common/Wsl.ps1')
 $profile=Get-RuntimeProfile -Name $RuntimeProfile
 $revision=(& git -C $RuntimeSourceRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -or $revision -cne $profile.revision) { throw 'Runtime source revision mismatch.' }
+if ($LASTEXITCODE -or (!$Development -and $revision -cne $profile.revision)) { throw 'Runtime source revision mismatch.' }
 if ((Get-FileHash -LiteralPath $Nupkg).Hash -ine $ExpectedSha256) { throw 'Runtime nupkg hash mismatch.' }
 $repository=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $work=Join-Path $repository ('Output/RuntimePreparation/'+[Guid]::NewGuid().ToString('N'))
@@ -38,17 +40,11 @@ Copy-Item -LiteralPath "$RuntimeSourceRoot/LICENSE.TXT","$RuntimeSourceRoot/THIR
 if ($profile.cryptoBackend -eq 'openssl') {
     Copy-Item -LiteralPath "$OpenSslRoot/libssl.so","$OpenSslRoot/libcrypto.so" -Destination "$work/native"
 } else {
-    $linuxHome=(& wsl.exe -d $Distribution -- printenv HOME).Trim()
-    if($LASTEXITCODE){throw 'Cannot resolve WSL home'}
+    $linuxHome = Get-WslHome -Distribution $Distribution
     if(!$LinuxAndroidSdkRoot){$LinuxAndroidSdkRoot="$linuxHome/.cache/lemonloader/android-sdk"}
     if(!$LinuxJavaHome){$LinuxJavaHome="$linuxHome/.cache/lemonloader/jdk-21.0.12.1-1"}
-    function LinuxPath([string]$Path) {
-        $value=& wsl.exe -d $Distribution -- wslpath -a ([IO.Path]::GetFullPath($Path).Replace('\','/'))
-        if($LASTEXITCODE){throw 'Path conversion failed'}
-        $value.Trim()
-    }
-    $linuxWork=LinuxPath $work
-    $linuxRepo=LinuxPath $repository
+    $linuxWork = ConvertTo-WslPath -Path $work -Distribution $Distribution
+    $linuxRepo = ConvertTo-WslPath -Path $repository -Distribution $Distribution
     & wsl.exe -d $Distribution -- bash "$linuxRepo/scripts/build/build-android-coreclr-crypto-loader.sh" `
         "$linuxRepo/MelonLoader.Bootstrap/Platforms/Android/Native/java/net/dot/android/crypto/LemonLoaderCryptoBootstrap.java" `
         "$linuxWork/native/libSystem.Security.Cryptography.Native.Android.jar" `
@@ -57,6 +53,6 @@ if ($profile.cryptoBackend -eq 'openssl') {
 }
 @{formatVersion=2;runtimeVersion=$profile.version;backend='coreclr';sourceRevision=$revision;
     hostingModel='coreclr-host-api';engineSha256=(Get-FileHash "$work/native/libcoreclr.so").Hash.ToLowerInvariant();
-    sourcePackageSha256=$ExpectedSha256.ToLowerInvariant()} | ConvertTo-Json | Set-Content "$work/runtime-provenance.json"
+    sourcePackageSha256=$ExpectedSha256.ToLowerInvariant();developmentBuild=[bool]$Development} | ConvertTo-Json | Set-Content "$work/runtime-provenance.json"
 & (Join-Path $PSScriptRoot 'import-runtime-pack.ps1') -RuntimeProfile $RuntimeProfile -SourceRoot $work `
-    -OpenSslLicense $OpenSslLicense -Destination $Destination
+    -OpenSslLicense $OpenSslLicense -Destination $Destination -Development:$Development

@@ -42,16 +42,6 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
 $outputDirectory = [System.IO.Path]::GetFullPath($OutputPath)
 New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
 
-function Invoke-Adb {
-    param([Parameter(Mandatory)] [string[]]$Arguments)
-
-    $result = & $adb -s $Serial @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "adb $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
-    }
-    return @($result)
-}
-
 $remoteBase = "/sdcard/Android/data/$PackageName/files/MelonLoader"
 $remoteLatestLog = "$remoteBase/MelonLoader/Latest.log"
 $smokeMod = $null
@@ -84,7 +74,7 @@ function Protect-RemoteFile {
     if ($exists) {
         New-Item -ItemType Directory -Force -Path $restoreDirectory | Out-Null
         $backup = Join-Path $restoreDirectory "$($remoteRestores.Count).backup"
-        Invoke-Adb -Arguments @("pull", $Path, $backup) | Out-Null
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("pull", $Path, $backup) | Out-Null
     }
     $remoteRestores.Add([pscustomobject]@{
         Path = $Path
@@ -94,9 +84,9 @@ function Protect-RemoteFile {
 }
 
 function Start-Package {
-    Invoke-Adb -Arguments @("logcat", "-c") | Out-Null
-    Invoke-Adb -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
-    Invoke-Adb -Arguments @(
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("logcat", "-c") | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
         "shell", "monkey", "-p", $PackageName,
         "-c", "android.intent.category.LAUNCHER", "1") | Out-Null
 }
@@ -119,7 +109,7 @@ if ($smokeMod) {
             }
             Start-Sleep -Milliseconds 500
         }
-        Invoke-Adb -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
 
         if (-not (Test-RemotePath -Path $remoteMods)) {
             throw "The application did not create '$remoteMods' during bootstrap."
@@ -128,7 +118,7 @@ if ($smokeMod) {
 
     $remoteSmokeMod = "$remoteMods/AndroidSmokeMod.dll"
     Protect-RemoteFile -Path $remoteSmokeMod
-    Invoke-Adb -Arguments @("push", $smokeMod, $remoteSmokeMod) | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", $smokeMod, $remoteSmokeMod) | Out-Null
 }
 if (-not [string]::IsNullOrWhiteSpace($HttpsProbeUrl)) {
     if (-not $smokeMod) {
@@ -143,7 +133,7 @@ if (-not [string]::IsNullOrWhiteSpace($HttpsProbeUrl)) {
     Set-Content -LiteralPath $probeFile -Value $HttpsProbeUrl -Encoding Ascii -NoNewline
     $remoteProbeFile = "$remoteBase/UserData/AndroidSmoke.https-url"
     Protect-RemoteFile -Path $remoteProbeFile
-    Invoke-Adb -Arguments @(
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
         "push",
         $probeFile,
         $remoteProbeFile) | Out-Null
@@ -158,9 +148,9 @@ $screenshotPath = Join-Path $outputDirectory "screen.png"
 $remoteScreenshot =
     "/sdcard/Download/lemonloader-smoke-$([Guid]::NewGuid().ToString('N')).png"
 try {
-    Invoke-Adb -Arguments @(
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
         "shell", "screencap", "-p", $remoteScreenshot) | Out-Null
-    Invoke-Adb -Arguments @("pull", $remoteScreenshot, $screenshotPath) | Out-Null
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("pull", $remoteScreenshot, $screenshotPath) | Out-Null
     if (-not (Test-Path -LiteralPath $screenshotPath -PathType Leaf) -or
         (Get-Item -LiteralPath $screenshotPath).Length -eq 0) {
         throw "The device screenshot is missing or empty at '$screenshotPath'."
@@ -174,7 +164,7 @@ finally {
 }
 
 $logcatPath = Join-Path $outputDirectory "logcat.txt"
-$logcat = Invoke-Adb -Arguments @("logcat", "-d", "-v", "threadtime")
+$logcat = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("logcat", "-d", "-v", "threadtime")
 $logcat | Set-Content -LiteralPath $logcatPath -Encoding Utf8
 
 $pidOutput = & $adb -s $Serial shell pidof $PackageName 2>&1
@@ -230,7 +220,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "MelonLoader did not create '$remoteLatestLog'. See '$logcatPath'."
 }
 
-$latestTimestampOutput = Invoke-Adb -Arguments @(
+$latestTimestampOutput = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
     "shell", "stat", "-c", "%Y", $remoteLatestLog)
 $latestTimestamp = 0L
 if (-not [long]::TryParse(($latestTimestampOutput -join "").Trim(), [ref]$latestTimestamp) -or
@@ -239,7 +229,7 @@ if (-not [long]::TryParse(($latestTimestampOutput -join "").Trim(), [ref]$latest
 }
 
 $latestLogPath = Join-Path $outputDirectory "Latest.log"
-Invoke-Adb -Arguments @("pull", $remoteLatestLog, $latestLogPath) | Out-Null
+Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("pull", $remoteLatestLog, $latestLogPath) | Out-Null
 $latestLog = Get-Content -LiteralPath $latestLogPath -Raw
 
 if ($latestLog -notmatch '(?m)(?:Lemon|Melon)Loader v\d') {

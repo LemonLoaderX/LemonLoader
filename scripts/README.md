@@ -13,8 +13,12 @@ without scanning one flat directory.
 | `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
 | `build/stage-android-package.ps1` | Assemble and verify the unpacked APK payload |
 | `build/resolve-android-runtime-pack.ps1` | Download, verify, and cache the pinned CoreCLR artifact |
-| `build/build-android-managed-runtime.ps1` | Rebuild CoreCLR from the maintained runtime fork |
-| `build/publish-android-runtime-pack.ps1` | Create the deterministic runtime release archive |
+| `build/prepare-runtime-pack.ps1` | Normalize a hash-verified .NET 11 nupkg and compile matching crypto inputs |
+| `build/import-runtime-pack.ps1` | Validate/import a normalized Android or Bionic pack |
+| `build/package-runtime.ps1` | Deterministically package validated active packs; supports all and OutputRoot |
+| `build/publish-android-release.ps1` | Package the staged Loader variant; refresh only the default alias |
+| `build/build-android-managed-runtime.ps1` | Frozen .NET 10 source recovery, requires -Legacy |
+| `build/publish-android-runtime-pack.ps1` | Frozen .NET 10 archive recovery, requires -Legacy |
 | `build/verify-android-bootstrap.ps1` | Verify an existing Android bootstrap ELF |
 
 ## Interop
@@ -35,7 +39,8 @@ without scanning one flat directory.
 | `test/deploy-android-managed-file.ps1` | Back up and replace one device managed file with hash checks |
 | `test/verify-android-runtime-parity.ps1` | Verify clean logs, Unity capture, preferences, and historical log output |
 
-Run all scripts from the repository root. Build output and captured device logs
+Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
+relative paths resolve from the current directory. Build output and captured device logs
 remain under `Output`. Scripts do not own APK decoding, signing, installation,
 uninstallation, or data clearing.
 
@@ -49,6 +54,22 @@ The NDK script is the only Android bootstrap build and writes
 `-ExpectedBootstrapFlavor Ndk` for device smoke tests so stale logs cannot
 satisfy the check.
 
-Normal builds resolve the runtime artifact pinned in
-`eng/AndroidDependencies.props`. Building the runtime source is a separate
-maintainer workflow and is not part of ordinary LemonLoader builds.
+Normal builds use `eng/runtime-profiles.json`: Android is the default, Bionic is
+selectable, and all means both active profiles. .NET 10 properties in
+`eng/AndroidDependencies.props` are only for explicit legacy fallback. Source
+builds use workspace scripts/build-runtime.ps1 and are separate from product builds.
+
+`build-android.ps1 -AllowDirtyDependencies` explicitly enables local source
+iteration, including a different HEAD. Its Loader archives go to
+`Output/DevelopmentReleases`, never the normal default alias. Workspace build
+scripts also accept the clearer `-Development` alias. Source status is recorded
+outside release archives; existing MonoMod/Harmony behavior probes still run.
+Runtime prepare/import accepts `-Development` for local source packs. Staging
+rejects such packs without development mode and always verifies their full file
+inventory, runtime version, RID and cryptography layout.
+
+Common helpers own profile selection/integrity, WSL conversion and ADB execution.
+Device callers pass the executable and serial explicitly; no helper changes the
+selected device implicitly. Checks that intentionally inspect nonzero ADB status
+remain local rather than using the throwing helper. Interop and device workflows
+remain supported and are not replaced by Patcher release production.

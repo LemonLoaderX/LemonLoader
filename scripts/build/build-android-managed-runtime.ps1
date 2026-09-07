@@ -28,7 +28,7 @@ if (!$Legacy) { throw 'This is the frozen .NET 10 builder. Use workspace scripts
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 . (Join-Path $PSScriptRoot "..\common\Wsl.ps1")
-$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot -IncludeLegacyRuntime
 $configuration = "Release"
 if ([string]::IsNullOrWhiteSpace($RuntimeVersion)) {
     $RuntimeVersion = [string]$dependencies.AndroidDotnetRuntimeVersion

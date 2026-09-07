@@ -13,7 +13,8 @@ param(
 
     [string]$DobbyRevision,
 
-    [string]$ExpectedNdkRevision
+    [string]$ExpectedNdkRevision,
+    [switch]$AllowDirtyDependencies
 )
 
 $ErrorActionPreference = "Stop"
@@ -86,11 +87,11 @@ if (-not (Test-Path -LiteralPath (Join-Path $dobbyRoot "CMakeLists.txt") -PathTy
     throw "Dobby source at '$dobbyRoot' does not contain CMakeLists.txt."
 }
 $dobbyHead = (& git -C $dobbyRoot rev-parse HEAD).Trim()
-if ($LASTEXITCODE -ne 0 -or $dobbyHead -ne $DobbyRevision) {
+if ($LASTEXITCODE -ne 0 -or (!$AllowDirtyDependencies -and $dobbyHead -ne $DobbyRevision)) {
     throw "Dobby source HEAD '$dobbyHead' does not match '$DobbyRevision'."
 }
 $dobbyChanges = @(& git -C $dobbyRoot status --porcelain --untracked-files=no)
-if ($LASTEXITCODE -ne 0 -or $dobbyChanges.Count -ne 0) {
+if ($LASTEXITCODE -ne 0 -or (!$AllowDirtyDependencies -and $dobbyChanges.Count -ne 0)) {
     throw "The Dobby source repository must be clean before building."
 }
 $sourceRoot = [System.IO.Path]::GetFullPath(

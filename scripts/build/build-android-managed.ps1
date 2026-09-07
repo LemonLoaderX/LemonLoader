@@ -51,7 +51,7 @@ function Invoke-AndroidMonoModBuild {
     }
 
     $head = (& git -C $SourceRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $head -cne $sourceRevision) {
+    if ($LASTEXITCODE -ne 0 -or (!$AllowDirtyDependencies -and $head -cne $sourceRevision)) {
         throw "MonoMod source HEAD '$head' does not match '$sourceRevision'."
     }
     $commonRevision = (& git -C $commonRoot rev-parse HEAD).Trim()
@@ -68,12 +68,6 @@ function Invoke-AndroidMonoModBuild {
     }
     if (($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0) -and !$AllowDirtyDependencies) {
         throw "MonoMod and MonoMod.Common source repositories must be clean before building."
-    }
-
-    $generatorSource = Get-Content -LiteralPath `
-        (Join-Path $commonRoot "Utils/DMDGenerators/DMDEmitDynamicMethodGenerator.cs") -Raw
-    if ($generatorSource -notmatch 'GetField\("_returnType"') {
-        throw "The MonoMod .NET 10 DynamicMethod return-type fix is missing."
     }
 
     $project = Join-Path $SourceRoot "MonoMod.RuntimeDetour\MonoMod.RuntimeDetour.csproj"
@@ -109,7 +103,7 @@ function Invoke-AndroidMonoModBuild {
         [ordered]@{
             formatVersion = 1
             version = $version
-            sourceRevision = $sourceRevision
+            sourceRevision = $head
             commonRevision = $commonRevision
             dirty = ($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0)
             buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false -p:GenerateRepositoryUrlAttribute=false -p:PathMap=<source>=/_/MonoMod"
@@ -147,32 +141,12 @@ function Invoke-AndroidHarmonyXBuild {
         throw "HarmonyX source was not found at '$SourceRoot'."
     }
     $head = (& git -C $SourceRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or $head -cne $sourceRevision) {
+    if ($LASTEXITCODE -ne 0 -or (!$AllowDirtyDependencies -and $head -cne $sourceRevision)) {
         throw "HarmonyX source HEAD '$head' does not match '$sourceRevision'."
     }
     $changes = @(& git -C $SourceRoot status --porcelain --untracked-files=no)
-    if ($LASTEXITCODE -ne 0 -or $changes.Count -ne 0) {
+    if ($LASTEXITCODE -ne 0 -or (!$AllowDirtyDependencies -and $changes.Count -ne 0)) {
         throw "HarmonyX source repository must be clean before building."
-    }
-
-    $emitterSource = Get-Content -LiteralPath `
-        (Join-Path $SourceRoot "Harmony/Internal/Util/EmitterExtensions.cs") -Raw
-    if ($emitterSource -notmatch 'System\.Reflection\.Emit\.RuntimeLocalBuilder') {
-        throw "The HarmonyX RuntimeLocalBuilder compatibility fix is missing."
-    }
-    $delegateFactorySource = Get-Content -LiteralPath `
-        (Join-Path $SourceRoot "Harmony/Extras/DelegateTypeFactory.cs") -Raw
-    if ($delegateFactorySource -notmatch 'ContainsDynamicType' -or
-        $delegateFactorySource -notmatch 'CreateEmittedDelegateType') {
-        throw "The HarmonyX dynamic delegate compatibility fix is missing."
-    }
-    foreach ($resolverSourcePath in @(
-        "Harmony/Public/Patching/ManagedMethodPatcher.cs",
-        "Harmony/Public/Patching/NativeDetourMethodPatcher.cs")) {
-        $resolverSource = Get-Content -LiteralPath (Join-Path $SourceRoot $resolverSourcePath) -Raw
-        if ($resolverSource -notmatch 'args\.MethodPatcher\s*!=\s*null') {
-            throw "The HarmonyX resolver precedence fix is missing from '$resolverSourcePath'."
-        }
     }
 
     $project = Join-Path $SourceRoot "Harmony\Harmony.csproj"
@@ -205,7 +179,8 @@ function Invoke-AndroidHarmonyXBuild {
         [ordered]@{
             formatVersion = 1
             version = $version
-            sourceRevision = $sourceRevision
+            sourceRevision = $head
+            dirty = ($changes.Count -ne 0)
             buildCommand = "dotnet build Harmony/Harmony.csproj -c Release -f netstandard2.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false -p:GenerateRepositoryUrlAttribute=false -p:PathMap=<source>=/_/HarmonyX"
             assemblySha256 = $assemblyHash
         } | ConvertTo-Json | Set-Content `

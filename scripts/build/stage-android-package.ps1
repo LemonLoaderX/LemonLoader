@@ -19,7 +19,8 @@ param(
 
     [string]$HarmonyXSourceRoot,
 
-    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile,
+    [switch]$DevelopmentBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -37,6 +38,9 @@ if ([string]::IsNullOrWhiteSpace($ManagedRuntimeRevision)) {
     $ManagedRuntimeRevision = $profile.revision
 }
 $managedRuntimeBackendId = "coreclr"
+if ($DotnetRuntimeVersion -cne $profile.version -or $ManagedRuntimeRevision -cne $profile.revision) {
+    throw 'Runtime version/revision conflicts with the selected profile.'
+}
 $dependencySourceRoots = [ordered]@{
     Dobby = if ([string]::IsNullOrWhiteSpace($DobbySourceRoot)) {
         Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name Dobby
@@ -108,54 +112,13 @@ else {
     Join-Path $repositoryRoot `
         "Output\Dependencies\dotnet-runtime\$DotnetRuntimeVersion\$managedRuntimeBackendId"
 }
-$managedRuntimeProvenancePath = Join-Path $managedRuntimeBuildRoot "runtime-provenance.json"
-Test-RuntimeProfilePack -Root $managedRuntimeBuildRoot -Profile $profile
+$managedRuntimeProvenance = Test-RuntimeProfilePack -Root $managedRuntimeBuildRoot -Profile $profile -PassThru -Development:$DevelopmentBuild
+$ManagedRuntimeRevision = $managedRuntimeProvenance.sourceRevision
 $runtimeManaged = Join-Path $managedRuntimeBuildRoot "managed"
 $runtimeNative = Join-Path $managedRuntimeBuildRoot "native"
 $managedRuntimeEngine = Join-Path $runtimeNative "libcoreclr.so"
 
-if (-not (Test-Path -LiteralPath $runtimeManaged) -or
-    -not (Test-Path -LiteralPath $runtimeNative)) {
-    throw "The Android $managedRuntimeBackendId runtime pack is incomplete at '$managedRuntimeBuildRoot'."
-}
-if (-not (Test-Path -LiteralPath $managedRuntimeEngine -PathType Leaf)) {
-    throw "The Android $managedRuntimeBackendId engine was not found at '$managedRuntimeEngine'."
-}
-if (-not (Test-Path -LiteralPath $managedRuntimeProvenancePath -PathType Leaf)) {
-    throw "The Android managed runtime provenance was not found at '$managedRuntimeProvenancePath'."
-}
-foreach ($legalFile in @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT")) {
-    if (-not (Test-Path -LiteralPath (Join-Path $managedRuntimeBuildRoot $legalFile) -PathType Leaf)) {
-        throw "The Android managed runtime attribution file '$legalFile' is missing."
-    }
-}
-if (-not $useOpenSsl -and -not (Test-Path -LiteralPath `
-    (Join-Path $runtimeNative "libSystem.Security.Cryptography.Native.Android.so") `
-    -PathType Leaf)) {
-    throw "The Android CoreCLR runtime pack is missing its source-built Android cryptography library."
-}
-
-if ($useOpenSsl) {
-    foreach ($name in @('libSystem.Security.Cryptography.Native.OpenSsl.so', 'libssl.so', 'libcrypto.so')) {
-        if (-not (Test-Path -LiteralPath (Join-Path $runtimeNative $name) -PathType Leaf)) {
-            throw "The experimental Bionic runtime is missing '$name'."
-        }
-    }
-    if (Test-Path -LiteralPath (Join-Path $runtimeNative 'libSystem.Security.Cryptography.Native.Android.so')) {
-        throw 'Mixed Android/Bionic cryptography packs are not supported.'
-    }
-}
-$managedRuntimeProvenance = Get-Content -LiteralPath $managedRuntimeProvenancePath -Raw |
-    ConvertFrom-Json
-$managedRuntimeEngineHash = (Get-FileHash -LiteralPath $managedRuntimeEngine -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($managedRuntimeProvenance.formatVersion -ne 2 -or
-    $managedRuntimeProvenance.runtimeVersion -cne $DotnetRuntimeVersion -or
-    $managedRuntimeProvenance.backend -cne $managedRuntimeBackendId -or
-    $managedRuntimeProvenance.sourceRevision -cne $ManagedRuntimeRevision -or
-    $managedRuntimeProvenance.hostingModel -cne "coreclr-host-api" -or
-    $managedRuntimeProvenance.engineSha256 -cne $managedRuntimeEngineHash) {
-    throw "The Android $managedRuntimeBackendId output does not match the locked runtime source '$ManagedRuntimeRevision'."
-}
+$managedRuntimeEngineHash = $managedRuntimeProvenance.engineSha256
 
 if (Test-Path -LiteralPath $packageRoot) {
     Remove-Item -LiteralPath $packageRoot -Recurse -Force
@@ -424,6 +387,15 @@ if (-not $hasCoreClrIdentity -or $hasMonoVmIdentity) {
     throw "The staged Android CoreCLR engine does not have an unambiguous CoreCLR identity."
 }
 
+$stagedHashes = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
+function Get-StagedFileHash([string]$Path) {
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    if (!$stagedHashes.ContainsKey($fullPath)) {
+        $stagedHashes[$fullPath] = (Get-FileHash -LiteralPath $fullPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    }
+    return $stagedHashes[$fullPath]
+}
+
 function Get-PayloadTreeHash {
     param(
         [Parameter(Mandatory)] [string]$PayloadRoot,
@@ -438,7 +410,7 @@ function Get-PayloadTreeHash {
                     $relativePath = [System.IO.Path]::GetRelativePath(
                         $PayloadRoot,
                         $_.FullName).Replace('\', '/')
-                    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+                    $hash = Get-StagedFileHash -Path $_.FullName
                     "$relativePath|$($_.Length)|$hash"
                 }
         }
@@ -461,12 +433,7 @@ $payloadDescriptor = [ordered]@{
     interopSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/interop"
     deploymentSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "deployment"
     managedRuntimeBackend = $managedRuntimeBackendId
-    managedRuntimeIdentitySha256 = (Get-FileHash `
-        -LiteralPath $runtimeIdentityOutput `
-        -Algorithm SHA256).Hash.ToLowerInvariant()
-    coreClrCryptoDexSha256 = if ($useOpenSsl) { $null } else { (Get-FileHash `
-        -LiteralPath $coreClrCryptoDexOutput `
-        -Algorithm SHA256).Hash.ToLowerInvariant() }
+    managedRuntimeIdentitySha256 = Get-StagedFileHash -Path $runtimeIdentityOutput
     deploymentProfile = "development"
     deploymentRevisionSha256 = [Convert]::ToHexString(
         [System.Security.Cryptography.SHA256]::HashData(
@@ -484,7 +451,7 @@ $manifestFiles = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
         [ordered]@{
             path = [System.IO.Path]::GetRelativePath($packageRoot, $_.FullName).Replace('\', '/')
             size = $_.Length
-            sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            sha256 = Get-StagedFileHash -Path $_.FullName
         }
     }
 $manifest = [ordered]@{
@@ -506,6 +473,17 @@ $manifest.runtimeRid = $profile.rid
 $manifest.runtimeProfile = $profile.name
 $manifest.runtimeChannel = $profile.channel
 $manifest.minimumAndroidApi = $profile.minimumApi
+$manifest.developmentBuild = [bool]$DevelopmentBuild
+if ($DevelopmentBuild) {
+    $sourceStates = foreach ($source in $dependencySourceRoots.GetEnumerator()) {
+        $head = & git -C $source.Value rev-parse HEAD
+        if ($LASTEXITCODE -ne 0) { throw "Cannot record source revision for $($source.Key)." }
+        $changes = @(& git -C $source.Value status --porcelain)
+        if ($LASTEXITCODE -ne 0) { throw "Cannot record source state for $($source.Key)." }
+        @{ name=$source.Key; revision=$head; changes=$changes }
+    }
+    $sourceStates | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path (Split-Path $packageRoot) 'development-sources.json')
+}
 $manifest | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $packageRoot "lemonloader-release.json") -Encoding Utf8
 

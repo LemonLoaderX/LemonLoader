@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build Android ARM64
+    name: Build Android and Bionic ARM64
     runs-on: windows-latest
     timeout-minutes: 90
     env:
@@ -74,22 +74,43 @@ jobs:
 
       - name: Build release
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          pwsh -NoProfile -File scripts/build/build-android.ps1 `
-            -Configuration Release `
-            -AndroidNdkRoot "$env:ANDROID_SDK_ROOT\ndk\$env:NDK_VERSION"
+          . ./scripts/common/RuntimeProfiles.ps1
+          foreach ($profile in Get-RuntimeProfileSelection -Name all) {
+            $tag = "coreclr-$($profile.version)-$($profile.revision.Substring(0, 12))"
+            $asset = "dotnet-runtime-$($profile.version)-$($profile.rid).zip"
+            $download = Join-Path $env:RUNNER_TEMP $profile.rid
+            gh release download $tag --repo LemonLoaderX/runtime `
+              --pattern $asset --pattern "$asset.sha256" --dir $download
+            if ($LASTEXITCODE -ne 0) { throw "Downloading $asset failed." }
+            $archive = Join-Path $download $asset
+            $expected = ((Get-Content "$archive.sha256" -Raw).Trim() -split '\s+')[0]
+            if ($expected -notmatch '^[0-9a-f]{64}$' -or
+                (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
+              throw "Runtime archive SHA-256 mismatch: $asset"
+            }
+            $pack = Join-Path $download 'pack'
+            Expand-Archive -LiteralPath $archive -DestinationPath $pack
+            Test-RuntimeProfilePack -Root $pack -Profile $profile
+            ./scripts/build/build-android.ps1 -Configuration Release `
+              -RuntimeProfile $profile.name -CoreClrRuntimePackRoot $pack `
+              -AndroidNdkRoot "$env:ANDROID_SDK_ROOT\ndk\$env:NDK_VERSION"
+          }
 
       - name: Record checksum
         id: artifact
         shell: pwsh
         run: |
-          $archive = Resolve-Path "Output/Releases/LemonLoader-Android-arm64.zip"
-          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          $lines = foreach ($archive in Get-ChildItem Output/Releases/*.zip | Sort-Object Name) {
+            $hash = (Get-FileHash -LiteralPath $archive.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($archive.Name)"
+          }
           [IO.File]::WriteAllText(
             "Output/Releases/SHA256SUMS.txt",
-            "$hash  LemonLoader-Android-arm64.zip`n",
+            ($lines -join "`n") + "`n",
             [Text.Encoding]::ASCII)
-          "sha256=$hash" >> $env:GITHUB_OUTPUT
 
       - name: Upload build
         uses: actions/upload-artifact@v7
@@ -97,6 +118,8 @@ jobs:
           name: LemonLoader-Android-arm64
           path: |
             Output/Releases/LemonLoader-Android-arm64.zip
+            Output/Releases/LemonLoader-runtime-android-arm64.zip
+            Output/Releases/LemonLoader-runtime-bionic-arm64.zip
             Output/Releases/SHA256SUMS.txt
           if-no-files-found: error
 
@@ -127,5 +150,5 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --title "LemonLoader $TAG" \
-              --notes "Android ARM64 preview using the .NET 10 CoreCLR backend. See the repository documentation for supported targets, installation, and known limitations."
+              --notes "Android ARM64 preview with selectable .NET 11 Android (default) and Bionic CoreCLR runtimes. Requires Patcher 1.1.0 or later and Android API 24+. Android synchronous HTTP remains unsupported by design. See the repository documentation for limitations."
           fi
