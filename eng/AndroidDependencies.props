@@ -3,6 +3,7 @@
     <AndroidNdkRevision>27.3.13750724</AndroidNdkRevision>
     <AndroidApiLevel>23</AndroidApiLevel>
 
+    <!-- Frozen legacy artifact only. Active runtime selection lives in runtime-profiles.json. -->
     <AndroidDotnetRuntimeVersion>10.0.13</AndroidDotnetRuntimeVersion>
     <AndroidDotnetRuntimeRevision>437631999af1b7c3af90aabba545e6437b6e58a0</AndroidDotnetRuntimeRevision>
     <AndroidDotnetRuntimeRepositoryUrl>https://github.com/LemonLoaderX/runtime.git</AndroidDotnetRuntimeRepositoryUrl>
@@ -18,7 +19,7 @@
     <AndroidHarmonyXRevision>b60a9c08da6d7dd1458fc69ebce35bac907542d5</AndroidHarmonyXRevision>
     <AndroidHarmonyXRepositoryUrl>https://github.com/LemonLoaderX/HarmonyX.git</AndroidHarmonyXRepositoryUrl>
     <AndroidMonoModVersion>22.7.31.1</AndroidMonoModVersion>
-    <AndroidMonoModRevision>5b2b2539b1e28f570815941389418be02f192eb9</AndroidMonoModRevision>
+    <AndroidMonoModRevision>43aca42db059e579108c2d25c65390a133bafc1f</AndroidMonoModRevision>
     <AndroidMonoModRepositoryUrl>https://github.com/LemonLoaderX/MonoMod.git</AndroidMonoModRepositoryUrl>
   </PropertyGroup>
 </Project>

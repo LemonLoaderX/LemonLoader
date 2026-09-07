@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
     [string]$RuntimePackRoot,
-    [string]$OutputPath
+    [string]$OutputPath,
+    [switch]$Legacy
 )
 
 $ErrorActionPreference = "Stop"
+if (!$Legacy) { throw 'This archives the frozen .NET 10 pack. Active packs use prepare-runtime-pack.ps1; select -Legacy only for recovery.' }
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot

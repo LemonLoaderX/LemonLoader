@@ -85,6 +85,10 @@ public static class EntryPoint
                 StringComparison.Ordinal) &&
                 maps.Contains("/libcoreclr.so", StringComparison.Ordinal);
             Console.Error.WriteLine("CORECLR_PROBE_STAGE identity");
+            if (Environment.GetEnvironmentVariable("LEMON_PROBE_NETWORK") == "1")
+                NetworkProbe.Run();
+            if (Environment.GetEnvironmentVariable("LEMON_PROBE_CRYPTO") == "1")
+                CryptoProbe.Run();
 
             if (!reflection || dynamicValue != 42 || !threadPool || !exception || !gc ||
                 !coreClrIdentity || monoVmIdentity || !mappedPrivateRuntime)

@@ -49,6 +49,22 @@ public sealed class AndroidSmokeMod : MelonMod
             byte[] content = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
             LoggerInstance.Msg(
                 $"HttpsRequest {(int)response.StatusCode} {content.Length} {uri.Host}");
+            string rid = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+            LoggerInstance.Msg($"RuntimeRid {rid}");
+            if (rid == "linux-bionic-arm64")
+            {
+                using HttpRequestMessage request = new(HttpMethod.Get, uri);
+                using HttpResponseMessage synchronous = client.Send(request);
+                synchronous.EnsureSuccessStatusCode();
+                using Stream stream = synchronous.Content.ReadAsStream();
+                using MemoryStream body = new();
+                stream.CopyTo(body);
+                LoggerInstance.Msg($"HttpsSyncRequest {(int)synchronous.StatusCode} {body.Length} {uri.Host}");
+                foreach (string mapping in File.ReadLines("/proc/self/maps"))
+                    if (mapping.Contains("/libssl.so", StringComparison.Ordinal) ||
+                        mapping.Contains("/libcrypto.so", StringComparison.Ordinal))
+                        LoggerInstance.Msg($"CryptoMap {mapping}");
+            }
         }
         catch (Exception exception)
         {

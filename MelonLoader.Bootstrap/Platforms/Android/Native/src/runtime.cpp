@@ -272,7 +272,8 @@ bool initialize_managed_runtime_impl() {
             native_search_directories.c_str(),
             runtime_directory.c_str(),
             managed_directory.c_str(),
-            "android-arm64",
+            std::filesystem::is_regular_file(runtime_directory / "libSystem.Security.Cryptography.Native.OpenSsl.so")
+                ? "linux-bionic-arm64" : "android-arm64",
             "true",
             "true",
             "false",

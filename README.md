@@ -14,10 +14,10 @@ with LavaGang, Unity Technologies, or a particular game.
 
 | Area | Support |
 | --- | --- |
-| Android | API 23 or later |
+| Android | API 24 or later (development profiles) |
 | ABI | `arm64-v8a` |
 | Unity backend | IL2CPP |
-| Managed runtime | Android CoreCLR from .NET 10 |
+| Managed runtime | .NET 11 CoreCLR, Android default / Bionic selectable |
 | Bootstrap | C++17 built with Android NDK r27d |
 | ELF alignment | 16 KiB-compatible load segments |
 
@@ -40,7 +40,9 @@ Modified upstream dependencies remain in reviewable source forks:
   [MonoMod.Common](https://github.com/LemonLoaderX/MonoMod.Common)
 - [runtime](https://github.com/LemonLoaderX/runtime)
 
-The normal build consumes a versioned Android CoreCLR artifact. Rebuilding the
+The normal build selects `eng/runtime-profiles.json` and consumes a validated
+local runtime pack. .NET 10 is frozen legacy and must be selected explicitly.
+These are development profiles, not a newly qualified public release. Rebuilding the
 runtime from its complete source fork is a separate maintainer workflow.
 
 ## Build

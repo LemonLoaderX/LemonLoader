@@ -18,10 +18,12 @@ param(
 
     [switch]$SkipHashValidation,
 
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$Legacy
 )
 
 $ErrorActionPreference = "Stop"
+if (!$Legacy) { throw 'This is the frozen .NET 10 builder. Use workspace scripts/build-runtime.ps1, or explicitly select -Legacy for recovery.' }
 . (Join-Path $PSScriptRoot "..\common\AndroidToolchain.ps1")
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")

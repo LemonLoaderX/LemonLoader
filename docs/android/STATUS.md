@@ -2,10 +2,14 @@
 
 ## Current architecture
 
-LemonLoader provides an Android API 23+ ARM64 adapter for Unity IL2CPP games on
-the MelonLoader 0.7 baseline. A C++17 NDK `libmain.so` hosts a private .NET 10
+LemonLoader develops an Android API 24+ ARM64 adapter for Unity IL2CPP games on
+the MelonLoader 0.7 baseline. A C++17 NDK `libmain.so` hosts a private .NET 11
 CoreCLR runtime and transfers control to the managed loader. CoreCLR is the only
 supported Android managed backend.
+
+The active profiles are android (default) and bionic, selected in
+`eng/runtime-profiles.json`. They share one source revision. .NET 10 is frozen
+legacy, not the default. This development migration is not release qualification.
 
 The game-independent LemonLoader Release is consumed by LemonLoader.Patcher,
 which owns game input extraction, Interop generation, APK mutation, alignment,
@@ -32,9 +36,9 @@ and CoreCLR sources remain independent, reviewable forks.
 | Area | Supported |
 | --- | --- |
 | ABI | `arm64-v8a` |
-| Android API | 23 or later |
+| Android API | 24 or later for development profiles |
 | Unity backend | IL2CPP |
-| Managed runtime | .NET 10 Android CoreCLR |
+| Managed runtime | .NET 11 Android/Bionic CoreCLR |
 | Bootstrap | Android NDK r27d |
 
 Android Mono games, 32-bit ABIs, and physical 16 KiB-page hardware have not been

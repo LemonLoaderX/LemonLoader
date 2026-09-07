@@ -5,13 +5,24 @@ param(
     [string]$RuntimeVersion,
     [string]$RuntimeRevision,
     [string]$ExpectedSha256,
-    [string]$ArtifactUrl
+    [string]$ArtifactUrl,
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+if (!$ArchivePath -and !$RuntimeVersion) {
+    . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+    $profile = Get-RuntimeProfile -Name $RuntimeProfile
+    if ($profile.channel -ne 'legacy') {
+        $packRoot = Join-Path $repositoryRoot "Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
+        Test-RuntimeProfilePack -Root $packRoot -Profile $profile
+        Write-Output $packRoot
+        return
+    }
+}
 $runtimeVersion = if ([string]::IsNullOrWhiteSpace($RuntimeVersion)) {
     [string]$dependencies.AndroidDotnetRuntimeVersion
 } else { $RuntimeVersion }

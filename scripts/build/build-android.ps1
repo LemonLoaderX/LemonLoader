@@ -17,10 +17,24 @@ param(
 
     [string]$DotnetRuntimeVersion,
 
-    [string]$CoreClrRuntimePackRoot
+    [string]$CoreClrRuntimePackRoot,
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile,
+    [switch]$AllowDirtyDependencies
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+$profile = Get-RuntimeProfile -Name $RuntimeProfile
+if ($DotnetRuntimeVersion -and $DotnetRuntimeVersion -cne $profile.version) { throw 'Runtime version conflicts with profile.' }
+$DotnetRuntimeVersion = $profile.version
+if ($AndroidApiLevel -and $AndroidApiLevel -lt $profile.minimumApi) { throw 'Android API is below the runtime minimum.' }
+if (!$AndroidApiLevel) { $AndroidApiLevel = $profile.minimumApi }
+if (!$CoreClrRuntimePackRoot -and $profile.channel -ne 'legacy') {
+    $CoreClrRuntimePackRoot = Join-Path $PSScriptRoot "../../Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
+}
+if ($CoreClrRuntimePackRoot) {
+    Test-RuntimeProfilePack -Root $CoreClrRuntimePackRoot -Profile $profile
+}
 
 if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     $AndroidNdkRoot = $env:ANDROID_NDK_HOME
@@ -37,10 +51,11 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     -AndroidNdkRoot $AndroidNdkRoot `
     -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `
     -MonoModSourceRoot $MonoModSourceRoot `
-    -HarmonyXSourceRoot $HarmonyXSourceRoot
+    -HarmonyXSourceRoot $HarmonyXSourceRoot `
+    -AllowDirtyDependencies:$AllowDirtyDependencies
 
 if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
-    $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1")
+    $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1") -RuntimeProfile legacy
     if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
         throw "Resolving the Android CoreCLR runtime artifact failed."
     }
@@ -51,6 +66,8 @@ if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
     -Configuration $Configuration `
     -AndroidNdkRoot $AndroidNdkRoot `
     -DotnetRuntimeVersion $DotnetRuntimeVersion `
+    -ManagedRuntimeRevision $profile.revision `
+    -RuntimeProfile $profile.name `
     -CoreClrRuntimePackRoot $CoreClrRuntimePackRoot `
     -DobbySourceRoot $DobbySourceRoot `
     -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `

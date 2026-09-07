@@ -63,7 +63,7 @@ std::string build_tpa_list(
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 4) {
+    if (argc != 4 && argc != 5) {
         fail("usage: coreclr_probe <dotnet-root> <probe-directory> <runtime-version>");
         return 2;
     }
@@ -71,6 +71,11 @@ int main(int argc, char** argv) {
     const std::string dotnet_root = argv[1];
     const std::string probe_directory = argv[2];
     const std::string runtime_version = argv[3];
+    const std::string runtime_identifier = argc == 5 ? argv[4] : "android-arm64";
+    if (runtime_identifier != "android-arm64" && runtime_identifier != "linux-bionic-arm64") {
+        fail("unsupported runtime identifier");
+        return 2;
+    }
     const std::string runtime_directory =
         dotnet_root + "/shared/Microsoft.NETCore.App/" + runtime_version;
     const std::string coreclr_path = runtime_directory + "/libcoreclr.so";
@@ -91,7 +96,8 @@ int main(int argc, char** argv) {
         mallopt_value(-204, 0);
     }
 
-    void* coreclr = dlopen(coreclr_path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    const bool global_symbols = std::getenv("LEMON_PROBE_GLOBAL_SYMBOLS") != nullptr;
+    void* coreclr = dlopen(coreclr_path.c_str(), RTLD_NOW | (global_symbols ? RTLD_GLOBAL : RTLD_LOCAL));
     if (coreclr == nullptr) {
         fail(std::string("dlopen coreclr: ") + dlerror());
         return 1;
@@ -127,7 +133,7 @@ int main(int argc, char** argv) {
         native_search.c_str(),
         runtime_directory.c_str(),
         probe_directory.c_str(),
-        "android-arm64",
+        runtime_identifier.c_str(),
         "true",
         "true",
         "false",
@@ -165,6 +171,9 @@ int main(int argc, char** argv) {
 
     int native_marker = 42;
     const int probe_status = reinterpret_cast<managed_probe_fn>(entry_pointer)(&native_marker);
+    if (probe_status == 0) {
+        std::fprintf(stderr, "CORECLR_PROBE_PASS managed-return=0\n");
+    }
     shutdown(host_handle, domain_id);
     return probe_status;
 }

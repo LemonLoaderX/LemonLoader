@@ -1,0 +1,33 @@
+{
+  "formatVersion": 1,
+  "defaultProfile": "android",
+  "profiles": {
+    "android": {
+      "rid": "android-arm64",
+      "version": "11.0.0",
+      "revision": "12e2dc84c3fec81acb741410c787f23d8c65e32d",
+      "tfm": "net11.0",
+      "minimumApi": 24,
+      "cryptoBackend": "android-jni",
+      "channel": "development"
+    },
+    "bionic": {
+      "rid": "linux-bionic-arm64",
+      "version": "11.0.0",
+      "revision": "12e2dc84c3fec81acb741410c787f23d8c65e32d",
+      "tfm": "net11.0",
+      "minimumApi": 24,
+      "cryptoBackend": "openssl",
+      "channel": "development"
+    },
+    "legacy": {
+      "rid": "android-arm64",
+      "version": "10.0.13",
+      "revision": "437631999af1b7c3af90aabba545e6437b6e58a0",
+      "tfm": "net10.0",
+      "minimumApi": 23,
+      "cryptoBackend": "android-jni",
+      "channel": "legacy"
+    }
+  }
+}

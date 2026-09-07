@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 
@@ -40,6 +41,26 @@ bool is_android_crypto_library(const char* library_name) {
 }  // namespace
 
 bool initialize_android_crypto(const std::string& runtime_directory) {
+    const auto root = std::filesystem::path(runtime_directory);
+    if (std::filesystem::is_regular_file(root / "libSystem.Security.Cryptography.Native.OpenSsl.so")) {
+        // Experimental Bionic packs carry their own OpenSSL pair. Never fall back to BoringSSL.
+        for (const char* name : {"libcrypto.so", "libssl.so"}) {
+            if (dlopen((root / name).c_str(), RTLD_NOW | RTLD_LOCAL) == nullptr) {
+                log_error(std::string("Bionic OpenSSL preload failed: ") + dlerror());
+                return false;
+            }
+        }
+        const char* certificates = "/apex/com.android.conscrypt/cacerts";
+        if (!std::filesystem::is_directory(certificates)) {
+            certificates = "/system/etc/security/cacerts";
+        }
+        if (!std::filesystem::is_directory(certificates) ||
+            setenv("SSL_CERT_DIR", certificates, 0) != 0) {
+            log_error("Bionic system certificate directory is unavailable");
+            return false;
+        }
+        return true;
+    }
     const std::filesystem::path crypto_library =
         std::filesystem::path(runtime_directory) /
         "libSystem.Security.Cryptography.Native.Android.so";

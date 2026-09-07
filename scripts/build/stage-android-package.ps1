@@ -17,7 +17,9 @@ param(
 
     [string]$MonoModSourceRoot,
 
-    [string]$HarmonyXSourceRoot
+    [string]$HarmonyXSourceRoot,
+
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,11 +27,14 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+. (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+$profile = Get-RuntimeProfile -Name $RuntimeProfile
+$useOpenSsl = $profile.cryptoBackend -eq 'openssl'
 if ([string]::IsNullOrWhiteSpace($DotnetRuntimeVersion)) {
-    $DotnetRuntimeVersion = [string]$dependencies.AndroidDotnetRuntimeVersion
+    $DotnetRuntimeVersion = $profile.version
 }
 if ([string]::IsNullOrWhiteSpace($ManagedRuntimeRevision)) {
-    $ManagedRuntimeRevision = [string]$dependencies.AndroidDotnetRuntimeRevision
+    $ManagedRuntimeRevision = $profile.revision
 }
 $managedRuntimeBackendId = "coreclr"
 $dependencySourceRoots = [ordered]@{
@@ -104,6 +109,7 @@ else {
         "Output\Dependencies\dotnet-runtime\$DotnetRuntimeVersion\$managedRuntimeBackendId"
 }
 $managedRuntimeProvenancePath = Join-Path $managedRuntimeBuildRoot "runtime-provenance.json"
+Test-RuntimeProfilePack -Root $managedRuntimeBuildRoot -Profile $profile
 $runtimeManaged = Join-Path $managedRuntimeBuildRoot "managed"
 $runtimeNative = Join-Path $managedRuntimeBuildRoot "native"
 $managedRuntimeEngine = Join-Path $runtimeNative "libcoreclr.so"
@@ -123,10 +129,21 @@ foreach ($legalFile in @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT")) {
         throw "The Android managed runtime attribution file '$legalFile' is missing."
     }
 }
-if (-not (Test-Path -LiteralPath `
+if (-not $useOpenSsl -and -not (Test-Path -LiteralPath `
     (Join-Path $runtimeNative "libSystem.Security.Cryptography.Native.Android.so") `
     -PathType Leaf)) {
     throw "The Android CoreCLR runtime pack is missing its source-built Android cryptography library."
+}
+
+if ($useOpenSsl) {
+    foreach ($name in @('libSystem.Security.Cryptography.Native.OpenSsl.so', 'libssl.so', 'libcrypto.so')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $runtimeNative $name) -PathType Leaf)) {
+            throw "The experimental Bionic runtime is missing '$name'."
+        }
+    }
+    if (Test-Path -LiteralPath (Join-Path $runtimeNative 'libSystem.Security.Cryptography.Native.Android.so')) {
+        throw 'Mixed Android/Bionic cryptography packs are not supported.'
+    }
 }
 $managedRuntimeProvenance = Get-Content -LiteralPath $managedRuntimeProvenancePath -Raw |
     ConvertFrom-Json
@@ -195,6 +212,12 @@ foreach ($legalFile in @("LICENSE.TXT", "THIRD-PARTY-NOTICES.TXT")) {
 }
 
 Copy-DirectoryContents -Source $managedSource -Destination $melonOutput
+if ($useOpenSsl) {
+    $opensslLegalOutput = Join-Path $packageRoot 'licenses/OpenSSL'
+    New-Item -ItemType Directory -Force -Path $opensslLegalOutput | Out-Null
+    Copy-NormalizedTextFile -Source (Join-Path $managedRuntimeBuildRoot 'licenses/OpenSSL/LICENSE.txt') `
+        -Destination (Join-Path $opensslLegalOutput 'LICENSE.txt')
+}
 $documentationPath = Join-Path $melonOutput "Documentation"
 if (Test-Path -LiteralPath $documentationPath) {
     Remove-Item -LiteralPath $documentationPath -Recurse -Force
@@ -272,19 +295,21 @@ Get-ChildItem -LiteralPath $runtimeNative -File |
     Where-Object {
         $_.Extension -in @(".so", ".dex") -and
         $_.Name -ne "libhostfxr.so" -and
-        $_.Name -ne "libSystem.Security.Cryptography.Native.OpenSsl.so" -and
+        ($useOpenSsl -or $_.Name -ne "libSystem.Security.Cryptography.Native.OpenSsl.so") -and
         $_.Name -ne $coreClrCryptoDexName -and
         ($Configuration -ne "Release" -or
             $_.Name -notin @("libmscordaccore.so", "libmscordbi.so"))
     } |
     Copy-Item -Destination $sharedRuntimeOutput -Force
 $coreClrCryptoDexSource = Join-Path $runtimeNative $coreClrCryptoDexName
+if (-not $useOpenSsl) {
 if (-not (Test-Path -LiteralPath $coreClrCryptoDexSource -PathType Leaf)) {
     throw "The Android CoreCLR runtime pack is missing its crypto helper dex."
 }
 New-Item -ItemType Directory -Force -Path $patcherToolsOutput | Out-Null
 Copy-Item -LiteralPath $coreClrCryptoDexSource `
     -Destination $coreClrCryptoDexOutput -Force
+}
 $coreLibSource = Join-Path $runtimeNative "System.Private.CoreLib.dll"
 if (-not (Test-Path -LiteralPath $coreLibSource -PathType Leaf)) {
     $coreLibSource = Join-Path $runtimeManaged "System.Private.CoreLib.dll"
@@ -300,6 +325,8 @@ Copy-Item -LiteralPath $managedRuntimeEngine `
     hostingModel = "coreclr-host-api"
     engineFile = "libcoreclr.so"
     engineSha256 = $managedRuntimeEngineHash
+    runtimeRid = $profile.rid
+    cryptoBackend = $profile.cryptoBackend
 } | ConvertTo-Json | Set-Content -LiteralPath $runtimeIdentityOutput -Encoding Utf8
 
 $runtimeConfigs = Get-ChildItem -LiteralPath $melonOutput `
@@ -437,9 +464,9 @@ $payloadDescriptor = [ordered]@{
     managedRuntimeIdentitySha256 = (Get-FileHash `
         -LiteralPath $runtimeIdentityOutput `
         -Algorithm SHA256).Hash.ToLowerInvariant()
-    coreClrCryptoDexSha256 = (Get-FileHash `
+    coreClrCryptoDexSha256 = if ($useOpenSsl) { $null } else { (Get-FileHash `
         -LiteralPath $coreClrCryptoDexOutput `
-        -Algorithm SHA256).Hash.ToLowerInvariant()
+        -Algorithm SHA256).Hash.ToLowerInvariant() }
     deploymentProfile = "development"
     deploymentRevisionSha256 = [Convert]::ToHexString(
         [System.Security.Cryptography.SHA256]::HashData(
@@ -447,6 +474,7 @@ $payloadDescriptor = [ordered]@{
     deploymentFiles = @()
     privateNativeLibraries = @()
 }
+$payloadDescriptor.runtimeRid = $profile.rid
 $payloadDescriptor | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $payloadOutput "payload.json") -Encoding Utf8
 
@@ -474,6 +502,10 @@ $manifest = [ordered]@{
     gameAssembliesIncluded = $false
     files = $manifestFiles
 }
+$manifest.runtimeRid = $profile.rid
+$manifest.runtimeProfile = $profile.name
+$manifest.runtimeChannel = $profile.channel
+$manifest.minimumAndroidApi = $profile.minimumApi
 $manifest | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $packageRoot "lemonloader-release.json") -Encoding Utf8
 

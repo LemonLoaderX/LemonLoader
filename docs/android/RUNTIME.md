@@ -1,13 +1,22 @@
 # Android CoreCLR runtime
 
-Android LemonLoader uses one managed backend: the Android ARM64 CoreCLR runtime
-from .NET 10. The MelonLoader assemblies remain targeted at `net6`; their
+Android LemonLoader uses one managed backend: ARM64 CoreCLR from .NET 11,
+with Android (default) and Linux Bionic profiles. The MelonLoader assemblies remain targeted at `net6`; their
 runtimeconfig requests `LatestMajor` roll-forward into the private runtime.
 
 The maintained version and source revision are defined once in
-`eng/AndroidDependencies.props`. Release manifests record the artifact identity
+`eng/runtime-profiles.json`. The .NET 10 entries in AndroidDependencies.props
+are frozen legacy inputs only. Release manifests record the artifact identity
 and hashes produced by that dependency, not a second set of hand-maintained
 revision constants.
+
+Select `build-android.ps1 -RuntimeProfile android|bionic|legacy`. Both active
+profiles use the same upstream source revision. Android uses JNI crypto and
+retains official synchronous HTTP rejection. Bionic uses a private OpenSSL pair
+and system CA directory; its current verification is not production security
+qualification. Runtime packs are prepared with prepare-runtime-pack.ps1 and
+validated before builds. The cryptography/build details below describe the
+historical Android/legacy path unless explicitly stated otherwise.
 
 ## Hosting model
 

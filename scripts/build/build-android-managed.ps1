@@ -9,7 +9,8 @@ param(
 
     [string]$MonoModSourceRoot,
 
-    [string]$HarmonyXSourceRoot
+    [string]$HarmonyXSourceRoot,
+    [switch]$AllowDirtyDependencies
 )
 
 $ErrorActionPreference = "Stop"
@@ -65,7 +66,7 @@ function Invoke-AndroidMonoModBuild {
     if ($LASTEXITCODE -ne 0) {
         throw "Could not inspect the MonoMod.Common source state."
     }
-    if ($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0) {
+    if (($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0) -and !$AllowDirtyDependencies) {
         throw "MonoMod and MonoMod.Common source repositories must be clean before building."
     }
 
@@ -110,6 +111,7 @@ function Invoke-AndroidMonoModBuild {
             version = $version
             sourceRevision = $sourceRevision
             commonRevision = $commonRevision
+            dirty = ($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0)
             buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false -p:GenerateRepositoryUrlAttribute=false -p:PathMap=<source>=/_/MonoMod"
             utilsSha256 = $utilsHash
         } | ConvertTo-Json | Set-Content `
