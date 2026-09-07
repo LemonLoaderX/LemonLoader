@@ -7,7 +7,11 @@ consumes pre-generated Interop assemblies.
 
 ## Prepare generator inputs
 
-Decode the APK with the tool of your choice, then run:
+Normal users should use Patcher, which extracts the required inputs directly
+from the APK. The standalone workflow below is for an existing decoded tree;
+do not round-trip a full APK through a case-insensitive filesystem.
+
+From the Loader repository, run:
 
 ```powershell
 ./scripts/interop/prepare-android-interop-input.ps1 `

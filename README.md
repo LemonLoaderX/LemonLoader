@@ -42,8 +42,8 @@ Modified upstream dependencies remain in reviewable source forks:
 
 The normal build selects `eng/runtime-profiles.json` and consumes a validated
 local runtime pack. .NET 10 is frozen legacy and must be selected explicitly.
-These are development profiles, not a newly qualified public release. Rebuilding the
-runtime from its complete source fork is a separate maintainer workflow.
+Preview 5 distributes both profiles and requires Patcher 1.1.0 or later.
+Rebuilding the runtime source is a separate maintainer workflow.
 
 ## Build
 
@@ -55,7 +55,8 @@ Requirements:
 - Android NDK r27d
 - the source dependencies recorded in `eng/AndroidDependencies.props`
 
-From this repository:
+From this repository, after obtaining the matching pack using
+[Building](docs/android/BUILDING.md#runtime-artifact):
 
 ```powershell
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
@@ -68,7 +69,12 @@ The release archive is written to:
 
 ```text
 Output/Releases/LemonLoader-Android-arm64.zip
+Output/Releases/LemonLoader-runtime-android-arm64.zip
 ```
+
+Use `-RuntimeProfile bionic` for `LemonLoader-runtime-bionic-arm64.zip`.
+The unqualified archive name is an alias for Android only. These scripts create
+local packages; GitHub publication is owned by the version-tag workflow.
 
 Build scripts validate dependency identity, architecture, Android imports,
 required exports, 16 KiB ELF alignment, and release manifests before publishing

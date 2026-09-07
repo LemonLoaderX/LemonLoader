@@ -97,7 +97,8 @@ use a new version for binary changes and edit notes only for prose corrections.
 - patch a private test input through the released Patcher;
 - use replacement installation only for device regression;
 - distinguish automated startup evidence from manual application acceptance;
-- inspect all Git refs and release archives with a secret scanner.
+- scan the selected publication histories and final release archives for secrets;
+  private backup refs are not publication inputs.
 
 Physical 16 KiB-page hardware, additional Unity revisions, complex hook layouts,
 and deployment fault injection remain continuing qualification work. Do not

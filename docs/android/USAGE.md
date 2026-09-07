@@ -9,10 +9,15 @@ It does not modify or install an APK itself. A complete payload is under:
 Output/Release/linux-bionic-arm64/package
 ```
 
-External tooling must place the staged `assets` and `lib` trees into a decoded
-ARM64 Unity IL2CPP APK, perform the required Unity Java/manifest integration,
-align the result for 16 KiB pages, and sign it. See `ARTIFACTS.md` for the exact
-file interface.
+Use LemonLoader.Patcher 1.1.0 or later with an original ARM64 Unity IL2CPP APK.
+It edits ZIP entries directly, generates Interop assemblies, and inserts the
+Android crypto DEX when required. Alignment and signing are explicit options.
+Do not extract/repack a complete APK on a case-insensitive filesystem.
+See [ARTIFACTS.md](ARTIFACTS.md) for the payload interface.
+
+Select `--runtime android` (default) or `--runtime bionic` in Patcher. Android's
+upstream synchronous HTTP rejection is unchanged. Use asynchronous HTTP on that
+profile; evaluate Bionic separately when a Mod requires synchronous requests.
 
 ## Before packaging
 
@@ -104,7 +109,8 @@ policy and transaction contract.
 ## Current limitations
 
 - Android ARM64 and Unity IL2CPP only.
-- API 23+; only 4 KiB and 16 KiB page-size devices are accepted by preflight.
+- Active runtime profiles require API 24+. Preflight accepts 4 KiB or 16 KiB pages;
+  this does not replace physical 16 KiB-device qualification.
 - Game-specific Interop assemblies must be generated off device.
 - Coroutine hosting is validated with asynchronous AssetBundle operations.
 - `Update`, `FixedUpdate`, and `LateUpdate` use the normal injected

@@ -21,8 +21,9 @@ Check the extracted `runtime-identity.json`, the engine hash, and the actual
 mapped `libcoreclr.so`. The runtime must export `coreclr_initialize`,
 `coreclr_create_delegate`, and `coreclr_shutdown` without a MonoVM identity.
 
-`[CoreCLR.Android.Host]` reports the first failing PAL or host stage.
-`[CoreCLR.Android.Thread]` reports a bounded native thread-resource snapshot.
+The frozen .NET 10 fork can emit `[CoreCLR.Android.Host]` and
+`[CoreCLR.Android.Thread]` diagnostics. Those optional patches are not carried
+into the current upstream-main profiles; their absence is not a startup failure.
 Investigate `EAGAIN` as a thread/PID limit or leak and `ENOMEM` as native address
 space or stack pressure. `EPERM` or `EACCES` from affinity calls can indicate a
 restricted Android kernel; the maintained runtime preserves the inherited valid
@@ -30,7 +31,7 @@ mask for those two errors.
 
 ## Managed cryptography fails
 
-The Patcher must promote the runtime artifact's helper DEX into the application
+For the Android profile, Patcher must promote the runtime artifact's helper DEX into the application
 class loader. The payload must contain
 `libSystem.Security.Cryptography.Native.Android.so` and must not substitute a
 generic Linux OpenSSL shim.
@@ -39,6 +40,17 @@ If the helper class is missing, verify that the Patcher selected the next unused
 top-level `classesN.dex` entry. If JNI state is missing, check that the bootstrap
 and CoreCLR resolve the same native cryptography module rather than loading a
 second namespace-local copy.
+
+For Bionic, check `runtimeRid` and `cryptoBackend` in the runtime identity,
+the OpenSSL shim, private `libssl.so`/`libcrypto.so`, and system CA access.
+Bionic does not need an Android crypto DEX. Do not mix inputs from the two packs.
+
+## Synchronous HTTP is unsupported
+
+On the Android runtime profile this is expected upstream behavior, not a
+packaging failure. Use asynchronous HTTP APIs or test the Bionic profile with
+the affected Mod. Switching profiles requires patching an original APK and a
+same-signer replacement installation, not editing the extracted runtime.
 
 ## Il2CppInterop startup or injection fails
 

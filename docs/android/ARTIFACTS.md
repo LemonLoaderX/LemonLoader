@@ -4,7 +4,12 @@ LemonLoader does not own APK mutation, signing, alignment, or installation.
 LemonLoader.Patcher consumes the artifact tree produced by this repository and
 updates APK ZIP entries without a case-insensitive unpack/repack cycle.
 
-## Required APK inputs
+## Release inputs and APK layout
+
+The tree below combines Release inputs and the final APK layout. The Release
+has no game Interop assemblies: Patcher creates `runtime/interop` content.
+`tools` and root license files are Release-side inputs, not copied APK assets.
+The Android profile is shown; Bionic differences follow below.
 
 ```text
 lib/arm64-v8a/
@@ -50,12 +55,13 @@ The supported `libmain.so` is available after
 `scripts/build/build-android-ndk-bootstrap.ps1`.
 `MelonLoader.dll` and `MelonLoader.NativeHost.dll` are available after
 `scripts/build/build-android-managed.ps1`. `scripts/build/build-android.ps1`
-assembles these with the verified .NET 10 Android runtime artifact and NDK C++
-runtime under:
+assembles these with the selected .NET 11 runtime pack under:
 
 ```text
 Output/<Configuration>/linux-bionic-arm64/package/
 Output/Releases/LemonLoader-Android-arm64.zip
+Output/Releases/LemonLoader-runtime-android-arm64.zip
+Output/Releases/LemonLoader-runtime-bionic-arm64.zip
 ```
 
 The package includes `lemonloader-release.json` with a SHA-256 entry for every
@@ -63,7 +69,8 @@ payload file (the manifest excludes itself), the locked dotnet source revision,
 and the exact managed runtime library SHA-256. It does not publish the build
 command or full `runtime-provenance.json`; those remain in the dependency build
 output. The runtime domain contains only a minimal `runtime-identity.json` with
-the version, backend, hosting model, engine filename, and engine hash. Supported output uses
+the version, backend, hosting model, engine filename/hash, runtime RID and crypto
+backend. Supported output uses
 `bootstrapFlavor: Ndk`. It is deployable only
 and always records `gameAssembliesIncluded: false`. Game-specific Interop DLLs
 are generated and merged by LemonLoader.Patcher. The manifest also records the
@@ -103,13 +110,19 @@ assemblies, not unrelated NuGet cache files.
   `Mods`, `Plugins`, `UserLibs`, and `UserData` keep their relative paths. The
   default development profile preserves existing files; production profiles can
   upgrade, refresh, or enforce managed files. Unknown files are never removed.
-- A CoreCLR Release must contain the Android crypto library and
-  `lemonloader-coreclr-crypto.dex`, declare no private native libraries, and carry
-  no generic Linux OpenSSL shim. It is
+- An Android-profile Release must contain the Android crypto library and
+  `lemonloader-coreclr-crypto.dex`, without the generic Linux OpenSSL shim. It is
   incomplete as an APK until the Patcher copies the helper to the next free
   top-level `classesN.dex`. The helper remains a Release-side Patcher tool input,
   is not copied into `runtime/dotnet`, and APK verification requires the promoted
-  entry to match the hash recorded in `payload.json`.
+  entry to match `coreClrCryptoDexSha256` in the final APK `payload.json`.
+  Release payloads omit that redundant field: `lemonloader-release.json` already
+  protects the helper's fixed path. Patcher 1.1.0+ carries the verified digest
+  into the final APK; older Release payloads with a digest are still checked.
+- A Bionic-profile Release has no JNI crypto library or helper DEX. Its shared
+  runtime contains `libSystem.Security.Cryptography.Native.OpenSsl.so`,
+  `libssl.so` and `libcrypto.so`; the archive includes OpenSSL attribution under
+  `licenses/OpenSSL/LICENSE.txt`. Patcher injects no DEX for this profile.
 - `libunity.so` is always the game's Unity player library. LemonLoader loads and
   hooks that original file; the Release neither supplies nor replaces it.
 - The dotnet tree is extracted to application-private storage. It must not run

@@ -20,16 +20,16 @@ host the private runtime without changing the desktop bootstrap.
 Android uses the CoreCLR host interface directly:
 
 1. extract a verified private runtime into application storage;
-2. initialize the Android cryptography bridge in the application class loader;
+2. initialize the selected cryptography backend;
 3. load and identity-check `libcoreclr.so`;
 4. build the trusted-platform-assembly and native-search paths;
 5. call `coreclr_initialize` and `coreclr_create_delegate`;
 6. transfer control to `MelonLoader.NativeHost`.
 
-Generic Linux-Bionic runtime packs and hostfxr-based MonoVM hosting were useful
-during migration but are not supported production backends. CoreCLR-only hosting
-removes the signal-ownership protocol, private OpenSSL shim, backend fallback,
-and duplicate runtime identities that those experiments required.
+The old hostfxr-based MonoVM backend is retired. Current Android and Linux Bionic
+profiles both host CoreCLR directly from the same .NET 11 source revision.
+Android uses a JNI crypto bridge; Bionic uses private OpenSSL libraries.
+Neither profile falls back to MonoVM or silently switches to the other runtime.
 
 ## Android cryptography
 

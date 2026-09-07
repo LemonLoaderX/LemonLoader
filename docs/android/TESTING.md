@@ -27,8 +27,8 @@ For native-hook changes, run the maintained Dobby far-target regression on both
 a native ARM64 device and any supported native-bridge emulator:
 
 ```powershell
-pwsh -NoProfile -File <Dobby-source-root>/scripts/test-android-near-hook.ps1 `
-    -DeviceSerial <serial>
+pwsh -NoProfile -File "<Dobby-source-root>/scripts/test-android-near-hook.ps1" `
+    -DeviceSerial "<serial>"
 ```
 
 ### Managed compatibility tests
@@ -37,21 +37,22 @@ pwsh -NoProfile -File <Dobby-source-root>/scripts/test-android-near-hook.ps1 `
 ../LemonLoader.Patcher/scripts/test.ps1 -Configuration Release
 ```
 
-This copies raw pinned NuGet assemblies, applies the Android transformations,
-and verifies that a second pass is byte-for-byte idempotent. It must fail when
-assembly identity or expected IL shape changes.
+Patcher tests cover release validation, runtime selection, APK and directory
+assembly, deployment policies, native collisions, and CLI/signing contracts.
+They use synthetic inputs and do not rewrite dependency binaries.
 
 Android managed builds also run `MonoModCoreClrProbe` and
-`HarmonyCoreClrProbe`. They exercise the source-built .NET 10 DynamicMethod and
+`HarmonyCoreClrProbe`. They exercise the source-built CoreCLR DynamicMethod and
 RuntimeLocalBuilder paths before packaging.
 
 ### Build tests
 
-For Android runtime or packaging changes:
+For runtime or packaging changes, provide validated packs and build both profiles
+sequentially (the staging directory is shared):
 
 ```powershell
-./scripts/build/build-android.ps1 `
-    -Configuration Release
+./scripts/build/build-android.ps1 -Configuration Release -RuntimeProfile android
+./scripts/build/build-android.ps1 -Configuration Release -RuntimeProfile bionic
 ```
 
 For shared managed code, also run the Win64 Il2Cpp support-module build from
@@ -65,8 +66,9 @@ was preserved.
     -PackageName com.example.game
 ```
 
-The device must advertise ARM64, use API 23+, use a 4 KiB or 16 KiB page size,
-and already contain the selected package.
+The device must advertise ARM64, use API 24+ for active profiles, use a 4 KiB or
+16 KiB page size, and already contain the selected package. A legacy preflight's
+API 23 acceptance does not qualify the .NET 11 runtime for that API.
 
 ### Device smoke test
 
@@ -105,9 +107,9 @@ and run the parity contract against the same launch:
 
 ```powershell
 ./scripts/test/verify-android-runtime-parity.ps1 `
-    -LatestLog <pulled-MelonLoader-base>/MelonLoader/Latest.log `
-    -RuntimeRoot <pulled-MelonLoader-base> `
-    -RequiredPreferenceFile <mod-preferences>.cfg `
+    -LatestLog "<pulled-MelonLoader-base>/MelonLoader/Latest.log" `
+    -RuntimeRoot "<pulled-MelonLoader-base>" `
+    -RequiredPreferenceFile "<mod-preferences>.cfg" `
     -RequireUnityLogs
 ```
 
@@ -147,7 +149,8 @@ deterministic marker before broadening a claim.
 
 ## Release evidence
 
-Record the following in the workspace `STATUS.md` for a release candidate:
+Record the following in ignored workspace evidence for a release candidate;
+keep `STATUS.md` limited to stable capabilities and qualification gaps:
 
 - commit, SDK, NDK, bootstrap flavor, and private runtime versions;
 - device Android API, ABI, page size, package version, and Unity version;

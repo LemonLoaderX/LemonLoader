@@ -1,7 +1,7 @@
 # Android architecture
 
 The port keeps Android-specific behavior behind a small platform layer while
-preserving the stable desktop implementation. It targets Android API 23+,
+preserving the stable desktop implementation. It targets Android API 24+,
 ARM64 IL2CPP, deterministic desktop-generated Interop assemblies, and
 pinned NDK r27d builds. APK patching, signing, Mono games, and 32-bit ABIs
 remain outside the LemonLoader runtime repository.
@@ -20,7 +20,7 @@ Unity Java player
   -> PLT redirect dlsym
   -> intercept il2cpp_init
   -> verify the selected engine identity
-  -> initialize source-built Android crypto through the application class loader
+  -> initialize the selected cryptography backend (JNI for Android, OpenSSL for Bionic)
   -> initialize Android CoreCLR through its direct host API
   -> load MelonLoader.NativeHost.dll
   -> intercept the first active-scene transition
@@ -68,9 +68,9 @@ The NDK bootstrap additionally identifies itself with
 `MELONLOADER_BOOTSTRAP_KIND=ndk`. This keeps Android directory discovery and
 managed-runtime startup out of desktop code.
 
-Stable MelonLoader remains compiled for `net6`. Android generates a structured
-runtimeconfig with `LatestMajor` roll-forward and ships the source-built .NET
-versioned .NET 10 Android CoreCLR runtime pack. This
+MelonLoader remains compiled for `net6.0`. Android generates a structured
+runtimeconfig with `LatestMajor` roll-forward and ships the selected .NET 11
+CoreCLR runtime pack. This
 keeps the upstream target unchanged and replaces the legacy port's runtimeconfig
 text mutation with an MSBuild-owned setting.
 
@@ -80,7 +80,7 @@ text mutation with an MSBuild-owned setting.
 API level for managed projects. The primary bootstrap is configured by CMake
 using the NDK toolchain and built by
 `scripts/build/build-android-ndk-bootstrap.ps1`. It has no ILCompiler or glibc
-dependency and is separate from the private .NET 10 managed runtime.
+dependency and is separate from the private managed runtime.
 
 The linker uses `--no-undefined`, and post-build verification explicitly rejects
 `__errno_location`. Using the glibc pack is not an acceptable fallback upgrade
@@ -139,7 +139,7 @@ the adapter falls back to the application's internal files directory.
   changed managed files are backed up and the ownership-state tree is committed
   only after all file actions succeed.
 - The private dotnet path is supplied before the first `il2cpp_init` call.
-- CoreCLR Android crypto helper classes must be promoted by the Patcher into the
+- For the Android profile, crypto helper classes must be promoted by the Patcher into the
   application class loader, and all crypto P/Invokes must resolve to that one
   `JNI_OnLoad`-initialized module.
 - Android initialization must return failure to Java rather than terminating
@@ -155,7 +155,7 @@ the adapter falls back to the application's internal files directory.
 | Native bootstrap and CoreCLR startup | `MelonLoader.Bootstrap/Platforms/Android/Native` |
 | Managed Android environment | `MelonLoader/JNI`, `MelonLoader/Utils` |
 | Il2Cpp Android ABI and injection compatibility | Maintained Il2CppInterop fork resolved under `.dependencies/` |
-| MonoMod .NET 10 compatibility | Maintained MonoMod fork resolved under `.dependencies/` |
+| MonoMod CoreCLR compatibility | Maintained MonoMod fork and its MonoMod.Common submodule |
 | HarmonyX .NET 9+ emit compatibility | Maintained HarmonyX fork resolved under `.dependencies/` |
 | Unity lifecycle adaptation | `Dependencies/SupportModules/Il2Cpp` |
 | Build orchestration | `scripts/build` |

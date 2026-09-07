@@ -9,7 +9,8 @@ supported Android managed backend.
 
 The active profiles are android (default) and bionic, selected in
 `eng/runtime-profiles.json`. They share one source revision. .NET 10 is frozen
-legacy, not the default. This development migration is not release qualification.
+legacy, not the default. Preview 5 distributes both profiles and requires Patcher
+1.1.0 or later; it does not imply broad game or device qualification.
 
 The game-independent LemonLoader Release is consumed by LemonLoader.Patcher,
 which owns game input extraction, Interop generation, APK mutation, alignment,
@@ -18,9 +19,9 @@ and CoreCLR sources remain independent, reviewable forks.
 
 ## Verified capabilities
 
-- Android bootstrap builds for `arm64-v8a` with API 23 and 16 KiB-compatible ELF
+- Active bootstrap builds target `arm64-v8a`, API 24+ and 16 KiB-compatible ELF
   load segments.
-- CoreCLR is hosted directly and uses the source-built Android cryptography path.
+- CoreCLR is hosted directly, with JNI cryptography for Android or OpenSSL for Bionic.
 - Runtime, loader, Interop, and deployment content have separate identities and
   transactional update behavior.
 - Il2CppInterop covers Android ARM64 aggregate ABI and multiple generic-method
@@ -53,6 +54,7 @@ qualified. Automated startup does not replace manual application acceptance.
 - upstream loader-neutral dependency fixes where maintainers accept them;
 - validate a second loader adapter before extracting generic APK tooling APIs.
 
-Exact versions and revisions live in `eng/AndroidDependencies.props`. Build
+Exact dependency versions live in `eng/AndroidDependencies.props`; runtime
+profiles live in `eng/runtime-profiles.json`. Build
 hashes, private application identities, and device evidence remain generated
 artifacts outside Git.

@@ -6,6 +6,11 @@ profiles, per-file policies, ownership state, and failure recovery.
 
 ## Packaging interface
 
+Deployment profiles (`development`, `production`, `locked`) control installed
+file policies. They are independent of the runtime profile (`android`, `bionic`)
+and the build's development-source switch. Choosing a deployment policy neither
+changes the runtime nor qualifies a development build for release.
+
 Developers select one profile and may add a small number of exact-file or
 `directory/**` overrides. LemonLoader.Patcher resolves those rules at package
 time and writes one concrete policy for every file in `payload.json`. Native

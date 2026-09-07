@@ -1,18 +1,22 @@
 # Building Android LemonLoader
 
+Unless a block says otherwise, run commands from the Loader repository root.
+
 ## Requirements
 
 | Input | Requirement |
 | --- | --- |
 | PowerShell | 7 or later |
-| .NET SDK | 10.0.x |
+| Product .NET SDK | Exact version in `global.json` (currently 10.0.204) |
 | Android SDK | CMake 3.22.1 or later and Ninja |
 | Android NDK | r27d (`27.3.13750724`) |
-| Target | Android API 23+, `arm64-v8a` |
+| Target | Android API 24+, `arm64-v8a` |
 
 Exact product dependency versions and source revisions are defined in
 `eng/AndroidDependencies.props`. Scripts read that file; revision hashes are not
-duplicated in command defaults or documentation.
+duplicated in command defaults. Runtime selection lives in
+`eng/runtime-profiles.json`: product SDK, Loader TFM (`net6.0`) and embedded
+runtime (.NET 11) are different inputs, not conflicting version requirements.
 
 ## Source dependencies
 
@@ -33,10 +37,33 @@ producing source.
 
 ## Runtime artifact
 
-The normal build consumes the Android CoreCLR archive recorded in the dependency
-manifest. The resolver uses a content-addressed ignored cache, verifies the
-archive SHA-256, rejects unsafe or duplicate ZIP entries, validates runtime
-provenance, and publishes the extracted pack atomically.
+Active builds consume a local pack matching the selected runtime profile. They
+do not automatically download a pack or fall back to .NET 10. CI downloads the
+versioned assets before building; local contributors can do the same:
+
+```powershell
+. ./scripts/common/RuntimeProfiles.ps1
+$profile = Get-RuntimeProfile -Name android # or bionic
+$tag = "coreclr-$($profile.version)-$($profile.revision.Substring(0, 12))"
+$asset = "dotnet-runtime-$($profile.version)-$($profile.rid).zip"
+$download = Join-Path $PWD "Output/RuntimeDownloads/$tag/$($profile.rid)"
+gh release download $tag --repo LemonLoaderX/runtime `
+    --pattern $asset --pattern "$asset.sha256" --dir $download
+if ($LASTEXITCODE -ne 0) { throw 'Runtime download failed.' }
+$archive = Join-Path $download $asset
+$expected = ((Get-Content "$archive.sha256" -Raw).Trim() -split '\s+')[0]
+if ($expected -notmatch '^[0-9a-f]{64}$' -or
+    (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
+    throw 'Runtime archive SHA-256 mismatch.'
+}
+$pack = Join-Path $PWD "Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
+Expand-Archive -LiteralPath $archive -DestinationPath $pack
+Test-RuntimeProfilePack -Root $pack -Profile $profile
+```
+
+Use a new destination, not `-Force`, when retrying an incomplete extraction.
+Existing valid packs can be reused. The archive checksum detects corruption; it
+is not an independent source signature.
 
 Use `-CoreClrRuntimePackRoot <directory>` for a reviewed local/offline pack. A
 runtime pack contains:
@@ -45,20 +72,24 @@ runtime pack contains:
 managed/
 native/
 runtime-provenance.json
+pack-files.json
+LICENSE.TXT
+THIRD-PARTY-NOTICES.TXT
+licenses/OpenSSL/LICENSE.txt  # Bionic only
 ```
 
-Rebuilding CoreCLR is a separate maintainer action:
+Rebuilding CoreCLR is a separate maintainer action in the contributor workspace:
 
 ```powershell
-pwsh -NoProfile -File scripts/setup-android-dependencies.ps1 -IncludeRuntime
-pwsh -NoProfile -File scripts/build/build-android-managed-runtime.ps1 `
-    -AndroidNdkRoot "<android-ndk-r27d>" `
-    -SourceRoot .dependencies/runtime
+# Run from the workspace root, not the Loader repository.
+pwsh -NoProfile -File scripts/setup-runtime.ps1
+pwsh -NoProfile -File scripts/build-runtime.ps1 -RuntimeProfile all
 ```
 
-The runtime build uses Linux directly or WSL from Windows and derives its cache
-under the selected Linux user's home directory. It does not modify the system
-JDK, SDK, PATH, registry, or global package sources.
+The active builder uses WSL, one source checkout and separate per-RID outputs on
+the workspace drive. Prepare/import each resulting pack before building Loader.
+The old `build-android-managed-runtime.ps1 -Legacy` is for frozen .NET 10 recovery
+only. See the workspace `docs/RUNTIME-DEVELOPMENT.md` for source iteration.
 
 ## Release build
 
@@ -82,8 +113,19 @@ The final files are:
 
 ```text
 Output/Release/linux-bionic-arm64/package/
+Output/Releases/LemonLoader-runtime-android-arm64.zip
+Output/Releases/LemonLoader-runtime-bionic-arm64.zip
 Output/Releases/LemonLoader-Android-arm64.zip
 ```
+
+Select `-RuntimeProfile android` (default) or `-RuntimeProfile bionic`. Each build
+produces only its selected variant; the default also refreshes the alias.
+The historical staging folder name does not identify the runtime RID. Build
+variants sequentially because they share staging.
+
+For local dependency edits, `-AllowDirtyDependencies` isolates packages under
+`Output/DevelopmentReleases`. It relaxes source selection, not content or ABI
+validation; those outputs must not be uploaded as formal release assets.
 
 The release is game-independent. Interop assemblies, Mods, configuration,
 alignment, signing, and APK mutation belong to LemonLoader.Patcher.

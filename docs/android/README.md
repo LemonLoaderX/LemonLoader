@@ -1,8 +1,9 @@
 # Android port
 
 LemonLoader adds an Android ARM64 platform adapter to the MelonLoader 0.7
-desktop baseline. The supported target is Unity IL2CPP on Android API 23 or
-later, hosted by a private .NET 10 CoreCLR runtime.
+desktop baseline. The target is Unity IL2CPP on Android API 24 or later, hosted
+by private .NET 11 CoreCLR. Android is the default runtime profile; Bionic is
+selectable. Both are preview distributions, not broad compatibility certification.
 
 ## Documentation map
 
@@ -28,7 +29,7 @@ small patch stack on the default branch; upstream desktop updates are merged wit
 their ancestry intact. Modified third-party projects are separate source forks
 under the LemonLoaderX organization.
 
-The loader repository produces one game-independent release archive. It does not
+The loader repository produces a game-independent archive for each profile. It does not
 accept a target APK, generated Interop assemblies, Mods, signing material, or
 device configuration. LemonLoader.Patcher combines those inputs later.
 
@@ -37,15 +38,18 @@ device configuration. LemonLoader.Patcher combines those inputs later.
 | Property | Value |
 | --- | --- |
 | ABI | `arm64-v8a` |
-| Android API | 23 or later |
+| Android API | 24 or later |
 | Unity scripting backend | IL2CPP |
-| Managed runtime | Android CoreCLR, .NET 10 |
+| Managed runtime | .NET 11 CoreCLR: Android (default) or Bionic |
 | Native bootstrap | C++17, Android NDK r27d |
 | ELF load alignment | at least `0x4000` |
 
 MonoVM, Android Mono games, and 32-bit ABIs are outside the supported target.
 
 ## Build outline
+
+First obtain the matching runtime pack as described in [Building](BUILDING.md).
+Source dependency setup alone does not download active runtime packs.
 
 ```powershell
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
@@ -56,10 +60,14 @@ pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
 
 The build produces the NDK bootstrap, managed host, Il2Cpp support module, and a
 verified payload under `Output/Release/linux-bionic-arm64`. It publishes
-`Output/Releases/LemonLoader-Android-arm64.zip` without modifying an APK.
+`Output/Releases/LemonLoader-runtime-android-arm64.zip` and the default alias
+`LemonLoader-Android-arm64.zip` without modifying an APK. Select
+`-RuntimeProfile bionic` for the separate Bionic archive; builds share staging
+and must run sequentially.
 
 Dependency versions and source revisions have one maintained source in
-`eng/AndroidDependencies.props`. Generated manifests record the exact runtime
+`eng/AndroidDependencies.props` and runtime profiles in `eng/runtime-profiles.json`.
+Generated manifests record the exact runtime
 artifact identity and content hashes for each build.
 
 ## Hard rules
