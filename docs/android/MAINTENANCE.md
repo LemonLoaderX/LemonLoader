@@ -76,8 +76,12 @@ For every shipped `.so` or linked `.a`:
 
 ## Release checklist
 
-Commit `docs/releases/<tag>.md` before tagging. The file contains the release
-body, not a duplicate title. Push the reviewed commit and version tag; the tag
+See [automatic release notes](../releases/README.md) for commit conventions,
+baseline selection, optional additions, and local/CI preview commands.
+
+CI generates the release body from commits. Only commit `docs/releases/<tag>.md`
+when extra upgrade or compatibility information is needed; it is prepended to
+the automatic changes. Push the reviewed commit and version tag; the tag
 workflow owns draft creation, CI asset upload and publication. Do not also
 create a Release manually. Published assets are not replaced on workflow retries;
 use a new version for binary changes and edit notes only for prose corrections.
