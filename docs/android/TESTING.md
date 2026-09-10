@@ -33,6 +33,23 @@ pwsh -NoProfile -File "<Dobby-source-root>/scripts/test-android-near-hook.ps1" `
 
 ### Managed compatibility tests
 
+Preference persistence and Android logging have focused host regressions:
+
+```powershell
+dotnet run --project tests/Preferences/Preferences.csproj
+```
+
+```bash
+# Linux/WSL; CXX may select a C++17 compiler.
+bash scripts/test/test-android-logging.sh
+```
+
+See `tests/README.md` for their boundaries. Preference save success messages are
+emitted only after a write; an I/O failure keeps the existing fallback behavior
+and error diagnostics. Fix the path/permissions and restart to leave fallback
+mode. Android logs use stripped text for file/logcat output and preserve WARN
+and ERROR priorities; native errors produce one logcat record.
+
 ```powershell
 ../LemonLoader.Patcher/scripts/test.ps1 -Configuration Release
 ```

@@ -115,16 +115,17 @@ namespace MelonLoader.Preferences
                 currentfile = MelonPreferences.DefaultFile;
 
             currentfile.document.PutValue(Identifier, Save());
+            bool saved = false;
             try
             {
-                currentfile.Save();
+                saved = currentfile.Save();
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error while Saving Preferences to {currentfile.FilePath}: {ex}");
                 currentfile.WasError = true;
             }
-            if (printmsg)
+            if (printmsg && saved)
                 MelonLogger.Msg($"MelonPreferences Saved to {currentfile.FilePath}");
         }
 

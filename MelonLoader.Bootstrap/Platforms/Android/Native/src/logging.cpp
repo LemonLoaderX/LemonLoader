@@ -223,9 +223,9 @@ std::string utf16_to_utf8(const uint16_t* value, int length) {
     return output;
 }
 
-void log_line(const std::string& message) {
+static void log_line(const std::string& message, int priority) {
     std::lock_guard<std::mutex> lock(log_mutex);
-    __android_log_write(ANDROID_LOG_INFO, "LemonLoader", message.c_str());
+    __android_log_write(priority, "LemonLoader", message.c_str());
 
     if (runtime_paths.base_directory.empty()) {
         return;
@@ -248,9 +248,12 @@ void log_line(const std::string& message) {
     }
 }
 
+void log_line(const std::string& message) {
+    log_line(message, ANDROID_LOG_INFO);
+}
+
 void log_error(const std::string& message) {
-    __android_log_write(ANDROID_LOG_ERROR, "LemonLoader", message.c_str());
-    log_line("[ERROR] " + message);
+    log_line("[ERROR] " + message, ANDROID_LOG_ERROR);
 }
 
 void reset_latest_log() {
@@ -379,9 +382,11 @@ extern "C" LEMON_EXPORT void LogMsg(
     const void*,
     const uint16_t* section,
     int section_length,
-    const uint16_t*,
-    int) {
-    std::string text = lemon::bootstrap::utf16_to_utf8(message, message_length);
+    const uint16_t* stripped_message,
+    int stripped_message_length) {
+    std::string text = stripped_message != nullptr
+        ? lemon::bootstrap::utf16_to_utf8(stripped_message, stripped_message_length)
+        : lemon::bootstrap::utf16_to_utf8(message, message_length);
     const std::string section_text =
         lemon::bootstrap::utf16_to_utf8(section, section_length);
     if (!section_text.empty()) {
@@ -402,7 +407,9 @@ extern "C" LEMON_EXPORT void LogError(
     if (!section_text.empty()) {
         text = '[' + section_text + "] " + text;
     }
-    lemon::bootstrap::log_line(std::string(warning ? "[WARNING] " : "[ERROR] ") + text);
+    lemon::bootstrap::log_line(
+        std::string(warning ? "[WARNING] " : "[ERROR] ") + text,
+        warning ? ANDROID_LOG_WARN : ANDROID_LOG_ERROR);
 }
 
 extern "C" LEMON_EXPORT void LogMelonInfo(

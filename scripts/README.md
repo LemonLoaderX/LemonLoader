@@ -38,6 +38,7 @@ without scanning one flat directory.
 | `test/smoke-test-android.ps1` | Relaunch an installed app and assert startup/lifecycle markers |
 | `test/deploy-android-managed-file.ps1` | Back up and replace one device managed file with hash checks |
 | `test/verify-android-runtime-parity.ps1` | Verify clean logs, Unity capture, preferences, and historical log output |
+| `test/test-android-logging.sh` | Run the Linux/WSL host regression for Android log text, severity, and file output |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

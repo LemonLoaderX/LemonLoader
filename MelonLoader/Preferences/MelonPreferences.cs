@@ -136,14 +136,16 @@ namespace MelonLoader
                 }
             }
 
+            bool saved = true;
             try
             {
-                DefaultFile.Save();
+                saved = DefaultFile.Save();
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error while Saving Preferences to {DefaultFile.FilePath}: {ex}");
                 DefaultFile.WasError = true;
+                saved = false;
             }
 
             if (PrefFiles.Count >= 0)
@@ -152,17 +154,20 @@ namespace MelonLoader
                 {
                     try
                     {
-                        file.Save();
+                        // Do not short-circuit: healthy files still need to be saved.
+                        saved &= file.Save();
                     }
                     catch (Exception ex)
                     {
                         MelonLogger.Error($"Error while Saving Preferences to {file.FilePath}: {ex}");
                         file.WasError = true;
+                        saved = false;
                     }
                 }
             }
 
-            MelonLogger.Msg("Preferences Saved!");
+            if (saved)
+                MelonLogger.Msg("Preferences Saved!");
         }
 
         public static MelonPreferences_Category CreateCategory(string identifier) => CreateCategory(identifier, null, false);

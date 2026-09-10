@@ -88,10 +88,10 @@ namespace MelonLoader.Preferences.IO
             MelonPreferences.OnPreferencesLoaded.Invoke(FilePath);
         }
 
-        internal void Save()
+        internal bool Save()
         {
             if (_waserror || !ShouldSave)
-                return;
+                return false;
             
             IsSaving = true;
             
@@ -101,6 +101,7 @@ namespace MelonLoader.Preferences.IO
                 System.IO.File.Delete(LegacyFilePath);
 
             MelonPreferences.OnPreferencesSaved.Invoke(FilePath);
+            return true;
         }
         
         private static string QuoteKey(string key) =>

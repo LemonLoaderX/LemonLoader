@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Samboy063.Tomlet" Version="$(TomletVersion)" />
+    <Compile Include="../../MelonLoader/Preferences/MelonPreferences*.cs" Link="Source/%(Filename)%(Extension)" />
+    <Compile Include="../../MelonLoader/Preferences/ValueValidator.cs" Link="Source/ValueValidator.cs" />
+    <Compile Include="../../MelonLoader/Preferences/IO/File.cs" Link="Source/File.cs" />
+  </ItemGroup>
+</Project>

@@ -160,16 +160,17 @@ namespace MelonLoader
             foreach (MelonPreferences_Entry entry in Entries)
                 if (!(entry.DontSaveDefault && entry.GetValueAsString() == entry.GetDefaultValueAsString()) && entry.GetValueAsString() != null)
                     currentfile.InsertIntoDocument(Identifier, entry.Identifier, entry.Save(), IsInlined);
+            bool saved = false;
             try
             {
-                currentfile.Save();
+                saved = currentfile.Save();
             }
             catch (Exception ex)
             {
                 MelonLogger.Error($"Error while Saving Preferences to {currentfile.FilePath}: {ex}");
                 currentfile.WasError = true;
             }
-            if (printmsg)
+            if (printmsg && saved)
                 MelonLogger.Msg($"MelonPreferences Saved to {currentfile.FilePath}");
         }
 

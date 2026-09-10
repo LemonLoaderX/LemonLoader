@@ -143,6 +143,17 @@ Changes shared with desktop builds must also pass:
 dotnet build MelonLoader.sln --configuration Release -p:Platform=x64
 ```
 
+For a compile-only desktop check, omit the bootstrap's automatic NativeAOT
+publish step:
+
+```powershell
+dotnet build MelonLoader.sln --configuration Release -p:Platform=x64 -p:SkipPublishAfterBuild=true
+```
+
+Use this narrower check when automatic publication fails with `Cross-OS native
+compilation is not supported`. It validates desktop compilation, not a published
+desktop bootstrap; report that limitation separately from Android verification.
+
 Hosted CI should consume published dependency and runtime artifacts. Source
 runtime builds remain a dedicated fork-maintenance workflow rather than part of
 every product build.
