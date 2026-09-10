@@ -96,7 +96,73 @@ replaced. Inspect the packaged deployment profile, per-file policy, installed
 ownership state, and the actual device file. Unknown and user-owned files are
 preserved intentionally.
 
+## Packaged deployment fails while applying a file
+
+`Failed to apply packaged deployment file` is a filesystem publication/removal
+failure, before loading the affected Mod. The action field distinguishes install,
+replace and remove. A failed publication also logs its source, destination and
+failing step: creating the destination directory, removing the temporary file,
+copying, or renaming. The system error text and numeric errno are captured before
+cleanup, so cleanup cannot erase the original cause. The same detail is available
+when publishing a backup or restoring a file during rollback.
+
+NDK r27d's libc++ implements `std::filesystem::copy_file` with `sendfile()` and
+does not fall back to buffered I/O when that syscall is rejected. External-storage
+implementations can reject it with `EINVAL` (`errno=22`), even when ordinary file
+reads and writes work. A libc++ 18 host reproduction that forces `sendfile` to
+return `EINVAL` reproduces the copy-stage failure. This does not substitute for
+tracing the syscall on a particular phone.
+
+Deployment publication now copies regular-file contents with bounded `read` and
+`write` calls. It retries interrupted reads/writes, handles short writes, checks
+the copied size and output close, then renames the sibling temporary file. It
+does not require `sendfile` or copying filesystem metadata. Original destination
+files are retained when copying fails; hash, path, deployment-policy and rollback
+validation remain in place.
+
+Older bootstraps emit only the destination path; that line alone cannot identify
+a permission, storage-space, missing-file or rename failure. First launch does not
+identify which filesystem operation failed. Reproduce with the diagnostic
+bootstrap and retain both the detailed error and any rollback error. Inspect the
+reported paths and free space according to the actual error; do not clear app
+data or remove deployment state as a diagnostic shortcut.
+
+The Linux/WSL regression is:
+
+```bash
+bash scripts/test/test-android-deployment.sh
+# With Clang and libc++ development libraries installed:
+CXX=clang++ bash scripts/test/test-android-deployment.sh --libcxx
+```
+
+It exercises successful initial publication and replacement with and without
+`sendfile` rejection, plus filesystem and read/write/close failures. It checks
+preservation of existing destinations and error codes after temporary-file
+cleanup. It does not reproduce a specific Android external-storage implementation;
+that requires evidence from the affected device.
+
+## JNI and native hook failures
+
+For `JNI failure during ...`, retain both Latest.log and the surrounding logcat
+output. Latest.log includes the failing operation and Java exception summary;
+the original Java stack is emitted through JNI `ExceptionDescribe` to logcat
+before the exception is cleared. If obtaining the summary itself fails, the
+original stack still has that output channel.
+On a noisy device, collect logcat continuously from before launch; a dump taken
+only at the end can lose early exceptions when Android's log buffer wraps.
+
+For `DobbyHook` or `DobbyDestroy` failures, retain the status and target/detour
+addresses together with the loader version and device/native-bridge environment.
+The status alone does not identify an allocator or instruction-relocation cause.
+Do not remove the established native-bridge reservation allocator to work around
+an unexplained failure; see [Android hardening](HARDENING.md).
+
 ## Reporting evidence
+
+For runtime lock failures, missing crypto bridges, stripped scene callbacks and
+configuration warnings, see [Android hardening](HARDENING.md). That document also
+records deployment interruption and native-bridge allocator limits. A successful
+host test or build does not replace reproduction on the affected phone.
 
 Remove package identities, game assets, account information, device serials,
 local paths, signing material, and credentials before sharing evidence. Prefer a

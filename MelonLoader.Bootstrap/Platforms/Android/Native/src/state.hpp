@@ -4,6 +4,7 @@
 #include <jni.h>
 
 #include <string>
+#include "utf.hpp"
 
 namespace lemon::bootstrap {
 
@@ -12,6 +13,7 @@ struct RuntimePaths {
     std::string base_directory;
     std::string internal_data_directory;
     std::string dotnet_directory;
+    std::string runtime_rid = "android-arm64";
 };
 
 extern JavaVM* java_vm;
@@ -24,7 +26,6 @@ void log_line(const std::string& message);
 void log_error(const std::string& message);
 void reset_latest_log();
 void configure_logging(uint32_t max_logs, bool capture_player_logs);
-std::string utf16_to_utf8(const uint16_t* value, int length);
 
 bool initialize_android_environment(JNIEnv* env);
 bool extract_runtime_assets();

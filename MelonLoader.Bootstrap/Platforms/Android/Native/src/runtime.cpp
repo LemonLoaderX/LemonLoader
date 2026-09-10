@@ -1,6 +1,7 @@
 #include "lemon_bootstrap.h"
 #include "plthook.h"
 #include "state.hpp"
+#include "native_errors.hpp"
 
 #include <dlfcn.h>
 #include <link.h>
@@ -16,6 +17,7 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <vector>
 #include <string>
 
@@ -59,7 +61,9 @@ std::once_flag managed_initialize_once;
 std::atomic<bool> managed_started{false};
 std::atomic<bool> managed_start_invoked{false};
 void coreclr_error(const char* message) {
-    log_error(std::string("coreclr: ") + (message == nullptr ? "<null>" : message));
+    native_boundary("CoreCLR error callback", [&]() {
+        log_error(std::string("coreclr: ") + (message == nullptr ? "<null>" : message));
+    });
 }
 
 std::filesystem::path find_managed_runtime_directory() {
@@ -68,19 +72,26 @@ std::filesystem::path find_managed_runtime_directory() {
         "Microsoft.NETCore.App";
     std::filesystem::path selected;
     std::error_code error;
-    for (const auto& entry : std::filesystem::directory_iterator(root, error)) {
-        if (!entry.is_directory()) {
+    for (std::filesystem::directory_iterator iterator(root, error), end;
+         !error && iterator != end; iterator.increment(error)) {
+        const auto& entry = *iterator;
+        const bool directory = entry.is_directory(error);
+        if (error) break;
+        if (!directory) {
             continue;
         }
-        if (selected.empty() || entry.path().filename() > selected.filename()) {
-            selected = entry.path();
+        if (!selected.empty()) {
+            log_error("Multiple CoreCLR version directories exist under '" + root.string() + "'");
+            return {};
         }
+        selected = entry.path();
     }
+    if (error) {
+        log_error("Could not enumerate CoreCLR runtime directory '" + root.string() + "': " + error.message());
+        return {};
+    }
+    if (selected.empty()) log_error("No CoreCLR version directory found under '" + root.string() + "'");
     return selected;
-}
-
-std::filesystem::path find_managed_runtime_engine() {
-    return find_managed_runtime_directory() / "libcoreclr.so";
 }
 
 std::string build_trusted_platform_assemblies(
@@ -89,17 +100,18 @@ std::string build_trusted_platform_assemblies(
     std::map<std::string, std::string> assemblies;
     for (const std::filesystem::path& directory : {runtime_directory, managed_directory}) {
         std::error_code error;
-        for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
-            if (error) {
-                break;
-            }
-            if (!entry.is_regular_file(error) || error || entry.path().extension() != ".dll") {
+        for (std::filesystem::directory_iterator iterator(directory, error), end;
+             !error && iterator != end; iterator.increment(error)) {
+            const auto& entry = *iterator;
+            const bool regular = entry.is_regular_file(error);
+            if (error) break;
+            if (!regular || entry.path().extension() != ".dll") {
                 continue;
             }
             assemblies.try_emplace(entry.path().filename().string(), entry.path().string());
         }
         if (error) {
-            log_error("Could not enumerate managed assemblies in '" + directory.string() + "'");
+            log_error("Could not enumerate managed assemblies in '" + directory.string() + "': " + error.message());
             return {};
         }
     }
@@ -115,11 +127,13 @@ std::string build_trusted_platform_assemblies(
     return result;
 }
 
-bool load_and_verify_managed_runtime() {
-    const std::filesystem::path engine_path = find_managed_runtime_engine();
+bool load_and_verify_managed_runtime(const std::filesystem::path& runtime_directory) {
+    const std::filesystem::path engine_path = runtime_directory / "libcoreclr.so";
     managed_runtime_module = dlopen(engine_path.c_str(), RTLD_NOW | RTLD_LOCAL);
     if (managed_runtime_module == nullptr) {
-        log_error("Could not acquire the loaded Android managed runtime module");
+        const char* error = dlerror();
+        log_error("Could not load CoreCLR '" + engine_path.string() + "': " +
+                  (error ? error : "unknown linker error"));
         return false;
     }
 
@@ -153,18 +167,20 @@ void* runtime_invoke_detour(void* method, void* object, void** arguments, void**
     void* result = original_runtime_invoke == nullptr
         ? nullptr
         : original_runtime_invoke(method, object, arguments, exception);
-    if (managed_started.load()) {
-        return result;
-    }
-    if (method == nullptr || method_get_name == nullptr) {
-        return result;
-    }
+    return native_boundary("IL2CPP scene startup callback", result, [&]() -> void* {
+        if (managed_started.load()) {
+            return result;
+        }
+        if (method == nullptr || method_get_name == nullptr) {
+            return result;
+        }
 
-    const char* name = method_get_name(method);
-    if (name != nullptr && std::strstr(name, "Internal_ActiveSceneChanged") != nullptr) {
-        start_managed_runtime();
-    }
-    return result;
+        const char* name = method_get_name(method);
+        if (name != nullptr && std::strstr(name, "Internal_ActiveSceneChanged") != nullptr) {
+            start_managed_runtime();
+        }
+        return result;
+    });
 }
 
 void* dlsym_detour(void* handle, const char* symbol) {
@@ -221,94 +237,94 @@ bool initialize_managed_runtime_impl() {
         coreclr_initialized = false;
     };
     const std::filesystem::path runtime_directory = find_managed_runtime_directory();
-        if (!initialize_android_crypto(runtime_directory.string())) {
-            return false;
-        }
-        if (!load_and_verify_managed_runtime()) {
-            return false;
-        }
-        auto initialize = reinterpret_cast<coreclr_initialize_fn>(
-            dlsym(managed_runtime_module, "coreclr_initialize"));
-        auto create_delegate = reinterpret_cast<coreclr_create_delegate_fn>(
-            dlsym(managed_runtime_module, "coreclr_create_delegate"));
-        auto set_error_writer = reinterpret_cast<coreclr_set_error_writer_fn>(
-            dlsym(managed_runtime_module, "coreclr_set_error_writer"));
-        shutdown_coreclr = reinterpret_cast<coreclr_shutdown_fn>(
-            dlsym(managed_runtime_module, "coreclr_shutdown"));
-        if (initialize == nullptr || create_delegate == nullptr || shutdown_coreclr == nullptr) {
-            log_error("The selected CoreCLR does not expose its native hosting interface");
-            return false;
-        }
-        if (set_error_writer != nullptr) {
-            set_error_writer(&coreclr_error);
-        }
+    if (runtime_directory.empty()) return false;
+    if (!initialize_android_crypto(runtime_directory.string())) {
+        return false;
+    }
+    if (!load_and_verify_managed_runtime(runtime_directory)) {
+        return false;
+    }
+    auto initialize = reinterpret_cast<coreclr_initialize_fn>(
+        dlsym(managed_runtime_module, "coreclr_initialize"));
+    auto create_delegate = reinterpret_cast<coreclr_create_delegate_fn>(
+        dlsym(managed_runtime_module, "coreclr_create_delegate"));
+    auto set_error_writer = reinterpret_cast<coreclr_set_error_writer_fn>(
+        dlsym(managed_runtime_module, "coreclr_set_error_writer"));
+    shutdown_coreclr = reinterpret_cast<coreclr_shutdown_fn>(
+        dlsym(managed_runtime_module, "coreclr_shutdown"));
+    if (initialize == nullptr || create_delegate == nullptr || shutdown_coreclr == nullptr) {
+        log_error("The selected CoreCLR does not expose its native hosting interface");
+        return false;
+    }
+    if (set_error_writer != nullptr) {
+        set_error_writer(&coreclr_error);
+    }
 
-        const std::string trusted_platform_assemblies =
-            build_trusted_platform_assemblies(runtime_directory, managed_directory);
-        const std::string native_search_directories =
-            runtime_directory.string() + ':' + managed_directory.string();
-        const std::string pinvoke_override = std::to_string(
-            reinterpret_cast<uintptr_t>(&resolve_android_crypto_pinvoke));
-        if (trusted_platform_assemblies.empty()) {
-            return false;
-        }
-        const char* property_keys[]{
-            "TRUSTED_PLATFORM_ASSEMBLIES",
-            "APP_PATHS",
-            "APP_NI_PATHS",
-            "NATIVE_DLL_SEARCH_DIRECTORIES",
-            "PLATFORM_RESOURCE_ROOTS",
-            "APP_CONTEXT_BASE_DIRECTORY",
-            "RUNTIME_IDENTIFIER",
-            "System.Globalization.Invariant",
-            "System.Globalization.PredefinedCulturesOnly",
-            "System.Reflection.Metadata.MetadataUpdater.IsSupported",
-            "PINVOKE_OVERRIDE",
-        };
-        const char* property_values[]{
-            trusted_platform_assemblies.c_str(),
-            managed_directory.c_str(),
-            managed_directory.c_str(),
-            native_search_directories.c_str(),
-            runtime_directory.c_str(),
-            managed_directory.c_str(),
-            std::filesystem::is_regular_file(runtime_directory / "libSystem.Security.Cryptography.Native.OpenSsl.so")
-                ? "linux-bionic-arm64" : "android-arm64",
-            "true",
-            "true",
-            "false",
-            pinvoke_override.c_str(),
-        };
-        int status = initialize(
-            native_host.c_str(),
-            "LemonLoader",
-            static_cast<int>(std::size(property_keys)),
-            property_keys,
-            property_values,
-            &coreclr_host_handle,
-            &coreclr_domain_id);
-        if (status < 0 || coreclr_host_handle == nullptr || coreclr_domain_id == 0) {
-            char status_hex[11]{};
-            std::snprintf(
-                status_hex,
-                sizeof(status_hex),
-                "0x%08X",
-                static_cast<uint32_t>(status));
-            log_error(
-                "coreclr_initialize failed with status " + std::to_string(status) +
-                " (" + status_hex + "), host=" +
-                (coreclr_host_handle == nullptr ? "null" : "set") +
-                ", domain=" + std::to_string(coreclr_domain_id));
-            return false;
-        }
-        coreclr_initialized = true;
-        status = create_delegate(
-            coreclr_host_handle,
-            coreclr_domain_id,
-            "MelonLoader.NativeHost",
-            "MelonLoader.NativeHost.NativeEntryPoint",
-            "CoreClrNativeEntry",
-            &entry_pointer);
+    const std::string trusted_platform_assemblies =
+        build_trusted_platform_assemblies(runtime_directory, managed_directory);
+    const std::string native_search_directories =
+        runtime_directory.string() + ':' + managed_directory.string();
+    const std::string pinvoke_override = std::to_string(
+        reinterpret_cast<uintptr_t>(&resolve_android_crypto_pinvoke));
+    if (trusted_platform_assemblies.empty()) {
+        return false;
+    }
+    const char* property_keys[]{
+        "TRUSTED_PLATFORM_ASSEMBLIES",
+        "APP_PATHS",
+        "APP_NI_PATHS",
+        "NATIVE_DLL_SEARCH_DIRECTORIES",
+        "PLATFORM_RESOURCE_ROOTS",
+        "APP_CONTEXT_BASE_DIRECTORY",
+        "RUNTIME_IDENTIFIER",
+        "System.Globalization.Invariant",
+        "System.Globalization.PredefinedCulturesOnly",
+        "System.Reflection.Metadata.MetadataUpdater.IsSupported",
+        "PINVOKE_OVERRIDE",
+    };
+    const char* property_values[]{
+        trusted_platform_assemblies.c_str(),
+        managed_directory.c_str(),
+        managed_directory.c_str(),
+        native_search_directories.c_str(),
+        runtime_directory.c_str(),
+        managed_directory.c_str(),
+        runtime_paths.runtime_rid.c_str(),
+        "true",
+        "true",
+        "false",
+        pinvoke_override.c_str(),
+    };
+    int status = initialize(
+        native_host.c_str(),
+        "LemonLoader",
+        static_cast<int>(std::size(property_keys)),
+        property_keys,
+        property_values,
+        &coreclr_host_handle,
+        &coreclr_domain_id);
+    if (status < 0 || coreclr_host_handle == nullptr || coreclr_domain_id == 0) {
+        char status_hex[11]{};
+        std::snprintf(
+            status_hex,
+            sizeof(status_hex),
+            "0x%08X",
+            static_cast<uint32_t>(status));
+        log_error(
+            "coreclr_initialize failed with status " + std::to_string(status) +
+            " (" + status_hex + "), host=" +
+            (coreclr_host_handle == nullptr ? "null" : "set") +
+            ", domain=" + std::to_string(coreclr_domain_id));
+        return false;
+    }
+    coreclr_initialized = true;
+    status = create_delegate(
+        coreclr_host_handle,
+        coreclr_domain_id,
+        "MelonLoader.NativeHost",
+        "MelonLoader.NativeHost.NativeEntryPoint",
+        "CoreClrNativeEntry",
+        &entry_pointer);
     if (status != 0 || entry_pointer == nullptr) {
         log_error("coreclr_create_delegate failed with status " + std::to_string(status));
         rollback_coreclr();
@@ -325,7 +341,7 @@ bool initialize_managed_runtime_impl() {
     void* start_pointer = bootstrap_handle;
     const int entry_status = entry(&start_pointer);
     if (entry_status != 0 || start_pointer == nullptr || start_pointer == bootstrap_handle) {
-        log_error("Managed NativeHost did not return a start callback");
+        log_error("Managed NativeHost did not return a start callback (status=" + std::to_string(entry_status) + ")");
         // Managed initialization may already have installed native callbacks.
         // Keep CoreCLR alive rather than invalidating partially published pointers.
         return false;
@@ -371,18 +387,20 @@ bool install_symbol_redirect() {
 }
 
 bool initialize_managed_runtime() {
-    bool initialized = false;
-    std::call_once(managed_initialize_once, [&initialized]() {
-        initialized = initialize_managed_runtime_impl();
+    return native_boundary("CoreCLR initialization", false, []() {
+        bool initialized = false;
+        std::call_once(managed_initialize_once, [&initialized]() {
+            initialized = native_boundary("CoreCLR initialization", false, initialize_managed_runtime_impl);
+        });
+        return managed_start != nullptr || initialized;
     });
-    return managed_start != nullptr || initialized;
 }
 
 void start_managed_runtime() {
     if (managed_start == nullptr || managed_start_invoked.exchange(true)) {
         return;
     }
-    const int status = managed_start();
+    const int status = native_boundary("Managed start callback", 1, []() { return managed_start(); });
     if (status != 0) {
         log_error("Managed MelonLoader start failed with status " + std::to_string(status));
         return;
@@ -397,39 +415,58 @@ using namespace lemon::bootstrap;
 extern "C" LEMON_EXPORT void LogManagedException(
     const char* message,
     int32_t message_length) {
-    if (message == nullptr || message_length <= 0) {
-        return;
-    }
-    log_error(std::string(message, static_cast<size_t>(message_length)));
+    lemon::bootstrap::native_boundary("LogManagedException", [&]() {
+        if (message == nullptr || message_length <= 0) {
+            return;
+        }
+        log_error(std::string(message, static_cast<size_t>(message_length)));
+    });
 }
 
 extern "C" LEMON_EXPORT void NativeHookAttach(void** target, void* detour) {
-    if (target == nullptr || *target == nullptr || detour == nullptr) {
-        return;
-    }
-    // Keep the near-relay allocator alive for the lifetime of all installed hooks.
-    static std::once_flag near_branch_trampoline_once;
-    std::call_once(near_branch_trampoline_once, []() {
-        dobby_set_near_trampoline_required(true);
+    const bool completed = lemon::bootstrap::native_boundary("NativeHookAttach", false, [&]() {
+        if (target == nullptr || *target == nullptr || detour == nullptr) {
+            return false;
+        }
+        // Keep the near-relay allocator alive for the lifetime of all installed hooks.
+        static std::once_flag near_branch_trampoline_once;
+        std::call_once(near_branch_trampoline_once, []() {
+            dobby_set_near_trampoline_required(true);
+        });
+        void* const hook_target = *target;
+        void* original = nullptr;
+        const int status = DobbyHook(hook_target, detour, &original);
+        if (status == 0) {
+            *target = original;
+        } else {
+            std::ostringstream message;
+            message << "DobbyHook failed with status " << status
+                    << " (target=" << hook_target << ", detour=" << detour << ')';
+            log_error(message.str());
+            *target = nullptr;
+        }
+        return status == 0;
     });
-    void* const hook_target = *target;
-    void* original = nullptr;
-    const int status = DobbyHook(hook_target, detour, &original);
-    if (status == 0) {
-        *target = original;
-    } else {
-        log_error("DobbyHook failed with status " + std::to_string(status));
-        *target = nullptr;
-    }
+    if (!completed && target != nullptr) *target = nullptr;
 }
 
-extern "C" LEMON_EXPORT void NativeHookDetach(void** target, void*) {
-    if (target != nullptr && *target != nullptr) {
+extern "C" LEMON_EXPORT int32_t TryNativeHookDetach(void** target, void* detour) {
+    return lemon::bootstrap::native_boundary("NativeHookDetach", int32_t{0}, [&]() -> int32_t {
+        if (target == nullptr || *target == nullptr) return 0;
         const int status = DobbyDestroy(*target);
         if (status != 0) {
-            log_error("DobbyDestroy failed with status " + std::to_string(status));
+            std::ostringstream message;
+            message << "DobbyDestroy failed with status " << status
+                    << " (target=" << *target << ", detour=" << detour << ')';
+            log_error(message.str());
         }
-    }
+        return status == 0 ? 1 : 0;
+    });
+}
+
+extern "C" LEMON_EXPORT void NativeHookDetach(void** target, void* detour) {
+    // Preserve the legacy void ABI and the caller's pointer on success and failure.
+    (void)TryNativeHookDetach(target, detour);
 }
 
 extern "C" LEMON_EXPORT void* CreateArm64ValueReturnAdapter(void* target, uint32_t value_size) {
@@ -485,6 +522,7 @@ extern "C" LEMON_EXPORT void* CreateArm64ValueReturnAdapter(void* target, uint32
         -1,
         0);
     if (adapter == MAP_FAILED) {
+        report_native_exception("Allocate ARM64 value-return adapter", std::strerror(errno));
         return nullptr;
     }
 
@@ -494,6 +532,7 @@ extern "C" LEMON_EXPORT void* CreateArm64ValueReturnAdapter(void* target, uint32
         static_cast<char*>(adapter),
         static_cast<char*>(adapter) + code_size);
     if (mprotect(adapter, allocation_size, PROT_READ | PROT_EXEC) != 0) {
+        report_native_exception("Make ARM64 value-return adapter executable", std::strerror(errno));
         munmap(adapter, allocation_size);
         return nullptr;
     }

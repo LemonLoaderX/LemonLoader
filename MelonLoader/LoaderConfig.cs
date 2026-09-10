@@ -68,8 +68,16 @@ public class LoaderConfig
     private static void LoadFile(string baseDir)
     {
         var userDataFolder = Path.Combine(baseDir, "UserData");
-        if (!Directory.Exists(userDataFolder))
-            Directory.CreateDirectory(userDataFolder);
+        try { Directory.CreateDirectory(userDataFolder); }
+        catch (Exception exception)
+        {
+#if ANDROID
+            MelonLogger.Warning($"Could not create Loader configuration directory '{userDataFolder}': {exception}");
+            return;
+#else
+            throw;
+#endif
+        }
 
         var path = Path.Combine(userDataFolder, "Loader.cfg");
         if (File.Exists(path))
@@ -78,11 +86,15 @@ public class LoaderConfig
             {
                 var doc = TomlParser.ParseFile(path);
                 Current = TomletMain.To<LoaderConfig>(doc) ?? new LoaderConfig();
-                SaveFile(path);
             }
-            catch
+            catch (Exception exception)
             {
+#if ANDROID
+                MelonLogger.Warning($"Could not load Loader configuration '{path}': {exception}");
+#endif
+                return;
             }
+            TrySaveFile(path);
         }
         else
             TrySaveFile(path);
@@ -95,8 +107,11 @@ public class LoaderConfig
         {
             SaveFile(path);
         }
-        catch
+        catch (Exception exception)
         {
+#if ANDROID
+            MelonLogger.Warning($"Could not save Loader configuration '{path}': {exception}");
+#endif
         }
     }
     

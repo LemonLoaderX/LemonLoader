@@ -1,5 +1,9 @@
 #include "state.hpp"
 #include "deployment_policy.hpp"
+#include "deployment_file.hpp"
+#include "asset_file.hpp"
+#include "jni_utils.hpp"
+#include "process_lock.hpp"
 
 #include <android/asset_manager_jni.h>
 #include <dlfcn.h>
@@ -23,27 +27,11 @@ namespace lemon::bootstrap {
 namespace {
 
 bool clear_exception(JNIEnv* env, const char* operation) {
-    if (!env->ExceptionCheck()) {
-        return false;
-    }
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-    log_error(std::string(operation) + " raised a Java exception");
-    return true;
+    return clear_java_exception(env, operation);
 }
 
 std::string get_string(JNIEnv* env, jstring value) {
-    if (value == nullptr) {
-        return {};
-    }
-    const char* utf8 = env->GetStringUTFChars(value, nullptr);
-    if (utf8 == nullptr) {
-        clear_exception(env, "GetStringUTFChars");
-        return {};
-    }
-    std::string result(utf8);
-    env->ReleaseStringUTFChars(value, utf8);
-    return result;
+    return java_string(env, value);
 }
 
 std::string get_file_path(JNIEnv* env, jobject file) {
@@ -51,9 +39,9 @@ std::string get_file_path(JNIEnv* env, jobject file) {
         return {};
     }
     jclass file_class = env->GetObjectClass(file);
-    jmethodID get_path = env->GetMethodID(
+    jmethodID get_path = required_method(env,
         file_class, "getAbsolutePath", "()Ljava/lang/String;");
-    auto value = static_cast<jstring>(env->CallObjectMethod(file, get_path));
+    auto value = static_cast<jstring>(checked_object_call(env, file, get_path));
     std::string result = get_string(env, value);
     env->DeleteLocalRef(value);
     env->DeleteLocalRef(file_class);
@@ -88,11 +76,11 @@ std::vector<std::string> list_asset_children(const std::string& asset_path) {
     }
 
     jclass manager_class = env->GetObjectClass(asset_manager_object);
-    jmethodID list_method = env->GetMethodID(
+    jmethodID list_method = required_method(env,
         manager_class, "list", "(Ljava/lang/String;)[Ljava/lang/String;");
-    jstring path = env->NewStringUTF(asset_path.c_str());
+    jstring path = new_java_string(env, asset_path.c_str());
     auto values = static_cast<jobjectArray>(
-        env->CallObjectMethod(asset_manager_object, list_method, path));
+        checked_object_call(env, asset_manager_object, list_method, path));
     env->DeleteLocalRef(path);
     env->DeleteLocalRef(manager_class);
     if (clear_exception(env, "AssetManager.list") || values == nullptr) {
@@ -118,6 +106,10 @@ bool extract_asset_node(
     if (!children.empty()) {
         std::error_code error;
         std::filesystem::create_directories(destination, error);
+        if (error) {
+            log_error("Could not create extracted asset directory '" + destination.string() + "': " + error.message());
+            return false;
+        }
         for (const std::string& child : children) {
             if (!extract_asset_node(asset_path + '/' + child, destination / child)) {
                 return false;
@@ -126,32 +118,10 @@ bool extract_asset_node(
         return true;
     }
 
-    AAsset* asset = AAssetManager_open(
-        asset_manager, asset_path.c_str(), AASSET_MODE_STREAMING);
-    if (asset != nullptr) {
-        std::error_code error;
-        std::filesystem::create_directories(destination.parent_path(), error);
-        std::ofstream output(destination, std::ios::binary | std::ios::trunc);
-        if (!output) {
-            log_error("Could not create extracted asset file '" + destination.string() + "'");
-            AAsset_close(asset);
-            return false;
-        }
-
-        char buffer[64 * 1024];
-        int read = 0;
-        while ((read = AAsset_read(asset, buffer, sizeof(buffer))) > 0) {
-            output.write(buffer, read);
-        }
-        AAsset_close(asset);
-        if (read != 0 || !output.good()) {
-            log_error("Could not write extracted asset file '" + destination.string() + "'");
-            return false;
-        }
-        return true;
-    }
-
-    log_error("APK asset path has no readable file or children: '" + asset_path + "'");
+    std::string failure;
+    if (extract_asset_file(asset_manager, asset_path, destination, failure)) return true;
+    log_error("Could not extract APK asset '" + asset_path + "' to '" +
+              destination.string() + "': " + failure);
     return false;
 }
 
@@ -163,7 +133,7 @@ bool read_file(const std::filesystem::path& path, std::string& output) {
     output.assign(
         std::istreambuf_iterator<char>(input),
         std::istreambuf_iterator<char>());
-    return true;
+    return !input.bad();
 }
 
 struct DeploymentFileDescriptor {
@@ -188,25 +158,30 @@ bool copy_if_changed(
         parent / (".lemon-staging-" + destination.filename().string());
     const std::filesystem::path previous =
         parent / (".lemon-previous-" + destination.filename().string());
+    const auto fail = [&](const char* operation) {
+        log_error(std::string(operation) + " for runtime tree '" + destination.string() +
+                  "': " + error.message() + " (errno=" + std::to_string(error.value()) + ")");
+        return false;
+    };
     std::filesystem::create_directories(parent, error);
     if (error) {
-        return false;
+        return fail("Create parent directory");
     }
 
     const bool destination_exists = std::filesystem::exists(destination, error);
     const bool previous_exists = !error && std::filesystem::exists(previous, error);
     if (error) {
-        return false;
+        return fail("Inspect current/previous extraction");
     }
     if (!destination_exists && previous_exists) {
         std::filesystem::rename(previous, destination, error);
         if (error) {
-            return false;
+            return fail("Recover previous extraction");
         }
     } else if (previous_exists) {
         std::filesystem::remove_all(previous, error);
         if (error) {
-            return false;
+            return fail("Remove previous extraction");
         }
     }
 
@@ -224,11 +199,11 @@ bool copy_if_changed(
     error.clear();
     std::filesystem::remove_all(staging, error);
     if (error) {
-        return false;
+        return fail("Clean extraction staging");
     }
     std::filesystem::create_directories(staging, error);
     if (error) {
-        return false;
+        return fail("Create extraction staging");
     }
 
     const std::filesystem::path staged_asset = staging / destination.filename();
@@ -240,12 +215,14 @@ bool copy_if_changed(
 
     const bool had_destination = std::filesystem::exists(destination, error);
     if (error) {
+        fail("Inspect extraction destination");
         std::filesystem::remove_all(staging, error);
         return false;
     }
     if (had_destination) {
         std::filesystem::rename(destination, previous, error);
         if (error) {
+            fail("Back up previous extraction");
             std::filesystem::remove_all(staging, error);
             return false;
         }
@@ -268,31 +245,36 @@ bool copy_if_changed(
         return false;
     }
     std::filesystem::remove_all(staging, error);
-    std::filesystem::remove_all(previous, error);
+    if (error) fail("Clean published extraction staging");
 
     std::filesystem::create_directories(hash_path.parent_path(), error);
     if (error) {
-        return false;
+        return fail("Create extraction marker directory");
     }
     std::filesystem::path temporary_hash = hash_path;
     temporary_hash += ".tmp";
     {
         std::ofstream hash_output(temporary_hash, std::ios::binary | std::ios::trunc);
         hash_output << asset_hash;
-        if (!hash_output.good()) {
+        if (!finish_output(hash_output, error)) {
+            log_error("Failed to write extraction marker '" + temporary_hash.string() + "': " + error.message());
             std::filesystem::remove(temporary_hash, error);
             return false;
         }
     }
     std::filesystem::rename(temporary_hash, hash_path, error);
     if (error) {
+        fail("Publish extraction marker");
         std::filesystem::remove(temporary_hash, error);
         return false;
     }
+    std::filesystem::remove_all(previous, error);
+    if (error) fail("Clean committed previous extraction");
     return true;
 }
 
 struct PayloadDescriptor {
+    std::string runtime_rid = "android-arm64";
     std::string loader_hash;
     std::string dotnet_hash;
     std::string interop_hash;
@@ -322,15 +304,15 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     if (json_class == nullptr || class_failed) {
         return false;
     }
-    jmethodID constructor = env->GetMethodID(
+    jmethodID constructor = required_method(env,
         json_class, "<init>", "(Ljava/lang/String;)V");
-    jmethodID get_int = env->GetMethodID(
+    jmethodID get_int = required_method(env,
         json_class, "getInt", "(Ljava/lang/String;)I");
-    jmethodID get_string_method = env->GetMethodID(
+    jmethodID get_string_method = required_method(env,
         json_class, "getString", "(Ljava/lang/String;)Ljava/lang/String;");
-    jmethodID get_long = env->GetMethodID(
+    jmethodID get_long = required_method(env,
         json_class, "getLong", "(Ljava/lang/String;)J");
-    jmethodID get_array = env->GetMethodID(
+    jmethodID get_array = required_method(env,
         json_class, "getJSONArray", "(Ljava/lang/String;)Lorg/json/JSONArray;");
     const bool method_resolution_failed = clear_exception(env, "Resolve JSONObject methods");
     if (constructor == nullptr || get_int == nullptr || get_string_method == nullptr ||
@@ -339,7 +321,7 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         return false;
     }
 
-    jstring json_value = env->NewStringUTF(json.c_str());
+    jstring json_value = new_java_string(env, json.c_str());
     jobject json_object = env->NewObject(json_class, constructor, json_value);
     env->DeleteLocalRef(json_value);
     const bool parse_failed = clear_exception(env, "Parse LemonLoader payload manifest");
@@ -348,10 +330,20 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         return false;
     }
 
+    const auto opt_string = required_method(env, json_class, "optString",
+        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    jstring rid_name = new_java_string(env, "runtimeRid");
+    jstring default_rid = new_java_string(env, "android-arm64");
+    auto rid = static_cast<jstring>(checked_object_call(env, json_object, opt_string, rid_name, default_rid));
+    descriptor.runtime_rid = get_string(env, rid);
+    env->DeleteLocalRef(rid);
+    env->DeleteLocalRef(default_rid);
+    env->DeleteLocalRef(rid_name);
+
     auto read_object_string = [&](jobject object, const char* name, std::string& value) {
-        jstring property_name = env->NewStringUTF(name);
+        jstring property_name = new_java_string(env, name);
         auto property_value = static_cast<jstring>(
-            env->CallObjectMethod(object, get_string_method, property_name));
+            checked_object_call(env, object, get_string_method, property_name));
         env->DeleteLocalRef(property_name);
         const bool property_failed = clear_exception(env, "Read payload manifest property");
         if (property_value == nullptr || property_failed) {
@@ -375,12 +367,13 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
             });
     };
 
-    jstring version_name = env->NewStringUTF("formatVersion");
+    jstring version_name = new_java_string(env, "formatVersion");
     const jint format_version = env->CallIntMethod(json_object, get_int, version_name);
     env->DeleteLocalRef(version_name);
     std::string managed_runtime_backend;
     bool valid = !clear_exception(env, "Read payload manifest version") &&
         format_version == 8 &&
+        (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64") &&
         read_property("loaderSha256", descriptor.loader_hash) &&
         read_property("dotnetSha256", descriptor.dotnet_hash) &&
         read_property("interopSha256", descriptor.interop_hash) &&
@@ -402,12 +395,12 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
          descriptor.deployment_profile == "production" ||
          descriptor.deployment_profile == "locked");
 
-    jstring files_name = env->NewStringUTF("deploymentFiles");
+    jstring files_name = new_java_string(env, "deploymentFiles");
     jobject files = valid
-        ? env->CallObjectMethod(json_object, get_array, files_name)
+        ? checked_object_call(env, json_object, get_array, files_name)
         : nullptr;
     env->DeleteLocalRef(files_name);
-    if (valid && (files == nullptr || clear_exception(env, "Read deployment file manifest"))) {
+    if (valid && (clear_exception(env, "Read deployment file manifest") || files == nullptr)) {
         valid = false;
     }
     jclass array_class = nullptr;
@@ -415,8 +408,8 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     jmethodID array_object = nullptr;
     if (valid) {
         array_class = env->GetObjectClass(files);
-        array_length = env->GetMethodID(array_class, "length", "()I");
-        array_object = env->GetMethodID(
+        array_length = required_method(env, array_class, "length", "()I");
+        array_object = required_method(env,
             array_class, "getJSONObject", "(I)Lorg/json/JSONObject;");
         valid = array_length != nullptr && array_object != nullptr &&
             !clear_exception(env, "Resolve JSONArray methods");
@@ -429,15 +422,15 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     descriptor.deployment_files.clear();
     descriptor.deployment_files.reserve(valid ? static_cast<size_t>(file_count) : 0);
     for (jint index = 0; valid && index < file_count; ++index) {
-        jobject file = env->CallObjectMethod(files, array_object, index);
-        if (file == nullptr || clear_exception(env, "Read deployment file entry")) {
+        jobject file = checked_object_call(env, files, array_object, index);
+        if (clear_exception(env, "Read deployment file entry") || file == nullptr) {
             env->DeleteLocalRef(file);
             valid = false;
             break;
         }
         DeploymentFileDescriptor entry;
         std::string policy;
-        jstring size_name = env->NewStringUTF("size");
+        jstring size_name = new_java_string(env, "size");
         const jlong size = env->CallLongMethod(file, get_long, size_name);
         env->DeleteLocalRef(size_name);
         valid = !clear_exception(env, "Read deployment file size") && size >= 0 &&
@@ -472,7 +465,7 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         std::sort(
             descriptor.deployment_files.begin(),
             descriptor.deployment_files.end(),
-            [](const auto& left, const auto& right) { return left.path < right.path; });
+            [](const auto& left, const auto& right) { return utf16_ordinal_less(left.path, right.path); });
         for (const DeploymentFileDescriptor& file : descriptor.deployment_files) {
             revision_input += '\n' + file.path + '|' + std::to_string(file.size) + '|' +
                 file.hash + '|' + deployment::name(file.policy);
@@ -521,7 +514,11 @@ bool write_text_file(const std::filesystem::path& path, const std::string& value
     }
     std::ofstream output(path, std::ios::binary | std::ios::trunc);
     output << value;
-    return output.good();
+    if (!finish_output(output, error)) {
+        log_error("Could not write/close state file '" + path.string() + "': " + error.message());
+        return false;
+    }
+    return true;
 }
 
 bool reject_metadata_symlink(const std::filesystem::path& path) {
@@ -570,25 +567,10 @@ bool validate_destination_path(
 bool publish_deployment_file(
     const std::filesystem::path& source,
     const std::filesystem::path& destination) {
-    std::error_code error;
-    std::filesystem::create_directories(destination.parent_path(), error);
-    if (error) {
-        return false;
-    }
-    std::filesystem::path temporary = destination;
-    temporary += ".lemon-deploy.tmp";
-    std::filesystem::remove(temporary, error);
-    if (error) {
-        return false;
-    }
-    std::filesystem::copy_file(source, temporary, std::filesystem::copy_options::none, error);
-    if (error) {
-        std::filesystem::remove(temporary, error);
-        return false;
-    }
-    std::filesystem::rename(temporary, destination, error);
-    if (error) {
-        std::filesystem::remove(temporary, error);
+    std::string failure;
+    if (!deployment::publish_file(source, destination, failure)) {
+        log_error("Failed to publish deployment file from '" + source.string() +
+                  "' to '" + destination.string() + "': " + failure);
         return false;
     }
     return true;
@@ -814,9 +796,9 @@ bool deploy_assets_if_changed(
         for (std::filesystem::recursive_directory_iterator iterator(staging, error), end;
              !error && iterator != end;
              iterator.increment(error)) {
-            if (!iterator->is_regular_file(error)) {
-                continue;
-            }
+            const bool regular = iterator->is_regular_file(error);
+            if (error) break;
+            if (!regular) continue;
             const std::filesystem::path relative =
                 std::filesystem::relative(iterator->path(), staging, error);
             if (error ||
@@ -856,15 +838,13 @@ bool deploy_assets_if_changed(
         for (std::filesystem::recursive_directory_iterator iterator(state_root, error), end;
              !error && iterator != end;
              iterator.increment(error)) {
-            if (!iterator->is_regular_file(error)) {
-                continue;
-            }
+            const bool regular = iterator->is_regular_file(error);
+            if (error) break;
+            if (!regular) continue;
             const std::filesystem::path relative =
                 std::filesystem::relative(iterator->path(), state_root, error);
-            if (error || relative == ".revision") {
-                error.clear();
-                continue;
-            }
+            if (error) break;
+            if (relative == ".revision") continue;
             InstalledDeploymentFile previous;
             if (is_safe_relative_path(relative.generic_string()) &&
                 read_deployment_state(iterator->path(), previous)) {
@@ -879,7 +859,7 @@ bool deploy_assets_if_changed(
     }
 
     std::filesystem::remove_all(next_state_root, error);
-    std::filesystem::create_directories(next_state_root, error);
+    if (!error) std::filesystem::create_directories(next_state_root, error);
     if (error || !write_text_file(
             next_state_root / ".revision", payload.deployment_revision + "\n")) {
         log_error("Failed to prepare packaged deployment state");
@@ -1023,8 +1003,18 @@ bool deploy_assets_if_changed(
             applied = std::filesystem::remove(operation.destination, error) && !error;
         }
         if (!applied) {
+            const char* action = operation.action == deployment::Action::install
+                ? "install"
+                : operation.action == deployment::Action::replace ? "replace" : "remove";
+            std::string detail = std::string(" (action=") + action + ")";
+            if (operation.action == deployment::Action::remove) {
+                detail += error
+                    ? ": " + error.message() + " (errno=" +
+                        std::to_string(error.value()) + ")"
+                    : ": destination no longer exists";
+            }
             log_error("Failed to apply packaged deployment file '" +
-                      operation.destination.string() + "'");
+                      operation.destination.string() + "'" + detail);
             if (!rollback_deployment(operations)) {
                 log_error("Packaged deployment rollback was incomplete");
             }
@@ -1105,25 +1095,25 @@ bool compute_file_sha256(const std::filesystem::path& path, std::string& output)
     }
 
     jclass digest_class = env->FindClass("java/security/MessageDigest");
-    if (digest_class == nullptr || clear_exception(env, "FindClass(MessageDigest)")) {
+    if (clear_exception(env, "FindClass(MessageDigest)") || digest_class == nullptr) {
         return false;
     }
-    jmethodID get_instance = env->GetStaticMethodID(
+    jmethodID get_instance = required_static_method(env,
         digest_class,
         "getInstance",
         "(Ljava/lang/String;)Ljava/security/MessageDigest;");
-    jmethodID update = env->GetMethodID(digest_class, "update", "([BII)V");
-    jmethodID digest_method = env->GetMethodID(digest_class, "digest", "()[B");
+    jmethodID update = required_method(env, digest_class, "update", "([BII)V");
+    jmethodID digest_method = required_method(env, digest_class, "digest", "()[B");
     if (get_instance == nullptr || update == nullptr || digest_method == nullptr ||
         clear_exception(env, "Resolve MessageDigest methods")) {
         env->DeleteLocalRef(digest_class);
         return false;
     }
 
-    jstring algorithm = env->NewStringUTF("SHA-256");
-    jobject digest = env->CallStaticObjectMethod(digest_class, get_instance, algorithm);
+    jstring algorithm = new_java_string(env, "SHA-256");
+    jobject digest = checked_static_object_call(env, digest_class, get_instance, algorithm);
     env->DeleteLocalRef(algorithm);
-    if (digest == nullptr || clear_exception(env, "Create SHA-256 MessageDigest")) {
+    if (clear_exception(env, "Create SHA-256 MessageDigest") || digest == nullptr) {
         env->DeleteLocalRef(digest_class);
         return false;
     }
@@ -1136,7 +1126,7 @@ bool compute_file_sha256(const std::filesystem::path& path, std::string& output)
     }
     std::array<char, 64 * 1024> buffer{};
     jbyteArray bytes = env->NewByteArray(static_cast<jsize>(buffer.size()));
-    if (bytes == nullptr || clear_exception(env, "Allocate SHA-256 input buffer")) {
+    if (clear_exception(env, "Allocate SHA-256 input buffer") || bytes == nullptr) {
         if (bytes != nullptr) {
             env->DeleteLocalRef(bytes);
         }
@@ -1176,9 +1166,9 @@ bool compute_file_sha256(const std::filesystem::path& path, std::string& output)
         return false;
     }
 
-    auto digest_bytes = static_cast<jbyteArray>(env->CallObjectMethod(digest, digest_method));
+    auto digest_bytes = static_cast<jbyteArray>(checked_object_call(env, digest, digest_method));
     const bool digest_failed =
-        digest_bytes == nullptr || clear_exception(env, "Finish SHA-256 digest");
+        clear_exception(env, "Finish SHA-256 digest") || digest_bytes == nullptr;
     const bool digest_length_invalid =
         !digest_failed && env->GetArrayLength(digest_bytes) != 32;
     if (digest_failed || digest_length_invalid) {
@@ -1220,23 +1210,23 @@ bool compute_text_sha256(const std::string& value, std::string& output) {
         return false;
     }
     jclass digest_class = env->FindClass("java/security/MessageDigest");
-    if (digest_class == nullptr || clear_exception(env, "FindClass(MessageDigest)")) {
+    if (clear_exception(env, "FindClass(MessageDigest)") || digest_class == nullptr) {
         return false;
     }
-    jmethodID get_instance = env->GetStaticMethodID(
+    jmethodID get_instance = required_static_method(env,
         digest_class,
         "getInstance",
         "(Ljava/lang/String;)Ljava/security/MessageDigest;");
-    jmethodID digest_method = env->GetMethodID(digest_class, "digest", "([B)[B");
+    jmethodID digest_method = required_method(env, digest_class, "digest", "([B)[B");
     if (get_instance == nullptr || digest_method == nullptr ||
         clear_exception(env, "Resolve MessageDigest methods")) {
         env->DeleteLocalRef(digest_class);
         return false;
     }
-    jstring algorithm = env->NewStringUTF("SHA-256");
-    jobject digest = env->CallStaticObjectMethod(digest_class, get_instance, algorithm);
+    jstring algorithm = new_java_string(env, "SHA-256");
+    jobject digest = checked_static_object_call(env, digest_class, get_instance, algorithm);
     env->DeleteLocalRef(algorithm);
-    if (digest == nullptr || clear_exception(env, "Create SHA-256 MessageDigest")) {
+    if (clear_exception(env, "Create SHA-256 MessageDigest") || digest == nullptr) {
         env->DeleteLocalRef(digest_class);
         return false;
     }
@@ -1248,7 +1238,7 @@ bool compute_text_sha256(const std::string& value, std::string& output) {
             static_cast<jsize>(value.size()),
             reinterpret_cast<const jbyte*>(value.data()));
     }
-    if (input == nullptr || clear_exception(env, "Create deployment revision input")) {
+    if (clear_exception(env, "Create deployment revision input") || input == nullptr) {
         if (input != nullptr) {
             env->DeleteLocalRef(input);
         }
@@ -1257,10 +1247,10 @@ bool compute_text_sha256(const std::string& value, std::string& output) {
         return false;
     }
     auto digest_bytes = static_cast<jbyteArray>(
-        env->CallObjectMethod(digest, digest_method, input));
+        checked_object_call(env, digest, digest_method, input));
     env->DeleteLocalRef(input);
     const bool digest_failed =
-        digest_bytes == nullptr || clear_exception(env, "Hash deployment revision");
+        clear_exception(env, "Hash deployment revision") || digest_bytes == nullptr;
     const bool digest_length_invalid =
         !digest_failed && env->GetArrayLength(digest_bytes) != 32;
     if (digest_failed || digest_length_invalid) {
@@ -1292,6 +1282,8 @@ bool compute_text_sha256(const std::string& value, std::string& output) {
     return true;
 }
 
+// Keep the process-wide default on both runtime profiles. Android CoreCLR's
+// Java trust store does not cover other OpenSSL consumers loaded by a game/Mod.
 void configure_android_certificate_store() {
     const char* certificate_directories[] = {
         "/apex/com.android.conscrypt/cacerts",
@@ -1304,15 +1296,13 @@ void configure_android_certificate_store() {
             error.clear();
             continue;
         }
-
         if (setenv("SSL_CERT_DIR", directory, 0) != 0) {
-            log_error("Could not configure Android system certificate directory");
-            return;
+            const int code = errno;
+            log_error(std::string("Could not configure Android system certificate directory '") +
+                      directory + "': " + std::error_code(code, std::generic_category()).message());
         }
-
         return;
     }
-
     log_error("Android system certificate directory was not found");
 }
 
@@ -1320,33 +1310,37 @@ void configure_android_certificate_store() {
 
 bool initialize_android_environment(JNIEnv* env) {
     jclass unity_player = env->FindClass("com/unity3d/player/UnityPlayer");
-    if (unity_player == nullptr || clear_exception(env, "FindClass(UnityPlayer)")) {
+    if (clear_exception(env, "FindClass(UnityPlayer)") || unity_player == nullptr) {
         return false;
     }
     jfieldID activity_field = env->GetStaticFieldID(
         unity_player, "currentActivity", "Landroid/app/Activity;");
+    if (clear_exception(env, "Resolve UnityPlayer.currentActivity") || !activity_field) {
+        env->DeleteLocalRef(unity_player);
+        return false;
+    }
     jobject activity = env->GetStaticObjectField(unity_player, activity_field);
-    if (activity == nullptr || clear_exception(env, "UnityPlayer.currentActivity")) {
+    if (clear_exception(env, "UnityPlayer.currentActivity") || activity == nullptr) {
         env->DeleteLocalRef(unity_player);
         return false;
     }
 
     jclass activity_class = env->GetObjectClass(activity);
-    jmethodID get_package_name = env->GetMethodID(
+    jmethodID get_package_name = required_method(env,
         activity_class, "getPackageName", "()Ljava/lang/String;");
-    jmethodID get_files_dir = env->GetMethodID(
+    jmethodID get_files_dir = required_method(env,
         activity_class, "getFilesDir", "()Ljava/io/File;");
-    jmethodID get_external_files_dir = env->GetMethodID(
+    jmethodID get_external_files_dir = required_method(env,
         activity_class, "getExternalFilesDir", "(Ljava/lang/String;)Ljava/io/File;");
-    jmethodID get_assets = env->GetMethodID(
+    jmethodID get_assets = required_method(env,
         activity_class, "getAssets", "()Landroid/content/res/AssetManager;");
 
     auto package_value = static_cast<jstring>(
-        env->CallObjectMethod(activity, get_package_name));
-    jobject files_directory = env->CallObjectMethod(activity, get_files_dir);
-    jobject external_directory = env->CallObjectMethod(
+        checked_object_call(env, activity, get_package_name));
+    jobject files_directory = checked_object_call(env, activity, get_files_dir);
+    jobject external_directory = checked_object_call(env,
         activity, get_external_files_dir, nullptr);
-    jobject assets = env->CallObjectMethod(activity, get_assets);
+    jobject assets = checked_object_call(env, activity, get_assets);
     if (clear_exception(env, "Activity path discovery")) {
         return false;
     }
@@ -1354,12 +1348,26 @@ bool initialize_android_environment(JNIEnv* env) {
     runtime_paths.package_name = get_string(env, package_value);
     const std::filesystem::path files_path = get_file_path(env, files_directory);
     const std::filesystem::path external_path = get_file_path(env, external_directory);
+    if (files_path.empty() || !files_path.is_absolute() ||
+        (!external_path.empty() && !external_path.is_absolute()) || !assets) {
+        log_error("Android returned an invalid files directory or AssetManager");
+        return false;
+    }
     runtime_paths.internal_data_directory = files_path.parent_path().string();
     runtime_paths.dotnet_directory =
         (files_path.parent_path() / "dotnet").string();
     runtime_paths.base_directory = external_path.empty()
         ? (files_path / "MelonLoader").string()
         : (external_path / "MelonLoader").string();
+    static ProcessLock runtime_lock;
+    std::error_code lock_error;
+    const auto lock_path = files_path / ".lemonloader-runtime.lock";
+    if (!runtime_lock.acquire(lock_path, lock_error)) {
+        log_error("Could not exclusively lock runtime files at '" + lock_path.string() +
+                  "': " + lock_error.message() +
+                  ". Another application process may already be using LemonLoader.");
+        return false;
+    }
     asset_manager = AAssetManager_fromJava(env, assets);
     asset_manager_object = env->NewGlobalRef(assets);
 
@@ -1373,7 +1381,8 @@ bool initialize_android_environment(JNIEnv* env) {
     env->DeleteLocalRef(activity);
     env->DeleteLocalRef(unity_player);
 
-    if (asset_manager == nullptr || asset_manager_object == nullptr ||
+    if (clear_exception(env, "Retain Android AssetManager") ||
+        asset_manager == nullptr || asset_manager_object == nullptr ||
         runtime_paths.base_directory.empty() ||
         runtime_paths.dotnet_directory.empty()) {
         log_error("Android runtime path or AssetManager discovery failed");
@@ -1387,6 +1396,7 @@ bool extract_runtime_assets() {
     if (!read_payload_descriptor(payload)) {
         return false;
     }
+    runtime_paths.runtime_rid = payload.runtime_rid;
 
     const std::filesystem::path base(runtime_paths.base_directory);
     const std::filesystem::path internal(runtime_paths.internal_data_directory);
@@ -1430,17 +1440,24 @@ bool extract_runtime_assets() {
 }
 
 bool prepare_android_runtime() {
-    setenv("MELONLOADER_BASE_DIR", runtime_paths.base_directory.c_str(), 1);
-    setenv("MELONLOADER_DOTNET_ROOT", runtime_paths.dotnet_directory.c_str(), 1);
-    setenv("MELONLOADER_ANDROID_PACKAGE", runtime_paths.package_name.c_str(), 1);
-    setenv("MELONLOADER_BOOTSTRAP_KIND", "ndk", 1);
-    setenv("MELONLOADER_MANAGED_RUNTIME_BACKEND", "coreclr", 1);
-    setenv("DOTNET_ROOT", runtime_paths.dotnet_directory.c_str(), 1);
-    configure_android_certificate_store();
+    const auto set_environment = [](const char* name, const char* value) {
+        if (setenv(name, value, 1) == 0) return true;
+        const int code = errno;
+        log_error(std::string("Could not set environment variable ") + name + ": " +
+                  std::error_code(code, std::generic_category()).message());
+        return false;
+    };
     const char* existing_path = getenv("PATH");
     const std::string path = runtime_paths.dotnet_directory + ':' +
         (existing_path == nullptr ? "" : existing_path);
-    setenv("PATH", path.c_str(), 1);
+    if (!set_environment("MELONLOADER_BASE_DIR", runtime_paths.base_directory.c_str()) ||
+        !set_environment("MELONLOADER_DOTNET_ROOT", runtime_paths.dotnet_directory.c_str()) ||
+        !set_environment("MELONLOADER_ANDROID_PACKAGE", runtime_paths.package_name.c_str()) ||
+        !set_environment("MELONLOADER_BOOTSTRAP_KIND", "ndk") ||
+        !set_environment("MELONLOADER_MANAGED_RUNTIME_BACKEND", "coreclr") ||
+        !set_environment("DOTNET_ROOT", runtime_paths.dotnet_directory.c_str()) ||
+        !set_environment("PATH", path.c_str())) return false;
+    configure_android_certificate_store();
 
     using mallopt_fn = int (*)(int, int);
     auto mallopt_value = reinterpret_cast<mallopt_fn>(dlsym(RTLD_DEFAULT, "mallopt"));

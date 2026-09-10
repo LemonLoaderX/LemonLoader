@@ -23,15 +23,19 @@ namespace MelonLoader.Support
         private static Queue<SceneInitEvent> scenesLoaded = new Queue<SceneInitEvent>();
 #if ANDROID
         private static bool sceneNameWarningLogged;
+        private static bool sceneIndexWarningLogged;
+        private static PropertyInfo sceneBuildIndex = typeof(Scene).GetProperty("buildIndex", BindingFlags.Instance | BindingFlags.Public);
 #endif
 
-        internal static void Init(MethodInfo sceneLoaded, MethodInfo sceneUnloaded)
+        internal static bool Init(MethodInfo sceneLoaded, MethodInfo sceneUnloaded)
         {
+            bool loaded = false, unloaded = false;
             if (sceneLoaded != null)
                 try
                 {
                     MethodInfo onSceneLoadPrefix = typeof(SceneHandler).GetMethod("OnSceneLoadPrefix", BindingFlags.Static | BindingFlags.NonPublic);
                     Core.HarmonyInstance.Patch(sceneLoaded, new HarmonyMethod(onSceneLoadPrefix));
+                    loaded = true;
                     MelonDebug.Msg($"Hooked into {sceneLoaded.FullDescription()}");
                 }
                 catch (Exception ex) { MelonLogger.Error($"SceneManager.sceneLoaded override failed: {ex}"); }
@@ -41,9 +45,17 @@ namespace MelonLoader.Support
                 {
                     MethodInfo onSceneUnloadPrefix = typeof(SceneHandler).GetMethod("OnSceneUnloadPrefix", BindingFlags.Static | BindingFlags.NonPublic);
                     Core.HarmonyInstance.Patch(sceneUnloaded, new HarmonyMethod(onSceneUnloadPrefix));
+                    unloaded = true;
                     MelonDebug.Msg($"Hooked into {sceneUnloaded.FullDescription()}");
                 }
                 catch (Exception ex) { MelonLogger.Error($"SceneManager.sceneUnloaded override failed: {ex}"); }
+#if ANDROID
+            if (sceneLoaded == null)
+                MelonLogger.Warning("SceneLoaded callbacks are unavailable: Unity's Internal_SceneLoaded method is missing.");
+            if (sceneUnloaded == null)
+                MelonLogger.Warning("SceneUnloaded callbacks are unavailable: Unity's Internal_SceneUnloaded method is missing.");
+#endif
+            return loaded && unloaded;
         }
 
         private static void OnSceneLoadPrefix(Scene __0, LoadSceneMode __1)
@@ -101,13 +113,34 @@ namespace MelonLoader.Support
         private static int GetBuildIndex(Scene scene)
         {
 #if ANDROID
-            // Stripped Android interop assemblies may omit Scene.buildIndex.
-            // Preserve lifecycle delivery with an explicit unknown index.
+            if (sceneBuildIndex != null)
+            {
+                try { return (int)sceneBuildIndex.GetValue(scene, null); }
+                catch (Exception ex) when (IsMissingSceneIndex(ex))
+                {
+                    sceneBuildIndex = null;
+                }
+            }
+            if (!sceneIndexWarningLogged)
+            {
+                sceneIndexWarningLogged = true;
+                MelonLogger.Warning("Scene build indices are unavailable in this Unity runtime; callbacks will use -1.");
+            }
             return -1;
 #else
             return scene.buildIndex;
 #endif
         }
+
+#if ANDROID
+        private static bool IsMissingSceneIndex(Exception exception)
+        {
+            for (Exception current = exception; current != null; current = current.InnerException)
+                if (current is MissingIl2CppInternalCallException || current is MissingMemberException)
+                    return true;
+            return false;
+        }
+#endif
 
         internal static void OnUpdate()
         {

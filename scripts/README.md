@@ -39,6 +39,8 @@ without scanning one flat directory.
 | `test/deploy-android-managed-file.ps1` | Back up and replace one device managed file with hash checks |
 | `test/verify-android-runtime-parity.ps1` | Verify clean logs, Unity capture, preferences, and historical log output |
 | `test/test-android-logging.sh` | Run the Linux/WSL host regression for Android log text, severity, and file output |
+| `test/test-android-bootstrap.sh` | Run Linux/WSL regressions for instruction bounds, JNI failures, asset I/O and runtime process locking; requires NDK headers |
+| `test/test-android-deployment.sh` | Run the Linux/WSL file-publication regression for preserved destinations and failure diagnostics |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

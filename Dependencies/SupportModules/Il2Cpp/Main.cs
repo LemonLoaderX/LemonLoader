@@ -38,7 +38,12 @@ namespace MelonLoader.Support
                 {
                     Assembly.LoadFrom(file);
                 }
-                catch { }
+                catch (Exception exception)
+                {
+#if ANDROID
+                    MelonLogger.Warning($"Could not preload Interop assembly '{Path.GetFileName(file)}': {exception}");
+#endif
+                }
             }
 
             UnityMappers.RegisterMappers();

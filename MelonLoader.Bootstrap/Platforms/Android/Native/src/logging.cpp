@@ -1,3 +1,4 @@
+#include "native_errors.hpp"
 #include "lemon_bootstrap.h"
 #include "state.hpp"
 
@@ -37,24 +38,6 @@ using AndroidLogPrintFn = int (*)(int, const char*, const char*, ...);
 AndroidLogWriteFn original_log_write = nullptr;
 AndroidLogVPrintFn original_log_vprint = nullptr;
 AndroidLogPrintFn original_log_print = nullptr;
-
-void append_utf8(std::string& output, uint32_t code_point) {
-    if (code_point <= 0x7f) {
-        output.push_back(static_cast<char>(code_point));
-    } else if (code_point <= 0x7ff) {
-        output.push_back(static_cast<char>(0xc0 | (code_point >> 6)));
-        output.push_back(static_cast<char>(0x80 | (code_point & 0x3f)));
-    } else if (code_point <= 0xffff) {
-        output.push_back(static_cast<char>(0xe0 | (code_point >> 12)));
-        output.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3f)));
-        output.push_back(static_cast<char>(0x80 | (code_point & 0x3f)));
-    } else {
-        output.push_back(static_cast<char>(0xf0 | (code_point >> 18)));
-        output.push_back(static_cast<char>(0x80 | ((code_point >> 12) & 0x3f)));
-        output.push_back(static_cast<char>(0x80 | ((code_point >> 6) & 0x3f)));
-        output.push_back(static_cast<char>(0x80 | (code_point & 0x3f)));
-    }
-}
 
 std::string timestamp() {
     const auto now = std::chrono::system_clock::now();
@@ -100,7 +83,7 @@ int hook_log_write(int priority, const char* tag, const char* text) {
     const bool outermost = !forwarding_player_log;
     if (outermost) {
         forwarding_player_log = true;
-        capture_unity_log(tag, text);
+        native_boundary("Unity log capture", [&]() { capture_unity_log(tag, text); });
     }
     const int result = original_log_write == nullptr
         ? 0
@@ -134,7 +117,7 @@ int hook_log_vprint(int priority, const char* tag, const char* format, va_list a
     const bool outermost = !forwarding_player_log;
     if (outermost) {
         forwarding_player_log = true;
-        capture_formatted_unity_log(tag, format, args);
+        native_boundary("Unity formatted log capture", [&]() { capture_formatted_unity_log(tag, format, args); });
     }
     const int result = original_log_vprint == nullptr
         ? 0
@@ -151,7 +134,7 @@ int hook_log_print(int priority, const char* tag, const char* format, ...) {
     const bool outermost = !forwarding_player_log;
     if (outermost) {
         forwarding_player_log = true;
-        capture_formatted_unity_log(tag, format, args);
+        native_boundary("Unity formatted log capture", [&]() { capture_formatted_unity_log(tag, format, args); });
     }
     const int result = original_log_vprint == nullptr
         ? 0
@@ -201,27 +184,6 @@ uint32_t install_player_log_hooks() {
 }
 
 }  // namespace
-
-std::string utf16_to_utf8(const uint16_t* value, int length) {
-    if (value == nullptr || length <= 0) {
-        return {};
-    }
-
-    std::string output;
-    output.reserve(static_cast<size_t>(length));
-    for (int index = 0; index < length; ++index) {
-        uint32_t code_point = value[index];
-        if (code_point >= 0xd800 && code_point <= 0xdbff && index + 1 < length) {
-            const uint32_t low = value[index + 1];
-            if (low >= 0xdc00 && low <= 0xdfff) {
-                code_point = 0x10000 + ((code_point - 0xd800) << 10) + (low - 0xdc00);
-                ++index;
-            }
-        }
-        append_utf8(output, code_point);
-    }
-    return output;
-}
 
 static void log_line(const std::string& message, int priority) {
     std::lock_guard<std::mutex> lock(log_mutex);
@@ -372,7 +334,9 @@ void configure_logging(uint32_t max_logs, bool should_capture_player_logs) {
 extern "C" LEMON_EXPORT void ConfigureLogging(
     uint32_t max_logs,
     uint8_t capture_player_logs) {
-    lemon::bootstrap::configure_logging(max_logs, capture_player_logs != 0);
+    lemon::bootstrap::native_boundary("ConfigureLogging", [&]() {
+        lemon::bootstrap::configure_logging(max_logs, capture_player_logs != 0);
+    });
 }
 
 extern "C" LEMON_EXPORT void LogMsg(
@@ -384,15 +348,17 @@ extern "C" LEMON_EXPORT void LogMsg(
     int section_length,
     const uint16_t* stripped_message,
     int stripped_message_length) {
-    std::string text = stripped_message != nullptr
-        ? lemon::bootstrap::utf16_to_utf8(stripped_message, stripped_message_length)
-        : lemon::bootstrap::utf16_to_utf8(message, message_length);
-    const std::string section_text =
-        lemon::bootstrap::utf16_to_utf8(section, section_length);
-    if (!section_text.empty()) {
-        text = '[' + section_text + "] " + text;
-    }
-    lemon::bootstrap::log_line(text);
+    lemon::bootstrap::native_boundary("LogMsg", [&]() {
+        std::string text = stripped_message != nullptr
+            ? lemon::bootstrap::utf16_to_utf8(stripped_message, stripped_message_length)
+            : lemon::bootstrap::utf16_to_utf8(message, message_length);
+        const std::string section_text =
+            lemon::bootstrap::utf16_to_utf8(section, section_length);
+        if (!section_text.empty()) {
+            text = '[' + section_text + "] " + text;
+        }
+        lemon::bootstrap::log_line(text);
+    });
 }
 
 extern "C" LEMON_EXPORT void LogError(
@@ -401,15 +367,17 @@ extern "C" LEMON_EXPORT void LogError(
     const uint16_t* section,
     int section_length,
     int warning) {
-    std::string text = lemon::bootstrap::utf16_to_utf8(message, message_length);
-    const std::string section_text =
-        lemon::bootstrap::utf16_to_utf8(section, section_length);
-    if (!section_text.empty()) {
-        text = '[' + section_text + "] " + text;
-    }
-    lemon::bootstrap::log_line(
-        std::string(warning ? "[WARNING] " : "[ERROR] ") + text,
-        warning ? ANDROID_LOG_WARN : ANDROID_LOG_ERROR);
+    lemon::bootstrap::native_boundary("LogError", [&]() {
+        std::string text = lemon::bootstrap::utf16_to_utf8(message, message_length);
+        const std::string section_text =
+            lemon::bootstrap::utf16_to_utf8(section, section_length);
+        if (!section_text.empty()) {
+            text = '[' + section_text + "] " + text;
+        }
+        lemon::bootstrap::log_line(
+            std::string(warning ? "[WARNING] " : "[ERROR] ") + text,
+            warning ? ANDROID_LOG_WARN : ANDROID_LOG_ERROR);
+    });
 }
 
 extern "C" LEMON_EXPORT void LogMelonInfo(
@@ -418,9 +386,11 @@ extern "C" LEMON_EXPORT void LogMelonInfo(
     int name_length,
     const uint16_t* info,
     int info_length) {
-    lemon::bootstrap::log_line(
-        lemon::bootstrap::utf16_to_utf8(name, name_length) + ": " +
-        lemon::bootstrap::utf16_to_utf8(info, info_length));
+    lemon::bootstrap::native_boundary("LogMelonInfo", [&]() {
+        lemon::bootstrap::log_line(
+            lemon::bootstrap::utf16_to_utf8(name, name_length) + ": " +
+            lemon::bootstrap::utf16_to_utf8(info, info_length));
+    });
 }
 
 extern "C" LEMON_EXPORT uint8_t IsConsoleOpen() {

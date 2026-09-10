@@ -73,7 +73,8 @@ public static class APKAssetManager
 
         ThrowIfException();
 
-        return new APKAssetStream(asset);
+        try { return new APKAssetStream(asset); }
+        catch { asset.Dispose(); throw; }
     }
 
     public static string[] GetDirectoryContents(string directory)
@@ -145,6 +146,19 @@ public static class APKAssetManager
         throw new IOException("An Android AssetManager operation failed.");
     }
 
+    private static JMethodID RequiredMethod(JClass type, string name, string signature)
+    {
+        ThrowIfException();
+        if (!type.Valid()) throw new IOException($"Android class is unavailable while resolving {name}{signature}.");
+        var method = JNI.GetMethodID(type, name, signature);
+        if (JNI.ExceptionCheck() || method.Handle == IntPtr.Zero)
+        {
+            ClearException();
+            throw new IOException($"Required Android method is unavailable: {name}{signature}.");
+        }
+        return method;
+    }
+
     private static void GetAndroidAssetManager()
     {
         if (assetManager?.Valid() ?? false)
@@ -179,6 +193,8 @@ public static class APKAssetManager
 
         private long _pos = 0;
         private bool _disposed = false;
+        private JArray<sbyte>? _readBuffer;
+        private int _readBufferCapacity;
 
         public APKAssetStream(JObject obj)
         {
@@ -186,25 +202,27 @@ public static class APKAssetManager
 
             using JClass streamClass = JNI.GetObjectClass(_streamObject);
 
-            _availableJmid = JNI.GetMethodID(streamClass, "available", "()I");
-            _readJmid = JNI.GetMethodID(streamClass, "read", "([BII)I");
-            _markJmid = JNI.GetMethodID(streamClass, "mark", "(I)V");
-            _markSupportedJmid = JNI.GetMethodID(streamClass, "markSupported", "()Z");
-            _skipJmid = JNI.GetMethodID(streamClass, "skip", "(J)J");
-            _resetJmid = JNI.GetMethodID(streamClass, "reset", "()V");
-            _closeJmid = JNI.GetMethodID(streamClass, "close", "()V");
+            _availableJmid = RequiredMethod(streamClass, "available", "()I");
+            _readJmid = RequiredMethod(streamClass, "read", "([BII)I");
+            _markJmid = RequiredMethod(streamClass, "mark", "(I)V");
+            _markSupportedJmid = RequiredMethod(streamClass, "markSupported", "()Z");
+            _skipJmid = RequiredMethod(streamClass, "skip", "(J)J");
+            _resetJmid = RequiredMethod(streamClass, "reset", "()V");
+            _closeJmid = RequiredMethod(streamClass, "close", "()V");
 
             _length = JNI.CallMethod<int>(_streamObject, _availableJmid);
+            ThrowIfException();
             _canSeek = JNI.CallMethod<bool>(_streamObject, _markSupportedJmid);
+            ThrowIfException();
             if (_canSeek)
                 JNI.CallVoidMethod(_streamObject, _markJmid, new JValue(int.MaxValue));
 
             ThrowIfException();
         }
 
-        public override bool CanRead => true;
+        public override bool CanRead => !_disposed;
 
-        public override bool CanSeek => _canSeek;
+        public override bool CanSeek => !_disposed && _canSeek;
 
         public override bool CanWrite => false;
 
@@ -231,21 +249,30 @@ public static class APKAssetManager
             if (count == 0)
                 return 0;
 
-            using JArray<sbyte> javaBuffer = JNI.NewArray<sbyte>(count);
+            int requested = Math.Min(count, 64 * 1024);
+            if (_readBufferCapacity < requested)
+            {
+                var replacement = JNI.NewArray<sbyte>(requested);
+                ThrowIfException();
+                _readBuffer?.Dispose();
+                _readBuffer = replacement;
+                _readBufferCapacity = requested;
+            }
 
             int read = JNI.CallMethod<int>(
                 _streamObject,
                 _readJmid,
-                new JValue(javaBuffer),
+                new JValue(_readBuffer!),
                 new JValue(0),
-                new JValue(count));
+                new JValue(requested));
             ThrowIfException();
 
             if (read == -1)
                 return 0;
-
-            sbyte[] source = javaBuffer.GetElements();
-            Buffer.BlockCopy(source, 0, buffer, offset, read);
+            if (read < 0 || read > requested)
+                throw new IOException("Android asset stream returned an invalid byte count.");
+            JNI.CopyByteArrayRegion(_readBuffer!, buffer, offset, read);
+            ThrowIfException();
 
             _pos += read;
             return read;
@@ -270,18 +297,24 @@ public static class APKAssetManager
             if (target < 0 || target > _length)
                 throw new IOException("Attempted to seek outside the APK asset.");
 
-            JNI.CallVoidMethod(_streamObject, _resetJmid);
-            long skipped = 0;
-            while (skipped < target)
+            if (target == _pos) return _pos;
+            if (target < _pos)
+            {
+                JNI.CallVoidMethod(_streamObject, _resetJmid);
+                ThrowIfException();
+                _pos = 0;
+            }
+            while (_pos < target)
             {
                 long current = JNI.CallMethod<long>(
                     _streamObject,
                     _skipJmid,
-                    new JValue(target - skipped));
-                if (current <= 0)
+                    new JValue(target - _pos));
+                ThrowIfException();
+                if (current <= 0 || current > target - _pos)
                     throw new IOException("The APK asset stream could not reach the requested position.");
 
-                skipped += current;
+                _pos += current;
             }
 
             ThrowIfException();
@@ -294,17 +327,30 @@ public static class APKAssetManager
 
         protected override void Dispose(bool disposing)
         {
-            if (!_disposed)
+            if (_disposed)
+                return;
+            _disposed = true;
+            try
             {
                 if (disposing)
                 {
-                    JNI.CallVoidMethod(_streamObject, _closeJmid);
-                    ClearException();
-                    _streamObject.Dispose();
+                    try
+                    {
+                        JNI.CallVoidMethod(_streamObject, _closeJmid);
+                        ThrowIfException();
+                    }
+                    finally
+                    {
+                        try { _streamObject.Dispose(); }
+                        finally
+                        {
+                            _readBuffer?.Dispose();
+                            _readBuffer = null;
+                        }
+                    }
                 }
-                _disposed = true;
             }
-            base.Dispose(disposing);
+            finally { base.Dispose(disposing); }
         }
     }
 }

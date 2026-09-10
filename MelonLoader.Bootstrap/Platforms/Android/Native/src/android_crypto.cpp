@@ -1,4 +1,5 @@
 #include "state.hpp"
+#include "jni_utils.hpp"
 
 #include <dlfcn.h>
 
@@ -14,13 +15,7 @@ void* android_crypto_module = nullptr;
 jclass android_crypto_loader_class = nullptr;
 
 bool clear_jni_exception(JNIEnv* env, const std::string& context) {
-    if (!env->ExceptionCheck()) {
-        return false;
-    }
-    env->ExceptionDescribe();
-    env->ExceptionClear();
-    log_error("Android CoreCLR crypto initialization failed while " + context);
-    return true;
+    return clear_java_exception(env, context.c_str());
 }
 
 bool is_android_crypto_library(const char* library_name) {
@@ -42,11 +37,13 @@ bool is_android_crypto_library(const char* library_name) {
 
 bool initialize_android_crypto(const std::string& runtime_directory) {
     const auto root = std::filesystem::path(runtime_directory);
-    if (std::filesystem::is_regular_file(root / "libSystem.Security.Cryptography.Native.OpenSsl.so")) {
+    if (runtime_paths.runtime_rid == "linux-bionic-arm64") {
         // Experimental Bionic packs carry their own OpenSSL pair. Never fall back to BoringSSL.
-        for (const char* name : {"libcrypto.so", "libssl.so"}) {
+        for (const char* name : {"libcrypto.so", "libssl.so", "libSystem.Security.Cryptography.Native.OpenSsl.so"}) {
             if (dlopen((root / name).c_str(), RTLD_NOW | RTLD_LOCAL) == nullptr) {
-                log_error(std::string("Bionic OpenSSL preload failed: ") + dlerror());
+                const char* detail = dlerror();
+                log_error("Bionic OpenSSL preload failed for '" + (root / name).string() +
+                          "': " + (detail ? detail : "unknown linker error"));
                 return false;
             }
         }
@@ -65,7 +62,8 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
         std::filesystem::path(runtime_directory) /
         "libSystem.Security.Cryptography.Native.Android.so";
     if (!std::filesystem::is_regular_file(crypto_library)) {
-        return true;
+        log_error("Android crypto library is missing: '" + crypto_library.string() + "'");
+        return false;
     }
     if (android_crypto_module != nullptr) {
         return true;
@@ -84,24 +82,27 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
 
     jclass loader_class = env->FindClass(
         "net/dot/android/crypto/LemonLoaderCryptoBootstrap");
-    if (loader_class == nullptr || clear_jni_exception(env, "finding the APK crypto bridge")) {
-        log_error("The Patcher did not install the Android CoreCLR crypto dex into the APK");
+    if (clear_jni_exception(env, "finding the APK crypto bridge") || loader_class == nullptr) {
+        log_error("Android CoreCLR crypto bridge is unavailable; verify the APK helper DEX and class loader");
         return false;
     }
-    jmethodID load_library = env->GetStaticMethodID(
+    jmethodID load_library = required_static_method(env,
         loader_class,
         "load",
         "(Ljava/lang/String;)V");
-    jstring library_path = env->NewStringUTF(crypto_library.c_str());
-    if (load_library != nullptr && library_path != nullptr) {
-        env->CallStaticVoidMethod(loader_class, load_library, library_path);
-    }
-    const bool load_failed = load_library == nullptr || library_path == nullptr ||
-        clear_jni_exception(env, "loading the Android crypto native library");
+    jstring library_path = new_java_string(env, crypto_library.string());
+    env->CallStaticVoidMethod(loader_class, load_library, library_path);
+    const bool load_failed = clear_jni_exception(env, "loading the Android crypto native library") ||
+        library_path == nullptr;
     if (!load_failed) {
         android_crypto_module = dlopen(
             crypto_library.c_str(),
             RTLD_NOW | RTLD_NOLOAD | RTLD_LOCAL);
+        if (!android_crypto_module) {
+            const char* detail = dlerror();
+            log_error("Could not retain Android crypto module '" + crypto_library.string() +
+                      "': " + (detail ? detail : "unknown linker error"));
+        }
         android_crypto_loader_class = static_cast<jclass>(env->NewGlobalRef(loader_class));
     }
 
@@ -110,7 +111,8 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
     }
     env->DeleteLocalRef(loader_class);
 
-    if (load_failed || android_crypto_module == nullptr ||
+    if (clear_jni_exception(env, "retaining the Android crypto bridge") ||
+        load_failed || android_crypto_module == nullptr ||
         android_crypto_loader_class == nullptr) {
         log_error("Android CoreCLR crypto native library initialization did not complete");
         return false;

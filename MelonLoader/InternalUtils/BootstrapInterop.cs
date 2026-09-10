@@ -12,6 +12,10 @@ namespace MelonLoader.InternalUtils;
 public static unsafe class BootstrapInterop
 {
     internal static BootstrapLibrary Library { get; private set; }
+#if ANDROID
+    // Resolved separately so an older bootstrap can still load this assembly.
+    private static delegate* unmanaged[Cdecl]<nint*, nint, int> _tryNativeHookDetach;
+#endif
 
     internal static void SetDefaultConsoleTitleWithGameName(string gameName, string gameVersion = null)
     {
@@ -75,11 +79,28 @@ public static unsafe class BootstrapInterop
 
     public static unsafe void NativeHookDetach(nint target, nint detour)
     {
-        NativeHookDetachDirect(target, detour);
+        TryNativeHookDetach(target, detour);
+    }
+
+    internal static bool TryNativeHookDetach(nint target, nint detour)
+    {
+#if ANDROID
+        if (_tryNativeHookDetach != null)
+        {
+            if (_tryNativeHookDetach((nint*)target, detour) == 0)
+                return false;
+        }
+        else
+#endif
+        {
+            // Legacy bootstraps expose no result. Preserve their existing behavior.
+            NativeHookDetachDirect(target, detour);
+        }
 
 #if NET6_0_OR_GREATER
         NativeStackWalk.UnregisterHookAddr((ulong)target);
 #endif
+        return true;
     }
     
     internal static unsafe void NativeHookDetachDirect(nint target, nint detour)
@@ -94,6 +115,10 @@ public static unsafe class BootstrapInterop
         try
         {
             Library = new NativeLibrary<BootstrapLibrary>(bootstrapHandle).Instance;
+#if ANDROID
+            _tryNativeHookDetach = (delegate* unmanaged[Cdecl]<nint*, nint, int>)
+                NativeLibrary.AgnosticGetProcAddress(bootstrapHandle, "TryNativeHookDetach");
+#endif
         }
         catch (Exception ex)
         {

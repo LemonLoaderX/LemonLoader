@@ -17,11 +17,9 @@ namespace MelonLoader.Support
             if (_initialized)
                 return;
 
-            _initialized = true;
-
             MethodInfo sceneLoaded = typeof(SceneManager).GetMethod("Internal_SceneLoaded", StaticMethodFlags);
             MethodInfo sceneUnloaded = typeof(SceneManager).GetMethod("Internal_SceneUnloaded", StaticMethodFlags);
-            SceneHandler.Init(sceneLoaded, sceneUnloaded);
+            _initialized = SceneHandler.Init(sceneLoaded, sceneUnloaded);
         }
     }
 }

@@ -859,13 +859,14 @@ public unsafe static partial class JNI
             if (!str.Valid())
                 return "";
 
-            IntPtr res = Env->Functions->GetStringUTFChars(Env, str.Handle, out byte isCopy);
+            var currentEnv = Env;
+            int length = currentEnv->Functions->GetStringLength(currentEnv, str.Handle);
+            IntPtr res = currentEnv->Functions->GetStringChars(currentEnv, str.Handle, out byte isCopy);
             if (res == IntPtr.Zero)
                 return string.Empty;
 
-            string? resultString = Marshal.PtrToStringUTF8(res);
-            Env->Functions->ReleaseStringUTFChars(Env, str.Handle, res);
-            return resultString ?? "";
+            try { return Marshal.PtrToStringUni(res, length) ?? string.Empty; }
+            finally { currentEnv->Functions->ReleaseStringChars(currentEnv, str.Handle, res); }
         }
     }
 
@@ -1065,6 +1066,19 @@ public unsafe static partial class JNI
             {
                 throw new ArgumentException($"GetArrayElements Type {t} not supported.");
             }
+        }
+    }
+
+    internal static void CopyByteArrayRegion(JArray<sbyte> array, byte[] destination, int offset, int count)
+    {
+        if (destination == null) throw new ArgumentNullException(nameof(destination));
+        if (offset < 0 || count < 0 || destination.Length - offset < count)
+            throw new ArgumentOutOfRangeException(nameof(count));
+        if (count == 0) return;
+        fixed (byte* target = &destination[offset])
+        {
+            var currentEnv = Env;
+            currentEnv->Functions->GetByteArrayRegion(currentEnv, array.Handle, 0, count, (sbyte*)target);
         }
     }
 

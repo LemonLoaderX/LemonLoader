@@ -6,6 +6,7 @@ namespace MelonLoader.Java;
 public class JObject : IDisposable
 {
     private bool Disposed { get; set; }
+    private readonly int ownerThreadId = Environment.CurrentManagedThreadId;
 
     public IntPtr Handle { get; set;}
 
@@ -22,7 +23,10 @@ public class JObject : IDisposable
     public JObject(JObject obj) : this(obj.Handle, obj.ReferenceType)
     {
         this.Disposed = obj.Disposed;
+        ownerThreadId = obj.ownerThreadId;
         obj.Disposed = true;
+        obj.Handle = IntPtr.Zero;
+        GC.SuppressFinalize(obj);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -33,6 +37,14 @@ public class JObject : IDisposable
         switch (this.ReferenceType)
         {
             case JNI.ReferenceType.Local:
+                // Local references belong to the creating JNI thread/frame. The VM
+                // releases abandoned locals when that frame exits; a CLR finalizer
+                // must never attempt DeleteLocalRef from its own thread.
+                if (!disposing)
+                    break;
+                if (ownerThreadId != Environment.CurrentManagedThreadId)
+                    throw new InvalidOperationException(
+                        "A local JNI reference must be disposed on its creating thread. Use a global reference across threads.");
                 JNI.DeleteLocalRef(this);
                 break;
 
@@ -56,7 +68,11 @@ public class JObject : IDisposable
 
     ~JObject()
     {
-        Dispose(disposing: false);
+        try { Dispose(disposing: false); }
+        catch
+        {
+            // VM attachment or shutdown failure must not escape a CLR finalizer.
+        }
     }
 
     public void Dispose()

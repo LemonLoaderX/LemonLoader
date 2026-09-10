@@ -1,13 +1,17 @@
 #include "lemon_bootstrap.h"
 #include "state.hpp"
+#include "native_errors.hpp"
 
 #include <dlfcn.h>
 #include <link.h>
 
 #include <array>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
+#include <fstream>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -83,11 +87,18 @@ bool decode_direct_branch(uintptr_t address, uint32_t instruction, uintptr_t& ta
 
 bool is_executable(uintptr_t address) {
     for (const auto& range : il2cpp_code.ranges) {
-        if (address >= range.begin && address < range.end) {
+        if (address >= range.begin && address < range.end && range.end - address >= instruction_size &&
+            (address % instruction_size) == 0) {
             return true;
         }
     }
     return false;
+}
+
+bool read_instruction(uintptr_t address, uint32_t& instruction) {
+    if (!is_executable(address)) return false;
+    std::memcpy(&instruction, reinterpret_cast<const void*>(address), sizeof(instruction));
+    return true;
 }
 
 int collect_il2cpp_segments(dl_phdr_info* info, size_t, void*) {
@@ -98,7 +109,7 @@ int collect_il2cpp_segments(dl_phdr_info* info, size_t, void*) {
 
     for (ElfW(Half) index = 0; index < info->dlpi_phnum; ++index) {
         const ElfW(Phdr)& header = info->dlpi_phdr[index];
-        if (header.p_type != PT_LOAD || (header.p_flags & PF_X) == 0) {
+        if (header.p_type != PT_LOAD || (header.p_flags & (PF_R | PF_X)) != (PF_R | PF_X)) {
             continue;
         }
         const uintptr_t begin = static_cast<uintptr_t>(info->dlpi_addr + header.p_vaddr);
@@ -117,6 +128,31 @@ bool initialize_module() {
         return false;
     }
     dl_iterate_phdr(&collect_il2cpp_segments, nullptr);
+    // ELF flags can differ from current mappings (e.g. execute-only protection).
+    std::ifstream maps("/proc/self/maps");
+    if (!maps) {
+        log_error("ARM64 resolver cannot inspect readable mappings in /proc/self/maps");
+        return false;
+    }
+    std::vector<executable_range> readable;
+    std::string line;
+    while (std::getline(maps, line)) {
+        unsigned long begin = 0, end = 0;
+        char permissions[5]{};
+        if (std::sscanf(line.c_str(), "%lx-%lx %4s", &begin, &end, permissions) != 3 ||
+            permissions[0] != 'r') continue;
+        for (const auto& range : il2cpp_code.ranges) {
+            const uintptr_t intersection_begin = std::max<uintptr_t>(begin, range.begin);
+            const uintptr_t intersection_end = std::min<uintptr_t>(end, range.end);
+            if (intersection_begin < intersection_end)
+                readable.push_back({intersection_begin, intersection_end});
+        }
+    }
+    il2cpp_code.ranges = std::move(readable);
+    if (maps.bad()) {
+        log_error("ARM64 resolver failed while reading /proc/self/maps");
+        return false;
+    }
     if (il2cpp_code.ranges.empty()) {
         log_error("ARM64 IL2CPP resolver could not find an executable libil2cpp segment");
         return false;
@@ -141,12 +177,8 @@ scan_result scan_function(
 
     for (size_t offset = 0; offset < max_function_scan; offset += instruction_size) {
         const uintptr_t address = start + offset;
-        if (!is_executable(address)) {
-            break;
-        }
-
         uint32_t instruction = 0;
-        std::memcpy(&instruction, reinterpret_cast<const void*>(address), sizeof(instruction));
+        if (address < start || !read_instruction(address, instruction)) break;
         if (instruction == arm64_ret && !ignore_return) {
             break;
         }
@@ -179,11 +211,8 @@ scan_result scan_function(
 uintptr_t first_branch_target(uintptr_t start, size_t instruction_limit = 4) {
     for (size_t index = 0; index < instruction_limit; ++index) {
         const uintptr_t address = start + index * instruction_size;
-        if (!is_executable(address)) {
-            return 0;
-        }
         uint32_t instruction = 0;
-        std::memcpy(&instruction, reinterpret_cast<const void*>(address), sizeof(instruction));
+        if (address < start || !read_instruction(address, instruction)) return 0;
         uintptr_t target = 0;
         bool link = false;
         if (decode_direct_branch(address, instruction, target, link) && !link && is_executable(target)) {
@@ -201,31 +230,38 @@ uintptr_t resolve_export_body(const char* export_name) {
     return api == 0 ? 0 : first_branch_target(api);
 }
 
-uintptr_t find_three_argument_wrapper(uintptr_t core) {
+uintptr_t find_three_argument_wrapper(uintptr_t core, uintptr_t known_caller = 0) {
     if (core < 8 || !is_executable(core - instruction_size)) {
         return 0;
     }
 
     uint32_t instruction = 0;
-    std::memcpy(&instruction, reinterpret_cast<const void*>(core - instruction_size), sizeof(instruction));
+    if (!read_instruction(core - instruction_size, instruction)) return 0;
     if (instruction != arm64_ret) {
         return 0;
     }
 
+    uintptr_t resolved = 0;
     for (size_t distance = 8; distance <= 128; distance += instruction_size) {
+        if (core < distance) break;
         const uintptr_t boundary = core - distance;
-        std::memcpy(&instruction, reinterpret_cast<const void*>(boundary), sizeof(instruction));
+        if (!read_instruction(boundary, instruction)) break;
         if (instruction != arm64_ret) {
             continue;
         }
 
         const uintptr_t candidate = boundary + instruction_size;
+        // The virtual-method path already identifies the MethodInfo overload.
+        // It can be adjacent to the three-argument overload and call the same
+        // core; it is not another candidate for the requested ABI.
+        if (candidate == known_caller) continue;
         const scan_result scan = scan_function(candidate);
         if (scan.calls.size() == 1 && scan.calls.front() == core && candidate < core) {
-            return candidate;
+            if (resolved != 0 && resolved != candidate) return 0;
+            resolved = candidate;
         }
     }
-    return 0;
+    return resolved;
 }
 
 bool has_legacy_generic_method_shim(const unity_version& version) {
@@ -267,7 +303,7 @@ uintptr_t resolve_generic_method_get_method(
         return shim_scan.transfers[shim_scan.transfers.size() > 1 ? 1 : 0];
     }
     return candidate_scan.calls.size() == 1
-        ? find_three_argument_wrapper(candidate_scan.calls.front())
+        ? find_three_argument_wrapper(candidate_scan.calls.front(), candidate)
         : 0;
 }
 
@@ -378,7 +414,9 @@ void initialize_target(uint32_t value, const unity_version& version) {
     const uintptr_t address = resolve_target(target, version);
     resolved_targets[value] = reinterpret_cast<void*>(address);
     if (address == 0) {
-        log_error(std::string("ARM64 IL2CPP resolver could not resolve ") + target_name(target));
+        log_error(std::string("ARM64 IL2CPP resolver could not resolve ") + target_name(target) +
+                  " for Unity " + std::to_string(version.major) + "." +
+                  std::to_string(version.minor) + "." + std::to_string(version.build));
     }
 }
 
@@ -391,6 +429,7 @@ extern "C" LEMON_EXPORT void* ResolveArm64Il2CppInjectionTarget(
     uint32_t unity_minor,
     uint32_t unity_build) {
     using namespace lemon::bootstrap;
+    return native_boundary("ARM64 IL2CPP target resolution", static_cast<void*>(nullptr), [&]() -> void* {
     if (target == 0 || target >= resolved_targets.size()) {
         return nullptr;
     }
@@ -399,4 +438,5 @@ extern "C" LEMON_EXPORT void* ResolveArm64Il2CppInjectionTarget(
         initialize_target(target, version);
     });
     return resolved_targets[target];
+    });
 }

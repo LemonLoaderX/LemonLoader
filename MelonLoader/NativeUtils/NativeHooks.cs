@@ -123,9 +123,10 @@ namespace MelonLoader.NativeUtils
             if (!IsHooked) 
                 return;
 
+            T trampoline = _trampoline;
             HookDetach();
             IsHooked = false;
-            _gcProtect.Remove(_trampoline);
+            _gcProtect.Remove(trampoline);
         }
 
         internal virtual unsafe void HookAttach()
@@ -148,7 +149,12 @@ namespace MelonLoader.NativeUtils
         {
 #if !BOOTSTRAP
             IntPtr original = _targetHandle;
+#if ANDROID
+            if (!BootstrapInterop.TryNativeHookDetach((IntPtr)(&original), _detourHandle))
+                throw new InvalidOperationException("The native hook could not be removed; its trampoline remains retained.");
+#else
             BootstrapInterop.NativeHookDetach((IntPtr)(&original), _detourHandle);
+#endif
 
             _trampoline = null;
             _trampolineHandle = IntPtr.Zero;

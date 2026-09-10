@@ -15,6 +15,8 @@ LEMON_EXPORT JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved);
 
 LEMON_EXPORT void NativeHookAttach(void** target, void* detour);
 LEMON_EXPORT void NativeHookDetach(void** target, void* detour);
+// Optional checked entry point: returns 1 on removal, 0 on failure; never writes target.
+LEMON_EXPORT int32_t TryNativeHookDetach(void** target, void* detour);
 LEMON_EXPORT void LogManagedException(const char* message, int32_t message_length);
 LEMON_EXPORT void* CreateArm64ValueReturnAdapter(void* target, uint32_t value_size);
 LEMON_EXPORT void DestroyArm64ValueReturnAdapter(void* adapter);
