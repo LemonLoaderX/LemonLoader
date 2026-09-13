@@ -46,9 +46,7 @@ namespace MelonLoader.InternalUtils
 
             try
             {
-                AssetsManager assetsManager = new AssetsManager();
-                ReadGameInfo(assetsManager, gameDataPath);
-                assetsManager.UnloadAll();
+                ReadGameInfo(gameDataPath);
             }
             catch (Exception ex)
             {
@@ -80,11 +78,15 @@ namespace MelonLoader.InternalUtils
             MelonLogger.WriteSpacer();
         }
 
-        private static void ReadGameInfo(AssetsManager assetsManager, string gameDataPath)
+        private static void ReadGameInfo(string gameDataPath)
         {
-            AssetsFileInstance instance = null;
+            var assetsManager = new AssetsManager();
+#if ANDROID
+            Stream gameDataStream = null;
+#endif
             try
             {
+                AssetsFileInstance instance;
                 string bundlePath = Path.Combine(gameDataPath, "globalgamemanagers");
                 if (!GameDataFileExists(bundlePath))
                     bundlePath = Path.Combine(gameDataPath, "mainData");
@@ -96,8 +98,8 @@ namespace MelonLoader.InternalUtils
                         return;
 
 #if ANDROID
-                    using Stream bundleStream = OpenGameDataFile(bundlePath);
-                    BundleFileInstance bundleFile = assetsManager.LoadBundleFile(bundleStream, bundlePath);
+                    gameDataStream = OpenGameDataFile(bundlePath);
+                    BundleFileInstance bundleFile = assetsManager.LoadBundleFile(gameDataStream, bundlePath);
 #else
                     BundleFileInstance bundleFile = assetsManager.LoadBundleFile(bundlePath);
 #endif
@@ -106,8 +108,8 @@ namespace MelonLoader.InternalUtils
                 else
 #if ANDROID
                 {
-                    using Stream assetsStream = OpenGameDataFile(bundlePath);
-                    instance = assetsManager.LoadAssetsFile(assetsStream, bundlePath, true);
+                    gameDataStream = OpenGameDataFile(bundlePath);
+                    instance = assetsManager.LoadAssetsFile(gameDataStream, bundlePath, true);
                 }
 #else
                     instance = assetsManager.LoadAssetsFile(bundlePath, true);
@@ -152,8 +154,17 @@ namespace MelonLoader.InternalUtils
             {
                 MelonDebug.Error(ex.ToString());
             }
-            if (instance != null)
-                instance.file.Close();
+            finally
+            {
+#if ANDROID
+                // AssetsTools reads field data lazily, including through bundle
+                // segment streams. Keep the source alive until all readers close.
+                try { assetsManager.UnloadAll(); }
+                finally { gameDataStream?.Dispose(); }
+#else
+                assetsManager.UnloadAll();
+#endif
+            }
         }
 
         private static void ReadGameInfoFallback()

@@ -21,6 +21,7 @@ ANDROID_NDK_ROOT=<ndk> bash scripts/test/test-android-bootstrap.sh
 
 ```powershell
 dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
+dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj -c Release -p:Platform=x64
 ```
 
 These link actual native/managed sources to controlled OS/JNI/Unity fixtures.
@@ -30,6 +31,10 @@ JNI regressions require stack description before clearing the original exception
 including when obtaining the Latest.log summary raises a secondary exception.
 Coverage and remaining device boundaries are listed in
 [Android hardening](../docs/android/HARDENING.md).
+
+Game information tests use real AssetsTools parsing and tracked source streams to
+check deferred PlayerSettings reads, metadata fallback and resource cleanup for
+standalone files and UnityFS bundles. Their fixtures are generated in memory.
 
 ## Preference save results
 

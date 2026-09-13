@@ -58,6 +58,11 @@ contracts and the commands used to test them.
   retained JNI references. Native hook detach releases the captured trampoline
   root after removal. With the checked Android export, a failure retains the
   trampoline, hook state and stack-walk registration.
+- Game information parsing keeps APK source streams open through AssetsTools'
+  deferred PlayerSettings reads. Closing the stream after loading file headers
+  could cause `ObjectDisposedException` and leave game metadata unavailable.
+  Asset readers and bundles are now unloaded before the source stream is disposed,
+  including on parse failures and early returns.
 
 ### Native hook compatibility
 
@@ -109,6 +114,7 @@ of the duplicate's executable mappings.
 
 ```powershell
 dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
+dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj -c Release -p:Platform=x64
 dotnet run --project tests/Preferences/Preferences.csproj
 ```
 
@@ -120,6 +126,14 @@ and stack-walk registration. Binding tests exercise the host-supplied native han
 through both P/Invoke library names, including parallel calls and missing-handle
 failure. Real Unity event delivery and actual Android JNI
 thread attachment require the separate device tests.
+
+Game information regressions use real AssetsTools parsing with synthetic
+`globalgamemanagers`, legacy `mainData` and uncompressed `data.unity3d` inputs.
+They check metadata values, fallback behavior and stream disposal after successful
+reads, invalid input and a bundle without the requested asset file. Only the Android
+asset transport is replaced by a tracked host stream; JNI coverage remains in the
+managed suite above.
+The stream-lifetime fix has also been confirmed on an affected device.
 
 On some devices or systems, native library lookup from different linker contexts
 can create independent IL2CPP instances. Reusing Unity's initialized handle fixes

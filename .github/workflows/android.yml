@@ -96,6 +96,14 @@ jobs:
             throw "PowerShell syntax validation failed."
           }
 
+      - name: Test game information stream lifetime
+        shell: pwsh
+        run: |
+          dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj -c Release -p:Platform=x64
+          if ($LASTEXITCODE -ne 0) {
+            throw "Game information stream regressions failed."
+          }
+
       - name: Resolve maintained dependencies
         shell: pwsh
         run: pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
