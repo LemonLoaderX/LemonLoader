@@ -52,6 +52,9 @@ using native_entry_fn = int (*)(void**);
 using managed_start_fn = int (*)();
 
 dlsym_fn original_dlsym = nullptr;
+// Borrowed from Unity's process-scoped NativeLoader. Never reopen by name:
+// CoreCLR and Unity can resolve that name in different linker namespaces.
+std::atomic<void*> unity_il2cpp_handle{nullptr};
 il2cpp_init_fn original_il2cpp_init = nullptr;
 il2cpp_runtime_invoke_fn original_runtime_invoke = nullptr;
 il2cpp_method_get_name_fn method_get_name = nullptr;
@@ -191,13 +194,24 @@ void* dlsym_detour(void* handle, const char* symbol) {
         return original;
     }
 
-    if (std::strcmp(symbol, "il2cpp_init") == 0) {
+    const bool is_init = std::strcmp(symbol, "il2cpp_init") == 0;
+    const bool is_invoke = std::strcmp(symbol, "il2cpp_runtime_invoke") == 0;
+    if (is_init || is_invoke) {
+        if (handle == nullptr || original == nullptr) return original;
+        void* expected = nullptr;
+        if (!unity_il2cpp_handle.compare_exchange_strong(expected, handle) && expected != handle) {
+            report_native_exception("IL2CPP symbol redirection", "Unity requested a second instance; refusing to redirect its entry points");
+            return original;
+        }
+    }
+
+    if (is_init) {
         original_il2cpp_init = reinterpret_cast<il2cpp_init_fn>(original);
         method_get_name = reinterpret_cast<il2cpp_method_get_name_fn>(
             original_dlsym(handle, "il2cpp_method_get_name"));
         return reinterpret_cast<void*>(&il2cpp_init_detour);
     }
-    if (std::strcmp(symbol, "il2cpp_runtime_invoke") == 0) {
+    if (is_invoke) {
         original_runtime_invoke = reinterpret_cast<il2cpp_runtime_invoke_fn>(original);
         method_get_name = reinterpret_cast<il2cpp_method_get_name_fn>(
             original_dlsym(handle, "il2cpp_method_get_name"));
@@ -411,6 +425,10 @@ void start_managed_runtime() {
 }  // namespace lemon::bootstrap
 
 using namespace lemon::bootstrap;
+
+extern "C" LEMON_EXPORT void* GetIl2CppLibraryHandle() {
+    return unity_il2cpp_handle.load();
+}
 
 extern "C" LEMON_EXPORT void LogManagedException(
     const char* message,

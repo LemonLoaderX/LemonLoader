@@ -101,33 +101,19 @@ bool read_instruction(uintptr_t address, uint32_t& instruction) {
     return true;
 }
 
-int collect_il2cpp_segments(dl_phdr_info* info, size_t, void*) {
-    if (info == nullptr || info->dlpi_name == nullptr ||
-        std::strstr(info->dlpi_name, "libil2cpp.so") == nullptr) {
-        return 0;
-    }
-
-    for (ElfW(Half) index = 0; index < info->dlpi_phnum; ++index) {
-        const ElfW(Phdr)& header = info->dlpi_phdr[index];
-        if (header.p_type != PT_LOAD || (header.p_flags & (PF_R | PF_X)) != (PF_R | PF_X)) {
-            continue;
-        }
-        const uintptr_t begin = static_cast<uintptr_t>(info->dlpi_addr + header.p_vaddr);
-        il2cpp_code.ranges.push_back({begin, begin + static_cast<uintptr_t>(header.p_memsz)});
-    }
-    return il2cpp_code.ranges.empty() ? 0 : 1;
-}
-
 bool initialize_module() {
-    il2cpp_code.handle = dlopen("libil2cpp.so", RTLD_NOW | RTLD_NOLOAD);
+    il2cpp_code.ranges.clear();
+    il2cpp_code.handle = GetIl2CppLibraryHandle();
     if (il2cpp_code.handle == nullptr) {
-        il2cpp_code.handle = dlopen("libil2cpp.so", RTLD_NOW | RTLD_LOCAL);
-    }
-    if (il2cpp_code.handle == nullptr) {
-        log_error("ARM64 IL2CPP resolver could not acquire libil2cpp.so");
+        log_error("ARM64 IL2CPP resolver has no Unity library handle; refusing to load another instance");
         return false;
     }
-    dl_iterate_phdr(&collect_il2cpp_segments, nullptr);
+    Dl_info info{};
+    void* init = dlsym(il2cpp_code.handle, "il2cpp_init");
+    if (init == nullptr || dladdr(init, &info) == 0 || info.dli_fbase == nullptr) {
+        log_error("ARM64 IL2CPP resolver could not identify Unity's library instance");
+        return false;
+    }
     // ELF flags can differ from current mappings (e.g. execute-only protection).
     std::ifstream maps("/proc/self/maps");
     if (!maps) {
@@ -141,18 +127,57 @@ bool initialize_module() {
         char permissions[5]{};
         if (std::sscanf(line.c_str(), "%lx-%lx %4s", &begin, &end, permissions) != 3 ||
             permissions[0] != 'r') continue;
-        for (const auto& range : il2cpp_code.ranges) {
-            const uintptr_t intersection_begin = std::max<uintptr_t>(begin, range.begin);
-            const uintptr_t intersection_end = std::min<uintptr_t>(end, range.end);
-            if (intersection_begin < intersection_end)
-                readable.push_back({intersection_begin, intersection_end});
-        }
+        if (begin < end) readable.push_back({begin, end});
     }
-    il2cpp_code.ranges = std::move(readable);
     if (maps.bad()) {
         log_error("ARM64 resolver failed while reading /proc/self/maps");
         return false;
     }
+    const auto can_read = [&readable](uintptr_t address, size_t size) {
+        for (const auto& range : readable)
+            if (address >= range.begin && address < range.end && size <= range.end - address)
+                return true;
+        return false;
+    };
+    // dl_iterate_phdr may expose only the caller's linker namespace. Read the
+    // headers of the exact instance containing Unity's init function instead.
+    const uintptr_t base = reinterpret_cast<uintptr_t>(info.dli_fbase);
+    ElfW(Ehdr) elf{};
+    if (!can_read(base, sizeof(elf))) {
+        log_error("ARM64 IL2CPP resolver cannot read Unity's ELF header");
+        return false;
+    }
+    std::memcpy(&elf, reinterpret_cast<const void*>(base), sizeof(elf));
+    if (std::memcmp(elf.e_ident, ELFMAG, SELFMAG) != 0 ||
+        elf.e_ident[EI_CLASS] != ELFCLASS64 || elf.e_phentsize != sizeof(ElfW(Phdr)) ||
+        elf.e_phnum == 0 || elf.e_phoff > UINTPTR_MAX - base) {
+        log_error("ARM64 IL2CPP resolver found invalid ELF headers for Unity's instance");
+        return false;
+    }
+    const uintptr_t table = base + elf.e_phoff;
+    if (!can_read(table, size_t{elf.e_phnum} * sizeof(ElfW(Phdr)))) {
+        log_error("ARM64 IL2CPP resolver cannot read Unity's program headers");
+        return false;
+    }
+    std::vector<executable_range> code_ranges;
+    for (size_t index = 0; index < elf.e_phnum; ++index) {
+        ElfW(Phdr) header{};
+        std::memcpy(&header, reinterpret_cast<const void*>(table + index * sizeof(header)), sizeof(header));
+        if (header.p_type != PT_LOAD || (header.p_flags & (PF_R | PF_X)) != (PF_R | PF_X)) continue;
+        if (header.p_vaddr > UINTPTR_MAX - base || header.p_memsz > UINTPTR_MAX - base - header.p_vaddr) {
+            log_error("ARM64 IL2CPP resolver found an overflowing segment range");
+            return false;
+        }
+        const uintptr_t begin = base + header.p_vaddr;
+        const uintptr_t end = begin + header.p_memsz;
+        for (const auto& range : readable) {
+            const uintptr_t intersection_begin = std::max(begin, range.begin);
+            const uintptr_t intersection_end = std::min(end, range.end);
+            if (intersection_begin < intersection_end)
+                code_ranges.push_back({intersection_begin, intersection_end});
+        }
+    }
+    il2cpp_code.ranges = std::move(code_ranges);
     if (il2cpp_code.ranges.empty()) {
         log_error("ARM64 IL2CPP resolver could not find an executable libil2cpp segment");
         return false;

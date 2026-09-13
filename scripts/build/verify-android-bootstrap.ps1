@@ -74,6 +74,7 @@ $requiredExports = @(
     "ResolveArm64Il2CppInjectionTarget",
     "ConfigureLogging",
     "GetJavaVM"
+    "GetIl2CppLibraryHandle"
 )
 foreach ($symbol in $requiredExports) {
     if ($nmText -notmatch "(?m)\b$([regex]::Escape($symbol))\s*$") {

@@ -146,6 +146,12 @@ the adapter falls back to the application's internal files directory.
   the game process when the bootstrap cannot start.
 - Android consumes pre-generated Il2CppInterop assemblies. It does not execute
   the legacy desktop Cpp2IL binary inside the application process.
+- The bootstrap retains the process-scoped IL2CPP handle observed in Unity's
+  symbol lookups. Managed P/Invoke, injection helpers and the ARM64 resolver use
+  that same instance. They must not reopen `libil2cpp.so` by name: another linker
+  namespace can create a second, uninitialized IL2CPP runtime. The resolver reads
+  only the selected instance's readable ELF code ranges, including when the
+  caller's `dl_iterate_phdr` cannot enumerate the owning namespace.
 
 ## Change placement
 

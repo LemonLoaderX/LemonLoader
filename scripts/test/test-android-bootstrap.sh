@@ -15,7 +15,10 @@ cp "$jni_header" "$build_root/include/jni.h"
     -I"$native_root/include" -I"$native_root/src" -I"$native_root/third_party/plthook" \
     "$test_root/bootstrap_test.cpp" -Wl,--gc-sections -ldl -pthread -o "$build_root/bootstrap-test"
 fixture=$(mktemp -d "$build_root/run.XXXXXX")
-"$build_root/bootstrap-test" "$fixture"
+"${CXX:-c++}" -shared -fPIC -O0 -Wl,-soname,libil2cpp.so \
+    "$test_root/il2cpp_instance_fixture.cpp" -o "$build_root/libil2cpp.so"
+ulimit -c 0
+"$build_root/bootstrap-test" "$fixture" "$build_root/libil2cpp.so"
 "${CXX:-c++}" -std=c++17 -ffunction-sections -fdata-sections \
     -I"$build_root/include" -I"$test_root/stubs" -I"$repository_root/tests/Android/Logging/stubs" \
     -I"$native_root/include" -I"$native_root/src" \

@@ -64,6 +64,7 @@ namespace MelonLoader.Support
                 DetourProvider = new MelonDetourProvider(),
 #if ANDROID
                 IsAndroid = true,
+                GameAssemblyHandle = BootstrapInterop.Library.GetIl2CppLibraryHandle(),
                 InjectionTargetResolver = target =>
                     BootstrapInterop.Library.ResolveArm64Il2CppInjectionTarget(
                         (uint)target,

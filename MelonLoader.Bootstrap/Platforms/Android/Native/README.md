@@ -10,10 +10,11 @@ It owns only the Android native startup chain:
 - direct CoreCLR host startup and the native/managed bootstrap ABI;
 - native hook, logging, and Java VM exports used by managed MelonLoader.
 
-The managed interface is deliberately limited to `NativeHookAttach`,
-`NativeHookDetach`, `LogMsg`, `LogError`, `LogMelonInfo`, `IsConsoleOpen`, and
-`GetJavaVM`. Configuration parsing belongs to managed CoreCLR and is not part of
-the native ABI.
+The managed interface is declared in `include/lemon_bootstrap.h`. It includes
+hooking, logging, Java VM access and `GetIl2CppLibraryHandle`, which exposes the
+borrowed, process-scoped IL2CPP handle captured from Unity. Managed consumers must
+not close that handle or replace it with a by-name load in another linker namespace.
+Configuration parsing belongs to managed CoreCLR and is not part of the native ABI.
 
 The implementation produces `lib/arm64-v8a/libmain.so`. Build it with:
 

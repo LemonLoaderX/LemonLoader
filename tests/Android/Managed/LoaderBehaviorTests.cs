@@ -85,6 +85,7 @@ static class LoaderBehaviorTests
         MelonLoader.InternalUtils.BootstrapInterop.NativeHookDetach((nint)(&original), 1);
         Check(original == 2, "Public legacy path must preserve the caller pointer.");
         Console.WriteLine("PASS native hook trampoline root release");
+        Il2CppBindingTests.Run();
     }
     static bool FailDetach;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvCdecl) })]
@@ -116,6 +117,8 @@ namespace MelonLoader.InternalUtils
     unsafe class BootstrapLibrary
     {
         internal static int LegacyDetachCalls;
+        internal static nint Il2CppHandle;
+        internal nint GetIl2CppLibraryHandle() => Il2CppHandle;
         internal void NativeHookAttach(nint* target, nint detour) => throw new NotSupportedException();
         internal void NativeHookDetach(nint* target, nint detour) => LegacyDetachCalls++;
         internal void LogManagedException(byte* message, int length) { }

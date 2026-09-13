@@ -17,6 +17,7 @@ internal class BootstrapLibrary
     internal GetLoaderConfigFn GetLoaderConfig { get; private set; }
 #else
     internal PtrRetFn GetJavaVM { get; private set; }
+    internal PtrRetFn GetIl2CppLibraryHandle { get; private set; }
     internal CreateArm64ValueReturnAdapterFn CreateArm64ValueReturnAdapter { get; private set; }
     internal DestroyArm64ValueReturnAdapterFn DestroyArm64ValueReturnAdapter { get; private set; }
     internal ResolveArm64Il2CppInjectionTargetFn ResolveArm64Il2CppInjectionTarget { get; private set; }

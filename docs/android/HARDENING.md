@@ -20,6 +20,11 @@ contracts and the commands used to test them.
   `JNI_OnUnload` after a successful `JNI_OnLoad`, and close the library. An unload
   callback exception cannot prevent the remaining cleanup. Successful loads stay
   pinned for the process lifetime; failed loads still require a new process.
+- IL2CPP binding reuses the instance initialized by Unity. The bootstrap captures
+  its library handle, managed P/Invoke and injection helpers borrow it, and native
+  scans use only that instance's readable code ranges. Missing handles fail without
+  opening another library by name. A double-namespace host fixture reproduces the
+  old null-class SIGSEGV and verifies the corrected binding.
 - JNI lookups reject missing method IDs before calling Java; exception reporting
   describes the original pending exception to logcat before clearing it, and
   includes operation context and the throwable description in Latest.log.
@@ -62,9 +67,12 @@ bootstraps do.
 
 The optional Android `TryNativeHookDetach` export returns an explicit 32-bit
 1/0 result and also preserves the pointer. Managed binding resolves it separately
-from required bootstrap exports. Older bootstraps still load and use their legacy
-void call; they cannot report removal failure to managed callers, so the extra
-failure retention guarantee only applies when the checked export is present.
+from required bootstrap exports. A bootstrap satisfying the current required
+export contract may omit it and use the legacy void call; it then cannot report
+removal failure to managed callers, so the extra failure retention guarantee only
+applies when the checked export is present. The current Android binding requires
+`GetIl2CppLibraryHandle`; bootstrap versions predating that export must be updated
+together with Loader and Il2CppInterop.
 Failed Dobby operations report the operation, status, target and detour addresses.
 They do not identify every internal allocator/relocation failure stage.
 
@@ -95,6 +103,9 @@ The same script runs the production `NativeLoader.load` implementation with
 wrapped linker operations and injected environment/extraction JNI failures. It
 checks rollback exactly once, cleanup after a throwing Unity unload callback,
 failure diagnostics, refusal to retry failed loads and successful-load pinning.
+The namespace fixture loads two copies of a native library, initializes only the
+Unity copy, and checks domain access, rejection of a conflicting handle and exclusion
+of the duplicate's executable mappings.
 
 ```powershell
 dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
@@ -105,8 +116,16 @@ Managed tests link production sources to a fake JNI function table and small
 Unity/logging hosts. They exercise reference ownership and finalizers, byte
 copy/buffer reuse, seeking and close errors, malformed configuration preservation,
 scene capability fallback, trampoline retention/removal, optional-export fallback
-and stack-walk registration. Real Unity event delivery and actual Android JNI
+and stack-walk registration. Binding tests exercise the host-supplied native handle
+through both P/Invoke library names, including parallel calls and missing-handle
+failure. Real Unity event delivery and actual Android JNI
 thread attachment require the separate device tests.
+
+On some devices or systems, native library lookup from different linker contexts
+can create independent IL2CPP instances. Reusing Unity's initialized handle fixes
+this failure mode. Startup recovery has also been confirmed on an affected device;
+this does not qualify every device, system or game. Private diagnostic evidence
+remains outside this repository.
 
 For local source forks, run the normal Android native and managed build scripts
 with explicit workspace dependency roots and `-AllowDirtyDependencies`. Shared

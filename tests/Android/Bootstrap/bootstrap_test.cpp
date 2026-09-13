@@ -28,6 +28,7 @@ namespace lemon::bootstrap {
 RuntimePaths runtime_paths;
 JavaVM* java_vm = nullptr;
 void* unity_handle = nullptr;
+bool prepare_android_runtime() { assert(false && "host fixture must not start CoreCLR"); return false; }
 void log_line(const std::string&) {}
 void log_error(const std::string& message) {
     if (fail_logger) throw std::bad_alloc();
@@ -88,7 +89,7 @@ static jint get_env(JavaVM*, void** result, jint) { *result = current_env; retur
 static jclass find_class(JNIEnv*, const char*) { pending = true; return nullptr; }
 
 int main(int argc, char** argv) {
-    assert(argc == 2);
+    assert(argc == 3);
     using namespace lemon::bootstrap;
     const std::filesystem::path fixture(argv[1]);
     const auto lock_path = fixture / "runtime.lock";
@@ -245,4 +246,38 @@ int main(int argc, char** argv) {
     assert(!initialize_android_crypto(crypto_root.string()));
     assert(!pending && last_error.find("APK helper DEX") != std::string::npos);
     std::cout << "PASS missing crypto bridge clears Java exception and reports recovery context\n";
+
+    // Unity's handle belongs to another linker namespace. A by-name load in
+    // the bootstrap's namespace finds a different, uninitialized instance.
+    assert(GetIl2CppLibraryHandle() == nullptr);
+    assert(!initialize_module());
+    void* duplicate = dlopen(argv[2], RTLD_NOW | RTLD_LOCAL);
+    void* unity = dlmopen(LM_ID_NEWLM, argv[2], RTLD_NOW | RTLD_LOCAL);
+    assert(duplicate != nullptr && unity != nullptr && duplicate != unity);
+    original_dlsym = &dlsym;
+    auto unity_init = reinterpret_cast<il2cpp_init_fn>(dlsym(unity, "il2cpp_init"));
+    assert(unity_init != nullptr);
+    assert(dlsym_detour(unity, "il2cpp_init") != nullptr);
+    assert(GetIl2CppLibraryHandle() == unity);
+    assert(dlsym_detour(duplicate, "il2cpp_init") == dlsym(duplicate, "il2cpp_init"));
+    assert(GetIl2CppLibraryHandle() == unity && original_il2cpp_init == unity_init);
+    assert(unity_init("fixture") != nullptr);
+    il2cpp_code.ranges.clear();
+    assert(initialize_module());
+    auto domain_get = reinterpret_cast<void* (*)()>(get_export("il2cpp_domain_get"));
+    assert(domain_get != nullptr);
+    pid_t query = fork();
+    assert(query >= 0);
+    if (query == 0) _exit(domain_get() != nullptr ? 0 : 2);
+    int query_status = 0;
+    waitpid(query, &query_status, 0);
+    if (!WIFEXITED(query_status) || WEXITSTATUS(query_status) != 0) {
+        std::cerr << "FAIL IL2CPP domain query selected an uninitialized duplicate; signal="
+                  << (WIFSIGNALED(query_status) ? WTERMSIG(query_status) : 0) << '\n';
+        return 1;
+    }
+    assert(il2cpp_code.handle == unity);
+    assert(domain_get == dlsym(unity, "il2cpp_domain_get"));
+    assert(!is_executable(reinterpret_cast<uintptr_t>(dlsym(duplicate, "il2cpp_domain_get"))));
+    std::cout << "PASS Unity IL2CPP instance survives a duplicate in another linker namespace\n";
 }

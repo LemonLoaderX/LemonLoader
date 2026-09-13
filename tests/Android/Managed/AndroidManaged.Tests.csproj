@@ -15,6 +15,7 @@
     <Compile Include="../../../MelonLoader/LoaderConfig.cs" Link="LoaderConfig.cs" />
     <Compile Include="../../../MelonLoader/NativeUtils/NativeHooks.cs" Link="NativeHooks.cs" />
     <Compile Include="../../../MelonLoader/InternalUtils/BootstrapInterop.cs" Link="BootstrapInterop.cs" />
+    <Compile Include="../../../MelonLoader/Fixes/Il2CppInterop/AndroidIl2CppInteropFix.cs" Link="AndroidIl2CppInteropFix.cs" />
     <Compile Include="../../../Dependencies/SupportModules/SceneHandler.cs" Link="SceneHandler.cs" />
     <PackageReference Include="Samboy063.Tomlet" Version="$(TomletVersion)" />
   </ItemGroup>

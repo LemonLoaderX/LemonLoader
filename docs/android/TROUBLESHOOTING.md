@@ -67,6 +67,26 @@ mismatch.
 
 ## Native hook fails or crashes nearby code
 
+Two independent executable mappings of the same `libil2cpp.so` can indicate two
+loaded runtime instances, not merely an ELF's ordinary read/write segments. A
+domain query in the uninitialized instance can pass a null class pointer to
+`Class::Init`, while Unity's GC threads run in the other instance. Compare module
+bases, Build IDs, fault registers and thread backtraces; a managed log ending
+near Mod loading does not by itself identify a hook failure.
+
+The bootstrap captures Unity's actual library handle and exports
+`GetIl2CppLibraryHandle`. Both managed native-library binding and Il2CppInterop's
+`GameAssemblyHandle` use this borrowed, process-scoped handle. A missing handle
+fails explicitly, without loading another library by name. Use matching bootstrap,
+Loader and Il2CppInterop builds; do not initialize a second IL2CPP instance or
+suppress its null-pointer failure as a workaround.
+
+The Linux bootstrap regression creates two real linker namespaces with the same
+fixture library, initializes only Unity's instance, then queries the domain using
+the production resolver. The old by-name lookup reproduces `SIGSEGV`; the fixed
+resolver selects Unity's instance and excludes the duplicate's code ranges.
+Run `scripts/test/test-android-bootstrap.sh` with the NDK JNI headers configured.
+
 Dobby is configured to require a near relay for short ARM64 targets. Allocation
 failure must return an error and leave the target instructions unchanged. Do not
 fall back to a larger overwrite that can cross into an adjacent function.

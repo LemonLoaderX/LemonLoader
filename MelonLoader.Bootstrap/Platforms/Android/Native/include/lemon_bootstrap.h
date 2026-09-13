@@ -49,5 +49,7 @@ LEMON_EXPORT void LogMelonInfo(
     int info_length);
 LEMON_EXPORT uint8_t IsConsoleOpen();
 LEMON_EXPORT JavaVM* GetJavaVM();
+// Borrowed, process-scoped handle captured from Unity. The caller must not close it.
+LEMON_EXPORT void* GetIl2CppLibraryHandle();
 
 }
