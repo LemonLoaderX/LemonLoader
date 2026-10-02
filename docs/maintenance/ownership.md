@@ -14,7 +14,7 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Patcher release CI | Patcher workflows and scripts | Patcher, retained |
 | Runtime source build | parent `build-runtime.ps1/.sh` | Loader runtime-build workflow |
 | Runtime setup | parent `setup-runtime.ps1` | Loader dependency workflow |
-| Product build coordinator | parent `build.ps1` | Loader narrow entry point |
+| Product build entry | Loader `scripts/build.ps1`; parent wrapper retained during migration | Loader |
 | Source setup/audit/status | parent scripts | per-product manifest validation |
 | Syntax/helper verification | parent `test-scripts.ps1` | per-product tests |
 | Source/archive secret scan | parent `scan-publication.ps1` | owned release checks |
@@ -26,11 +26,10 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 
 ## Existing path coupling
 
-- Loader's default source resolver uses `.dependencies/<name>`; its public setup
-  already pins fork sources. Parent builds override this with `dependencies/*`.
-- Patcher publishing defaults to `../dependencies/Il2CppInterop`; it independently
-  verifies the pin in its own props. It needs a sibling/default-cache migration,
-  not adoption of Loader's pin.
+- Both products select a matching sibling HEAD or a private per-revision cache.
+  Loader reads its props; Patcher independently reads generator URL/revision from
+  its own props. Setup never switches shared or existing checkouts. Parent builds
+  still override Loader paths with `dependencies/*` during physical migration.
 - Loader release CI operates from the Loader checkout and downloads reviewed
   runtime artifacts; it does not require the parent Git lock. Local runtime
   source build/setup/test/audit still do.

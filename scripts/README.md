@@ -8,6 +8,7 @@ without scanning one flat directory.
 | Script | Purpose |
 | --- | --- |
 | `setup-android-dependencies.ps1` | Resolve maintained source forks at their manifest revisions |
+| `build.ps1` | Product build entry, profile selection and explicit development source roots; no parent workspace required |
 | `build/build-android.ps1` | Full CoreCLR Android orchestration |
 | `build/build-android-ndk-bootstrap.ps1` | Build NDK `libmain.so`; active Android requires a validated matching runtime pack for embedded crypto |
 | `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
@@ -41,6 +42,7 @@ without scanning one flat directory.
 | `test/test-android-logging.sh` | Run the Linux/WSL host regression for Android log text, severity, and file output |
 | `test/test-android-bootstrap.sh` | Run Linux/WSL regressions for instruction bounds, JNI failures, embedded crypto, asset I/O and runtime process locking; requires NDK headers |
 | `test/test-android-deployment.sh` | Run the Linux/WSL file-publication regression for preserved destinations and failure diagnostics |
+| `test/test-source-dependencies.ps1` | Local Git fixtures for independent pins, sibling/cache selection and setup preservation |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs
@@ -62,10 +64,10 @@ selectable, and all means both active profiles. .NET 10 properties in
 `eng/AndroidDependencies.props` are only for explicit legacy fallback. Source
 builds use workspace scripts/build-runtime.ps1 and are separate from product builds.
 
-`build-android.ps1 -AllowDirtyDependencies` explicitly enables local source
+`build.ps1 -Development` with explicit source paths enables local source
 iteration, including a different HEAD. Its Loader archives go to
-`Output/DevelopmentReleases`, never the normal default alias. Workspace build
-scripts also accept the clearer `-Development` alias. Source status is recorded
+`Output/DevelopmentReleases`, never the normal default alias. The narrow build
+scripts retain `-AllowDirtyDependencies`. Source status is recorded
 outside release archives; existing MonoMod/Harmony behavior probes still run.
 Runtime prepare/import accepts `-Development` for local source packs. Staging
 rejects such packs without development mode and always verifies their full file

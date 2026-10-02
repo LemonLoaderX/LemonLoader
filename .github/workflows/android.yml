@@ -108,7 +108,9 @@ jobs:
 
       - name: Resolve maintained dependencies
         shell: pwsh
-        run: pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
+        run: |
+          pwsh -NoProfile -File scripts/test/test-source-dependencies.ps1
+          pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 
       - name: Build release
         shell: pwsh
@@ -132,7 +134,7 @@ jobs:
             $pack = Join-Path $download 'pack'
             Expand-Archive -LiteralPath $archive -DestinationPath $pack
             Test-RuntimeProfilePack -Root $pack -Profile $profile
-            ./scripts/build/build-android.ps1 -Configuration Release `
+            ./scripts/build.ps1 -Configuration Release `
               -RuntimeProfile $profile.name -CoreClrRuntimePackRoot $pack `
               -AndroidNdkRoot "$env:ANDROID_SDK_ROOT\ndk\$env:NDK_VERSION"
           }

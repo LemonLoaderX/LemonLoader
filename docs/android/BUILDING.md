@@ -27,9 +27,16 @@ forks. Resolve their URLs and revisions from the product manifest with:
 pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 ```
 
-The script refuses to replace a checkout with local changes and places managed
-sources below the ignored `.dependencies/` directory. Builds may instead pass
-the corresponding `-SourceRoot` parameters for reviewed external checkouts.
+Setup/build selects a sibling `../Dobby`, `../Il2CppInterop`, `../HarmonyX` or
+`../MonoMod` only when its HEAD matches this product's manifest. Otherwise setup
+creates an isolated `.dependencies/<name>/<revision>` checkout. Existing sources
+are verified without fetching or switching revisions; local changes are preserved.
+Different product pins never switch a shared checkout. Builds do not fetch.
+
+Use the corresponding `-DobbySourceRoot`, `-Il2CppInteropSourceRoot`,
+`-HarmonyXSourceRoot` or `-MonoModSourceRoot` for explicit external checkouts.
+Setup's optional `-SourceRoot <directory>` creates/verifies named checkouts there
+instead; pass those explicit paths to builds. Existing old caches are left intact.
 
 MonoMod.Common is a MonoMod submodule and must be initialized at the gitlink
 revision. Modified dependency binaries are never accepted without their
@@ -110,7 +117,7 @@ only. See the workspace `docs/RUNTIME-DEVELOPMENT.md` for source iteration.
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
 pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
-pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
+pwsh -NoProfile -File scripts/build.ps1 -Configuration Release
 ```
 
 Partial entries:
@@ -136,7 +143,10 @@ produces only its selected variant; the default also refreshes the alias.
 The historical staging folder name does not identify the runtime RID. Build
 variants sequentially because they share staging.
 
-For local dependency edits, `-AllowDirtyDependencies` isolates packages under
+The product entry accepts `-RuntimeProfile android|bionic|legacy|all` without a
+parent repository or Patcher checkout. Use `all` only with per-profile pack caches.
+For local dependency edits, pass explicit source paths and `-Development`
+(alias `-AllowDirtyDependencies`) to isolate packages under
 `Output/DevelopmentReleases`. It relaxes source selection, not content or ABI
 validation; those outputs must not be uploaded as formal release assets.
 

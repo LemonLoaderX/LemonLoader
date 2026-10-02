@@ -17,6 +17,8 @@ owns deployment consumer semantics. The [runtime-extraction decision](../../impl
 owns runtime digest subtraction. The [producer decision](../../implemented/simplification/2026-10-02-minimal-produced-payload.md)
 owns minimal layout-9 production and old-consumer compatibility; independent repository
 ownership remain within this broader proposal.
+The [source-resolution decision](../../implemented/process/2026-10-02-independent-source-resolution.md)
+owns per-product pins, read-only sibling selection and isolated source setup.
 
 ## Proposal
 
