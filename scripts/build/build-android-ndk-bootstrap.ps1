@@ -184,13 +184,17 @@ if ($Configuration -eq "Release") {
     if ($LASTEXITCODE -ne 0) {
         throw "Stripping the Android Release bootstrap failed with exit code $LASTEXITCODE."
     }
-
-    $llvmObjCopy = Get-AndroidNdkTool -AndroidNdkRoot $ndkRoot -Name "llvm-objcopy"
-    & $llvmObjCopy --remove-section=.note.gnu.build-id $outputLibrary
-    if ($LASTEXITCODE -ne 0) {
-        throw "Removing the machine-dependent Android build ID failed with exit code $LASTEXITCODE."
-    }
 }
+
+$readElf = Get-AndroidNdkTool -AndroidNdkRoot $ndkRoot -Name "llvm-readelf"
+$buildIds = foreach ($library in @($builtLibrary, $outputLibrary)) {
+    $notes = (& $readElf --notes $library 2>&1) -join "`n"
+    if ($LASTEXITCODE -ne 0) { throw "Could not read bootstrap build ID: '$library'." }
+    $match = [regex]::Match($notes, '(?m)^\s*Build ID:\s*([0-9a-fA-F]{40})\s*$')
+    if (!$match.Success) { throw "Bootstrap build ID is missing or invalid: '$library'." }
+    $match.Groups[1].Value.ToLowerInvariant()
+}
+if ($buildIds[0] -cne $buildIds[1]) { throw 'Stripping changed the bootstrap build ID.' }
 
 & (Join-Path $PSScriptRoot "verify-android-bootstrap.ps1") `
     -LibraryPath $outputLibrary `

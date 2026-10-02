@@ -50,6 +50,10 @@ configuration does not close that gap.
 
 ## Alternatives considered
 
+The [native build-ID decision](../../implemented/bug-fix/2026-10-02-preserve-native-build-id.md)
+owns ELF identity preservation and private symbol matching, independently of the
+reporter alternatives below.
+
 - Crashpad offers richer process/thread snapshots and mature offline tools.
   Its [Android architecture](https://github.com/chromium/crashpad/blob/main/doc/overview_design.md)
   adds a handler process, IPC, ptrace/broker behavior and mini_chromium dependency.

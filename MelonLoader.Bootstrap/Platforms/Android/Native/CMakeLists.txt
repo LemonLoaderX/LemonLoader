@@ -11,6 +11,13 @@ if(NOT EXISTS "${LEMON_DOBBY_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR "Set LEMON_DOBBY_SOURCE_DIR to the complete LemonLoader Dobby source repository")
 endif()
 
+# Keep local checkout/toolchain paths out of debug inputs to the linker build ID.
+add_compile_options(
+    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/src/LemonLoader/AndroidNative"
+    "-ffile-prefix-map=${CMAKE_BINARY_DIR}=/build/LemonLoader/AndroidNative"
+    "-ffile-prefix-map=${LEMON_DOBBY_SOURCE_DIR}=/src/Dobby"
+    "-ffile-prefix-map=${CMAKE_ANDROID_NDK}=/toolchain/android-ndk")
+
 set(DOBBY_DEBUG OFF CACHE BOOL "" FORCE)
 add_subdirectory("${LEMON_DOBBY_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/dependencies/dobby" EXCLUDE_FROM_ALL)
 

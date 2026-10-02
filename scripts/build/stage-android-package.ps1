@@ -367,8 +367,8 @@ if ($Configuration -eq "Release" -and
     throw "The Android Release bootstrap contains debug or static symbol sections."
 }
 if ($Configuration -eq "Release" -and
-    $bootstrapSections -match '(?m)\.note\.gnu\.build-id\b') {
-    throw "The Android Release bootstrap contains a machine-dependent build ID."
+    $bootstrapSections -notmatch '(?m)\.note\.gnu\.build-id\b') {
+    throw "The Android Release bootstrap is missing its crash-symbol build ID."
 }
 $bootstrapDynamic = (& $readElf -d $stagedBootstrap 2>&1) -join [Environment]::NewLine
 if ($LASTEXITCODE -ne 0) {

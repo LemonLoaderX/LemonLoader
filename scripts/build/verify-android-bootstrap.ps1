@@ -28,6 +28,9 @@ $readElfText = $readElfOutput -join [Environment]::NewLine
 if ($readElfText -notmatch '(?m)^\s*Machine:\s+AArch64\s*$') {
     throw "The bootstrap is not an AArch64 ELF shared library."
 }
+if ($readElfText -notmatch '(?m)^\s*Build ID:\s*[0-9a-fA-F]{40}\s*$') {
+    throw "The bootstrap is missing a valid linker build ID for crash symbol matching."
+}
 
 $loadSegments = [regex]::Matches(
     $readElfText,

@@ -45,6 +45,9 @@ startup. This is ordinary next-launch recovery, not signal-handler code.
 
 ## Consequences
 
+The [native build-ID decision](../bug-fix/2026-10-02-preserve-native-build-id.md)
+keeps published bootstrap IDs matched to private symbols for offline trace lookup.
+
 System reports supplement [CoreCLR reports](2026-10-02-runtime-crash-reports.md)
 and [previous logs](../bug-fix/2026-10-02-preserve-previous-log.md). They can identify
 low-memory/signalled exits without claiming those are native crashes. API 26-29
