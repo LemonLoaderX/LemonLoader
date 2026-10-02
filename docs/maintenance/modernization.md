@@ -221,3 +221,19 @@ as `ccd329f`; win-x64 Patcher outputs built locally. Rebuild preflight exposed a
 DrvFS/Linux-Git stat bottleneck; native Windows Git preserves source checks and
 lets compilation begin. The required SDK downloads from the official CI feed
 when the primary SDK feed has no copy. Original packs remain untouched.
+
+Rebuild recovery: official SDK installation and full Android restore now pass.
+The external-artifacts feed-discovery fix is committed in the temporary parent
+as `f0fec60` (native Git preflight fix: `14b14ab`). Full both-profile build has
+restarted using `b85b9fbd264`; no completed runtime packs or Loader release are
+claimed yet. Check the active background build before rerunning or moving any
+dependency directory. Outputs are under parent `temp/runtime-development/local/`
+by exact source revision and RID; failure logs and exit-code files remain there.
+
+Next P1 actions: obtain successful nupkgs, normalize/import new isolated packs,
+update both product runtime pins to the reviewed common revision, build/check
+matching Loader archives, and record artifact identities outside Git. Patcher
+win-x64 is ready locally. Maintainer device acceptance remains pending. NuGet
+audit reported known high-severity advisories on the upstream DiaSymReader.Native
+build dependency; assess publication exposure separately rather than suppressing
+the warning or upgrading unrelated pins without review.

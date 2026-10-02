@@ -50,6 +50,10 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 - The native host parses these identities, computes deployment revision and
   verifies staged content. Deployment invalidity currently shares the payload
   failure path; this needs a behavioral separation, not just a helper relocation.
+  In bootstrap native_load_impl, extraction/redirect failure returns JNI_FALSE
+  while the Unity rollback guard remains active. Optional deployment isolation
+  must occur before hooks/runtime startup or use a separately verified fallback;
+  simply changing that return to success is unsafe.
 - Candidate destination: Loader-owned public contract plus a reusable metadata
   tool/interface, consumed by Patcher and a minimal second installer. The precise
   packaging and editable-deployment policy remain P3 design tasks.
