@@ -54,15 +54,22 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   while the Unity rollback guard remains active. Optional deployment isolation
   must occur before hooks/runtime startup or use a separately verified fallback;
   simply changing that return to success is unsafe.
-- Candidate destination: Loader-owned public contract plus a reusable metadata
-  tool/interface, consumed by Patcher and a minimal second installer. The precise
-  packaging and editable-deployment policy remain P3 design tasks.
+- Candidate destination: a minimal Loader-owned file layout/extraction/update
+  contract, with optional Patcher. Remove unnecessary metadata requirements first;
+  do not assume shared metadata-generation tooling is needed. No per-file
+  diagnostic system or routine startup scan is requested.
 - Declared deployment revision is not an authenticity boundary: an APK editor
   can change content and metadata together. Its real consumers are refresh-once,
   obsolete-file actions and the unchanged-deployment fast path. P3 evaluates
   removing global revision and deriving update decisions locally; stale revision
   validation must not gate game startup. Per-file previous hashes may still be
   useful for preserving user modifications, independently of trust.
+- Normal extraction compares a domain hash to its saved marker and directory
+  existence; it does not recompute installed file hashes. Release validation
+  separately checks individual files. Neither requires a new diagnostic framework.
+- Upstream MelonAssembly loads the file and reports exceptions; it also prints a
+  Mod hash without making it a manifest admission check. Reuse ordinary loading
+  behavior rather than add corruption diagnosis.
 
 ## Crash evidence baseline
 

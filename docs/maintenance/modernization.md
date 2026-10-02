@@ -11,9 +11,10 @@ Requested: 2026-10-02. Status: active, incremental work.
 2. Retain useful native crash evidence on the device without requiring a user
    to run logcat. Preserve previous-session logs and provide an accessible,
    bounded diagnostic export with offline symbolization inputs.
-3. Make installation and updates practical without Patcher. Ordinary deployment
-   edits, including MT Manager edits, must not prevent the original game from
-   starting merely because a packaged revision/hash is stale.
+3. Simplify the whole installation/update contract, not only deployment revision.
+   Remove unnecessary generated metadata and hash admission gates so manual
+   installation/MT Manager edits do not depend on Patcher. Reuse ordinary loading
+   errors/logs; do not add per-file diagnostics or routine startup scans.
 4. Remove the parent repository as a required version lock and build coordinator.
    LemonLoader and Patcher independently own their dependencies and workflows.
 5. Reduce maintenance and onboarding cost: concise indexed documentation, a small
@@ -26,8 +27,9 @@ Requested: 2026-10-02. Status: active, incremental work.
 - Preserve unrelated worktree edits, independent Git histories, private outputs,
   successful runtime packs, signing material and application data.
 - Keep unsafe ZIP paths, duplicate entries, ABI errors, native-name collisions,
-  hash/signature mismatch on protected inputs and incomplete runtime detection.
-  Usability improvements must not disable these checks globally.
+  existing download/release hash or signature validation, and actionable runtime
+  compatibility/missing-input errors. This does not require preserving every
+  installed-payload hash/revision gate or replacing it with another framework.
 - Deployment revision is an update/cache hint, not an authenticity guarantee or
   permission to start the game. A hash stored beside mutable content does not
   establish trust. Distinguish download/build consistency checks, authenticated
@@ -134,8 +136,13 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
 
 ### P3: Installation/deployment contract owned by Loader
 
-- [ ] Map identity producers/consumers and separate immutable runtime integrity,
-  installation/update freshness, deployment policy and local user content.
+- [ ] Reassess all manifests, identity digests, mixed domain hashes, extraction
+  markers and deployment policy state from actual installation/update needs.
+  Prefer deleting unnecessary requirements, not rebuilding the same machinery.
+- [ ] Compare with upstream MelonLoader's directory installation/loading. Keep
+  demonstrated Android requirements: APK asset extraction, private runtime files
+  and process-safe publication. Do not add per-file corruption diagnostics,
+  expected-file inventories or routine startup scans; reuse existing error logs.
 - [ ] Remove deployment revision self-consistency as a startup prerequisite. Treat
   legacy revision as an optional rollout hint or retire it when equivalent update
   decisions are derived locally. Missing/stale declared revision must not prevent
@@ -144,9 +151,9 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
   only the state needed for refresh-once, user-edit preservation, safe obsolete
   file handling and transactional recovery. Per-file previous hashes can support
   those decisions without pretending to authenticate the APK's editable content.
-- [ ] Specify a small public installation interface in Loader and reusable tooling
-  for metadata generation/verification. Patcher consumes this interface rather
-  than owning an undocumented recipe. Avoid duplicated generators in two repos.
+- [ ] Specify a minimal Loader-owned file layout and extraction/update behavior.
+  Patcher is an optional adapter, not an admission authority. Do not build a
+  metadata-generation framework unless necessary metadata remains after deletion.
 - [ ] Make ordinary deployment explicitly editable; do not introduce a mandatory
   locked/verified path merely to keep the current manifest design. Evaluate
   optional managed/locked policies for a demonstrated distribution need.
@@ -166,7 +173,8 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
   the new semantics safely.
 
 Exit: a second minimal installer and ordinary local deployment edits work without
-Patcher internals, while protected runtime security checks remain enforced.
+Patcher internals, manual digest regeneration or new scanning overhead. Existing
+release/download verification and structural safety checks remain.
 Deployment revisions are not admission checks. Document what validation detects
 and its trust source; do not label colocated hashes as proof of authenticity.
 
@@ -259,3 +267,8 @@ is not a security identity. P3 prioritizes removing revision/hash metadata as an
 admission requirement for ordinary editable deployment, and evaluates eliminating
 the global revision rather than simply adding a second complex deployment mode.
 Current runtime behavior remains unchanged until that stage's migration/tests.
+
+Further clarification: P3 covers the entire installed-payload contract. No
+per-file diagnostic system is requested. Favor deleting derived metadata and
+unnecessary gates; use upstream-style loading/logging. Normal runtime domain
+hashes are extraction freshness markers, not continuous installed-file checks.

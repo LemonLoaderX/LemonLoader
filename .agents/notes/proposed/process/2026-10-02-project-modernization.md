@@ -31,6 +31,13 @@ for rollout, user edits, obsolete files and rollback. Do not require a new locke
 mode solely to preserve the present validation design. Build/download checks and
 actual runtime compatibility remain separate concerns.
 
+Reassess the entire installed-payload design: domain mixed hashes, identity
+digests, manifests, extraction markers and deployment policy state. Prefer
+removal and ordinary Loader installation/loading over new validation tooling.
+Do not add per-file diagnostics, expected-file inventories or startup scans.
+Release/download checks and structural safety are separate from installed-payload
+admission. Old-format migration still requires testing before changing behavior.
+
 ## Alternatives considered
 
 - Retaining the parent Git lock gives one coordinated snapshot, but requires an
@@ -42,9 +49,12 @@ actual runtime compatibility remain separate concerns.
 - Keeping global revision validation catches mismatched generated metadata, but
   provides no anti-tamper guarantee and makes ordinary APK editing depend on
   Patcher's recipe. Prefer local update decisions and optional legacy rollout hints.
-- Maintaining separate copies of metadata generators in both products allows
-  local builds, but perpetuates drift. Loader should own a reusable installation
-  interface/tool, with Patcher consuming a reviewed version.
+- A reusable metadata generator reduces duplication but may preserve a recipe
+  users do not need. Simplify to file layout/update behavior first; add tooling
+  only for demonstrated irreducible requirements.
+- Per-file diagnostics locate corruption but add generation, scanning and
+  maintenance costs. The maintainer rejects this direction; use loading errors
+  and retained logs instead.
 - A fatal signal handler that calls the normal logger is small, but may deadlock,
   allocate or interfere with CoreCLR's recoverable signals. Evaluate established
   crash tooling and async-signal-safe evidence collection before choosing.
