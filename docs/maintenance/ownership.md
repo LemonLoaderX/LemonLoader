@@ -18,7 +18,8 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Source setup/audit/status | parent scripts | per-product manifest validation |
 | Syntax/helper verification | parent `test-scripts.ps1` | per-product tests |
 | Source/archive secret scan | parent `scan-publication.ps1` | owned release checks |
-| Cleanup | parent `clean.ps1` | per-product output cleanup |
+| Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup; parent delegate retained temporarily |
+| Agent rules | each product `AGENTS.md` | per-product rules; Loader owns main rationale |
 | Runtime current docs | Loader `docs/android/RUNTIME-DEVELOPMENT.md` | Loader, retained |
 | Runtime historical evidence prose | parent `RUNTIME-EXPERIMENT.md` | compact Loader history/notes |
 | Parent operations/status | parent docs | current facts merged into Loader docs |

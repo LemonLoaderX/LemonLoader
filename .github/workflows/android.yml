@@ -29,6 +29,9 @@ jobs:
           tool: git-cliff@2.10.1
       - name: Test release-note generation
         run: bash scripts/test-release-notes.sh
+      - name: Test product cleanup safety
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/test/test-cleanup.ps1
       - name: Generate tagged release body
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -110,6 +113,7 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoProfile -File scripts/test/test-source-dependencies.ps1
+          pwsh -NoProfile -File scripts/test/test-cleanup.ps1
           pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 
       - name: Build release

@@ -36,3 +36,23 @@ Use an imperative subject with a meaningful scope, for example
 problem, root cause, chosen behavior, and verification in the body when they are
 not obvious from the diff. Do not mix dependency updates, generated output, and
 unrelated refactoring in one commit.
+
+## Cleanup
+
+Stop builds first and preview from this repository root:
+
+```powershell
+pwsh -NoProfile -File scripts/clean.ps1 -WhatIf
+pwsh -NoProfile -File scripts/clean.ps1
+# Also remove known pack/download/archive directories:
+pwsh -NoProfile -File scripts/clean.ps1 -AllOutputs -WhatIf
+```
+
+Routine cleanup removes Output/Debug, Release and Dependencies, project bin/obj
+and known per-project outputs. Save exact-build symbols outside those build trees
+before cleaning. Packs and formal/development archives require AllOutputs.
+RuntimeDevelopment, diagnostic/test evidence, private/unknown Output directories,
+source caches and sibling repositories remain untouched in both modes. Runtime
+source outputs need deliberate maintenance at their real output root, not through
+the source artifacts symlink. Links within a selected tree or on its path reject
+cleanup before deletion. There is no cross-repository Deep mode.

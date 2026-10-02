@@ -22,6 +22,14 @@ if ($errors.Count) { $errors; exit 1 }
 
 The Android build adds ELF architecture, Android API, required export, Bionic
 symbol, and 16 KiB segment-alignment checks automatically.
+Product cleanup safety has a standalone synthetic-tree regression:
+
+```powershell
+pwsh -NoProfile -File scripts/test/test-cleanup.ps1
+```
+
+It checks previews, retained packs/archives/evidence, source/cache boundaries and
+link rejection without cleaning actual builds or dependency checkouts.
 The native bootstrap host suite includes system-exit recovery tests against
 the NDK JNI interface: API gating, current-process selection, exact trace bytes,
 stream errors/closure, retry, capacity limits and safe retention. These fake-JNI

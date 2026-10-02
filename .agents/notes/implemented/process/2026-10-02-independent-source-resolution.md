@@ -40,6 +40,17 @@ build trees. Temporary parent wrappers preserve old paths until retirement.
 Runtime setup checks tracked changes, matching the builder: its artifacts symlink
 and build lock are untracked source-side outputs. They and other untracked local
 files remain untouched. Generic dependency setup still rejects untracked files.
+
+Each product owns scripts/clean.ps1 and its cleanup fixtures. Cleanup selects known
+generated build trees, never sibling source repositories or .dependencies caches.
+Routine cleanup preserves packs, published/development archives, runtime source
+outputs, symbols, diagnostic evidence and unknown Output directories. AllOutputs
+adds only explicitly named pack/download/archive directories, not a wildcard
+purge. Runtime source cleanup is manual and scoped to its actual output target;
+the old cross-repository Deep switch is not retained. Stop builds before cleaning.
+All selected trees are validated before deletion; links at/above a target and
+nested links reject cleanup. Traversal skips nested Git repositories and links.
+Per-product AGENTS.md retains maintenance rules without requiring parent docs.
 Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
@@ -53,6 +64,9 @@ Physical dependency moves remain a separate step of the
   product and can overwrite local work. Use isolated revision caches instead.
 - A new shared resolver package avoids a small amount of script duplication but
   adds another synchronized dependency. Each product owns its narrow helper.
+- Keeping umbrella cleanup provides one command but mutates other independently
+  maintained sources and treats unknown outputs as disposable. Product-owned,
+  named cleanup targets keep ownership and evidence retention explicit.
 
 ## Consequences
 
@@ -61,7 +75,10 @@ without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
 prepared. Existing runtime artifacts are not moved or deleted by script migration.
-Remaining root audit/cleanup/test workflows still require ownership migration.
+Remaining root audit/test/publication workflows still require ownership migration.
+The temporary parent cleanup delegates to product commands without dependency
+cleanup. Product cleanup does not reclaim shared dependency build caches or
+runtime source build space; those need deliberate owner-specific maintenance.
 
 Local Git fixtures cover matching/conflicting siblings, independent cache paths,
 explicit overrides, dirty/wrong checkouts and pinned setup without shared-source
@@ -70,6 +87,9 @@ fixtures exercise real launcher/backend path conversion, per-RID output isolatio
 development evidence, exclusive locking, existing-artifacts protection and failed
 build propagation using a small fixture build.sh. They do not compile CoreCLR.
 Product build and publish entries verify the actual manifests/inputs.
+Cleanup fixtures operate only on synthetic standalone trees and exercise WhatIf,
+default/archive retention, unknown diagnostics, nested Git checkout preservation,
+containment and ancestor/nested-link rejection before any selected tree is removed.
 
 ## Prior-note Audit
 
