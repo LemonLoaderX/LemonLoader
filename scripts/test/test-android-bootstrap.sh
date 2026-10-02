@@ -31,3 +31,8 @@ ulimit -c 0
     "$test_root/embedded_crypto_test.cpp" -Wl,--gc-sections \
     -Wl,--wrap=dlopen,--wrap=dlsym,--wrap=dlclose -ldl -o "$build_root/embedded-crypto-test"
 "$build_root/embedded-crypto-test" "$fixture/embedded-crypto"
+"${CXX:-c++}" -std=c++17 \
+    -I"$build_root/include" -I"$test_root/stubs" -I"$repository_root/tests/Android/Logging/stubs" \
+    -I"$native_root/include" -I"$native_root/src" \
+    "$test_root/system_exit_test.cpp" -o "$build_root/system-exit-test"
+"$build_root/system-exit-test" "$fixture/system-exit"

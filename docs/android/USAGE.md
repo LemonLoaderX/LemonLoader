@@ -95,6 +95,15 @@ JSON; preserve its original bytes rather than treating it as a complete report.
 Some P/Invoke faults can fail reporting before any bytes are written. Empty
 temporary reports cannot supply a trace; system tombstones/logcat are still
 needed for such cases.
+On API 30+, `MelonLoader/SystemExit/<timestamp>-<pid>/exit.txt` retains the latest
+relevant abnormal exit of the same application process. Reasons `2` through `7`
+mean signalled exit, low memory, Java crash, native crash, ANR and initialization
+failure respectively; `status` contains the exit status or signal where available.
+API 31+ native crashes can also supply `trace.pb` (Android's original tombstone
+protobuf); ANRs can supply `trace.txt`. Eight events are retained, with an 8 MiB
+limit per trace. Collection occurs on the next launch and does not require logcat.
+Android may return no trace or may have overwritten it. Review raw traces for
+sensitive data before sharing; collection does not upload anything.
 Set `loader.capture_player_logs = true` in `Loader.cfg` to mirror Android logcat
 messages tagged `Unity` into both current and retained logs. A successful setup
 records `Unity player log capture enabled` near the start of `Latest.log` and

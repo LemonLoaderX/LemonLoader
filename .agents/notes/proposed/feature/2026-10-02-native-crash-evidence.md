@@ -19,11 +19,10 @@ which uses the existing log root without a separate private export pipeline.
 Evaluate its coverage before adding a new crash dependency. Do not upload
 automatically.
 
-Supplement with the application's own ApplicationExitInfo on API 30+. Native
-tombstone streams begin at API 31, contain protobuf rather than text, and may be
-absent/overwritten. Save the original stream for offline inspection; do not add
-a runtime protobuf parser just to retain evidence. API 26-30 still needs an
-explicit native-trace coverage decision after the runtime reporter is tested.
+System exit recovery follows the [scoped Android decision](../../implemented/feature/2026-10-02-system-exit-evidence.md):
+API 30+ metadata and API 31+ native tombstone bytes, with bounded retention.
+API 26-30 still needs an explicit native-trace coverage decision; reporter
+configuration does not close that gap.
 
 ## Verified source boundaries
 
@@ -93,4 +92,5 @@ partially overlaps and retains the overall sequence. This note owns the narrower
 reporting investigation. The [embedded crypto decision](../../implemented/architecture/2026-10-02-embedded-android-crypto.md)
 is unrelated to signal ownership and still applies. The previous-log decision
 implements the logging concern, and the CoreCLR decision owns runtime report
-configuration. This proposal owns supplemental trace recovery and coverage.
+configuration. The system-exit decision owns Android trace recovery; this
+proposal retains older-API coverage and signal-coexistence qualification.

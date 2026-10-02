@@ -27,6 +27,7 @@ void log_error(const std::string& message);
 void reset_latest_log();
 void configure_logging(uint32_t max_logs, bool capture_player_logs);
 void configure_crash_reporting();
+void recover_system_exit(JNIEnv* env) noexcept;
 
 bool initialize_android_environment(JNIEnv* env);
 bool extract_runtime_assets();

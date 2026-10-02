@@ -69,6 +69,7 @@ namespace lemon::bootstrap {
 void log_line(const std::string&) {}
 void log_error(const std::string& message) { last_error = message; }
 void reset_latest_log() {}
+void recover_system_exit(JNIEnv*) noexcept {}
 bool initialize_android_environment(JNIEnv*) {
     ++environment_calls;
     runtime_paths.base_directory = "fixture";

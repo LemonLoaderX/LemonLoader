@@ -25,6 +25,7 @@ add_library(main SHARED
     src/deployment_policy.hpp
     src/bootstrap.cpp
     src/logging.cpp
+    src/system_exit.cpp
     src/runtime.cpp)
 
 set(LEMON_CRYPTO_DEX "" CACHE FILEPATH "Validated runtime pack crypto helper DEX")

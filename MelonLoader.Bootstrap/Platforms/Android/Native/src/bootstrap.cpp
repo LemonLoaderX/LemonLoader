@@ -106,6 +106,7 @@ jboolean native_load_impl(JNIEnv* env, jstring native_library_directory) {
         return JNI_FALSE;
     }
     reset_latest_log();
+    recover_system_exit(env);
     if (!extract_runtime_assets() || !install_symbol_redirect()) {
         return JNI_FALSE;
     }
