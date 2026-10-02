@@ -23,8 +23,9 @@ and never switched, fetched or reset; missing revisions use separate cache paths
 Matching shared siblings are verified without submodule mutation. Local edits,
 wrong HEADs and uninitialized nested dependencies receive actionable errors.
 Patcher owns its generator URL and revision; Loader does not supply them.
-New clones enable long paths locally, and dependency inspection passes the option
-before Git's -C path handling so deep staging roots work on Windows. Blob filtering applies to HTTPS clones;
+New clones enable long paths locally; temporary checkout names omit the revision
+basename because Git's Windows directory changes can still hit MAX_PATH despite
+core.longpaths. Blob filtering applies to HTTPS clones;
 local offline fixture/source clones do not create a filtered remote pointing at
 another checkout, which can trigger recursive lazy fetching from partial sources.
 

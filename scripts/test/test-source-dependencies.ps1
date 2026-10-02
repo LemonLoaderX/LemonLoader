@@ -45,7 +45,7 @@ $manifest.Save((Join-Path $product 'eng/AndroidDependencies.props'))
 Assert-Equal $sibling (Get-AndroidDependencySourceRoot -RepositoryRoot $product -Name Il2CppInterop)
 $invalid = Join-Path $product '.dependencies/invalid'
 Assert-Rejected { Initialize-AndroidSourceCheckout -Path $invalid -Url $origin -Revision ('0' * 40) }
-if ((Test-Path -LiteralPath $invalid) -or @(Get-ChildItem -Path "$invalid.staging-*" -ErrorAction SilentlyContinue).Count) {
+if ((Test-Path -LiteralPath $invalid) -or @(Get-ChildItem -Path (Join-Path (Split-Path $invalid) '.staging-*') -ErrorAction SilentlyContinue).Count) {
     throw 'Failed setup published or left staging output.'
 }
 $nestedOrigin = Join-Path $fixture 'nested-origin'

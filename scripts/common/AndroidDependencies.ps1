@@ -126,7 +126,8 @@ function Initialize-AndroidSourceCheckout {
     }
     $Path = [IO.Path]::GetFullPath($Path)
     [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($Path))
-    $staging = "$Path.staging-$([Guid]::NewGuid().ToString('N'))"
+    $stagingPrefix = Join-Path ([IO.Path]::GetDirectoryName($Path)) '.staging-'
+    $staging = "$stagingPrefix$([Guid]::NewGuid().ToString('N'))"
     try {
         $cloneArguments = @('--config', 'core.longpaths=true', '--no-checkout')
         if ($Url.StartsWith('https://', [StringComparison]::OrdinalIgnoreCase)) {
@@ -152,7 +153,7 @@ function Initialize-AndroidSourceCheckout {
     }
     finally {
         if (Test-Path -LiteralPath $staging) {
-            $expected = [IO.Path]::GetFullPath("$Path.staging-")
+            $expected = [IO.Path]::GetFullPath($stagingPrefix)
             if (![IO.Path]::GetFullPath($staging).StartsWith($expected, [StringComparison]::Ordinal)) {
                 throw "Refusing to clean an unexpected source staging path."
             }
