@@ -78,7 +78,8 @@ mandatory umbrella repo under another name.
 - [x] Persist goals, constraints, sequence and acceptance gates in Loader.
 - [x] Inspect ownership and existing decisions; preserve unrelated proposal.
 - [x] Commit the plan alone (`87e1c2c0` in Loader).
-- [ ] Inventory current changes, scripts, CI callers, outputs and repository roots.
+- [x] Record initial [ownership inventory](ownership.md); exhaustive caller and
+  Git-metadata checks remain mandatory before P4 physical moves/deletions.
 
 Exit: a resumable plan exists in the primary product without requiring chat
 history; runtime behavior has not been changed by planning.
@@ -215,4 +216,8 @@ committed as `b85b9fbd264` after explicit/legacy host JNI regressions. Self-revi
 fixed constructor-lookup JNI cleanup and a stale API table; bootstrap host tests
 pass. Both-profile runtime rebuild is in progress with isolated development
 outputs. P2-P5 are not implemented; no new crash capture or editable-deployment
-behavior is claimed.
+behavior is claimed. Loader implementation is committed as `a6c5e65d`, Patcher
+as `ccd329f`; win-x64 Patcher outputs built locally. Rebuild preflight exposed a
+DrvFS/Linux-Git stat bottleneck; native Windows Git preserves source checks and
+lets compilation begin. The required SDK downloads from the official CI feed
+when the primary SDK feed has no copy. Original packs remain untouched.
