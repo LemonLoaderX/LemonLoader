@@ -29,6 +29,9 @@ tests do not establish OEM tombstone availability or Android permission behavior
 The same suite exercises editable deployment through real extraction/transaction
 code with fake APK/JNI inputs: stale/absent metadata, add/edit/delete, user-edit
 protection, no unchanged-package scan and pre-hook Loader disabling on failure.
+Runtime extraction cases cover absent/minimal configuration, no generated
+digest/identity/Interop manifest, APK update replacement/removal and retry when
+the platform update token is unavailable.
 
 For native-hook changes, run the maintained Dobby far-target regression on both
 a native ARM64 device and any supported native-bridge emulator:

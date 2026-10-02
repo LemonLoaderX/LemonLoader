@@ -81,5 +81,5 @@ fails, Loader is disabled before installing symbol redirects or starting managed
 code; Unity remains loaded and the original game can start. Mods do not execute
 against a possibly incomplete deployment. Errors remain in retained logs.
 
-This document covers deployment only. Runtime/Interop metadata and required
-runtime extraction have their separate current contract in [ARTIFACTS.md](ARTIFACTS.md).
+This document covers deployment only. Required runtime extraction and optional
+runtime configuration have their contract in [ARTIFACTS.md](ARTIFACTS.md).

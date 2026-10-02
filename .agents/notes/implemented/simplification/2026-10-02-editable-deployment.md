@@ -36,7 +36,8 @@ before symbol redirects/managed initialization while leaving Unity loaded. No
 Mod executes after an incomplete rollback. Required runtime extraction failures
 remain fatal in this step. Release/download validation is unchanged. Producers
 continue writing the old additive metadata for compatibility with old Loaders;
-removing producer fields and runtime-domain gates are separate migration steps.
+producer cleanup remains separate. The [runtime-extraction decision](2026-10-02-runtime-extraction-without-digests.md)
+owns removal of runtime-domain digest requirements.
 
 ## Alternatives considered
 
@@ -60,8 +61,9 @@ after migrating old revision state performs a transaction. Reinstallation update
 all refresh files once, even if only another package asset changed. Enforce is an
 explicit deployment policy, not protection against APK editing.
 
-This is the deployment portion of the wider installed-contract subtraction. It
-does not make runtime-domain hashes, payload format or game Interop optional.
+This is the deployment portion of the wider installed-contract subtraction.
+Runtime extraction/configuration belongs to the linked runtime decision; game
+Interop assemblies remain necessary for Mods that use their generated surface.
 Package update time is platform freshness metadata, not byte integrity evidence.
 
 ## Test Coverage

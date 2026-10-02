@@ -17,8 +17,8 @@ that JNI registration failed.
 
 ## CoreCLR initialization fails
 
-Check the extracted `runtime-identity.json`, the engine hash, and the actual
-mapped `libcoreclr.so`. The runtime must export `coreclr_initialize`,
+Start with retained startup errors and the actual mapped `libcoreclr.so`.
+The runtime must export `coreclr_initialize`,
 `coreclr_create_delegate`, and `coreclr_shutdown` without a MonoVM identity.
 
 The frozen .NET 10 fork can emit `[CoreCLR.Android.Host]` and
@@ -43,7 +43,7 @@ Releases only, verify the next unused `classesN.dex` entry. If JNI state is miss
 and CoreCLR resolve the same native cryptography module rather than loading a
 second namespace-local copy.
 
-For Bionic, check `runtimeRid` and `cryptoBackend` in the runtime identity,
+For Bionic, check the configured `runtimeRid`,
 the OpenSSL shim, private `libssl.so`/`libcrypto.so`, and system CA access.
 Bionic does not need an Android crypto DEX. Do not mix inputs from the two packs.
 

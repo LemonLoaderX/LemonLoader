@@ -9,7 +9,7 @@ It does not modify or install an APK itself. A complete payload is under:
 Output/Release/linux-bionic-arm64/package
 ```
 
-Use LemonLoader.Patcher 1.1.0 or later with an original ARM64 Unity IL2CPP APK.
+LemonLoader.Patcher 1.1.0 or later is the automated adapter for an original ARM64 Unity IL2CPP APK.
 It edits ZIP entries directly, generates Interop assemblies, and inserts the
 Android crypto DEX when required. Alignment and signing are explicit options.
 Do not extract/repack a complete APK on a case-insensitive filesystem.
@@ -18,6 +18,37 @@ See [ARTIFACTS.md](ARTIFACTS.md) for the payload interface.
 Select `--runtime android` (default) or `--runtime bionic` in Patcher. Android's
 upstream synchronous HTTP rejection is unchanged. Use asynchronous HTTP on that
 profile; evaluate Bionic separately when a Mod requires synchronous requests.
+
+## Manual Injection
+
+MT Manager or another ZIP-entry editor can install the same Loader without
+Patcher's metadata recipe. Use the matching current Loader Release and already
+generated ARM64 Interop DLLs for the exact game's IL2CPP library/metadata.
+
+1. Check the Release against its published checksum and retain an original APK.
+   Use a standard Unity layout with `lib/arm64-v8a/libmain.so`, `libunity.so` and
+   `libil2cpp.so`, where Unity loads the library named `main`. Check that runtime
+   private native names do not collide with game libraries; do not overwrite
+   unrelated native libraries or merge an existing Loader installation.
+2. Replace only `lib/arm64-v8a/libmain.so` with the Release bootstrap, and copy the
+   Release `assets/LemonLoader/runtime` tree into the same APK asset path.
+   Preserve the game's `libunity.so`, `libil2cpp.so` and game assets.
+3. Add the matching Interop DLLs under `assets/LemonLoader/runtime/interop`.
+   Generation manifests are not needed by loading. Optional packaged Mods/config
+   go under `assets/LemonLoader/deployment` with their destination-relative paths.
+4. Copy Release `payload.json` as-is, or use the minimal configuration from
+   [ARTIFACTS.md](ARTIFACTS.md#minimal-installed-configuration). Android needs no
+   configuration file; Bionic needs its RID selection. No digest/revision is
+   recalculated. Active Releases need no additional `classesN.dex`.
+5. Preserve case-sensitive, unique, safe ZIP paths and ARM64/16 KiB compatibility.
+   Align and sign the finished APK using the existing package/signing identity,
+   then use Android's replacement update path. APK updates invalidate extraction;
+   copying files into the installed APK without an Android update does not.
+
+Root release manifests, licenses and `tools` are Release-side material, not APK
+asset destinations. Loader extracts dotnet into private storage on launch; the
+editor does not need access to that private directory. Older external-DEX
+Releases still use their historical adapter contract.
 
 ## Before packaging
 
@@ -116,9 +147,8 @@ uninstall or clear app data. External tooling should use the platform's replace
 installation path and should record `firstInstallTime` before and after the
 update. The value must remain unchanged.
 
-Runtime domain hashes in `assets/LemonLoader/payload.json` invalidate runtime
-extraction caches. Deployment uses Android's APK update time instead, without
-requiring deployment hash/revision regeneration for manual asset edits. A replacement runtime
+Android's APK update time invalidates runtime and deployment extraction caches,
+without requiring digest/revision regeneration for manual asset edits. A replacement runtime
 is copied into a staging directory before replacing the prior extraction, so
 files removed from the new payload do not survive indefinitely. The packaged
 deployment tree mirrors the MelonLoader base directory, so an APK can preload

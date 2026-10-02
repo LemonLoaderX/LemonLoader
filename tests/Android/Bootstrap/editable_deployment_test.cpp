@@ -21,7 +21,7 @@ std::map<std::string, std::string> assets;
 std::string asset_bytes, error;
 size_t asset_position;
 int asset_reads = 0, asset_lists = 0, hashes = 0, frames = 0;
-bool pending = false, missing_update = false, failed_list = false;
+bool pending = false, missing_update = false, failed_list = false, short_read = false;
 jlong update_time = 1234;
 JNIEnv* current_env;
 AAsset asset;
@@ -99,8 +99,10 @@ jobject static_call(JNIEnv*, jclass, jmethodID id, va_list) {
 }
 jint int_call(JNIEnv*, jobject receiver, jmethodID id, va_list args) {
     if (std::strcmp(method(id), "length") == 0) return node(receiver)->children.size();
-    assert(std::strcmp(method(id), "getInt") == 0);
-    const auto key = string(va_arg(args, jstring)); return std::stoi(node(receiver)->fields.at(key));
+    assert(std::strcmp(method(id), "optInt") == 0);
+    const auto key = string(va_arg(args, jstring)); const auto fallback = va_arg(args, jint);
+    const auto found = node(receiver)->fields.find(key);
+    return found == node(receiver)->fields.end() ? fallback : std::stoi(found->second);
 }
 void void_call(JNIEnv*, jobject receiver, jmethodID id, va_list args) {
     assert(std::strcmp(method(id), "update") == 0);
@@ -127,7 +129,7 @@ AAsset* AAssetManager_open(AAssetManager*, const char* path, int) {
 int64_t AAsset_getLength(AAsset*) { return asset_bytes.size(); }
 int64_t AAsset_getLength64(AAsset*) { return asset_bytes.size(); }
 int AAsset_read(AAsset*, void* destination, size_t count) {
-    const auto size = std::min(count, asset_bytes.size() - asset_position);
+    const auto size = std::min(count, asset_bytes.size() - asset_position) - (short_read && count > 0 ? 1 : 0);
     std::memcpy(destination, asset_bytes.data() + asset_position, size); asset_position += size; return size;
 }
 void AAsset_close(AAsset*) {}
@@ -231,14 +233,14 @@ int main(int argc, char** argv) {
     assets["LemonLoader/runtime/loader/Dependencies/Helper.dll"] = "dependency";
     assets["LemonLoader/runtime/interop/Game.dll"] = "interop";
     assets["LemonLoader/runtime/dotnet/runtime-identity.json"] = "runtime identity";
-    write(base / "identity-fixture", "runtime identity");
-    assert(compute_file_sha256(base / "identity-fixture", root->fields["managedRuntimeIdentitySha256"]));
     runtime_paths.base_directory = (base / "integration/external").string();
     runtime_paths.internal_data_directory = (base / "integration/internal").string();
     runtime_paths.dotnet_directory = (base / "integration/internal/dotnet").string();
     options = nullptr; policy("../unsafe", "seed");
     runtime_paths.loader_disabled = false;
+    hash_count = hashes;
     assert(extract_runtime_assets() && runtime_paths.loader_disabled && !pending && frames == 0);
+    assert(hashes == hash_count); // No identity or runtime-tree hashing.
     assert(read(base / "integration/external/MelonLoader/net6/Host.dll") == "host");
     std::cout << "PASS full runtime extraction isolates invalid optional deployment before hooks\n";
     options = nullptr; runtime_paths.loader_disabled = false;
@@ -246,4 +248,47 @@ int main(int argc, char** argv) {
     write(base / "integration/external/Mods/new.dll.lemon-deploy.tmp/keep", "blocked");
     assert(extract_runtime_assets() && runtime_paths.loader_disabled);
     std::cout << "PASS full runtime extraction isolates deployment transaction failure\n";
+    root->fields = {{"runtimeRid", "linux-bionic-arm64"}};
+    assert(read_payload_descriptor(payload) && payload.runtime_rid == "linux-bionic-arm64");
+    root->fields["runtimeRid"] = "unsafe-rid"; assert(!read_payload_descriptor(payload));
+    root->fields = {{"formatVersion", "7"}}; assert(!read_payload_descriptor(payload));
+    root->fields.clear();
+    assert(read_payload_descriptor(payload) && payload.runtime_rid == "android-arm64");
+    short_read = true; assert(!read_payload_descriptor(payload)); short_read = false;
+    assets.erase("LemonLoader/payload.json");
+    assert(read_payload_descriptor(payload));
+    std::cout << "PASS minimal/absent payload options accept no digests while rejecting unsupported layouts and RIDs\n";
+    assets.erase("LemonLoader/runtime/dotnet/runtime-identity.json");
+    assets["LemonLoader/runtime/dotnet/shared/Microsoft.NETCore.App/11/System.Private.CoreLib.dll"] = "runtime";
+    runtime_paths.base_directory = (base / "minimal/external").string();
+    runtime_paths.internal_data_directory = (base / "minimal/internal").string();
+    runtime_paths.dotnet_directory = (base / "minimal/internal/dotnet").string();
+    runtime_paths.loader_disabled = false;
+    assert(extract_runtime_assets() && !runtime_paths.loader_disabled);
+    assert(read(base / "minimal/external/MelonLoader/Il2CppAssemblies/Game.dll") == "interop");
+    assert(!std::filesystem::exists(base / "minimal/internal/dotnet/runtime-identity.json"));
+    lists = asset_lists; opens = asset_reads; hash_count = hashes;
+    write(base / "minimal/external/MelonLoader/net6/Host.dll", "local host edit");
+    assert(extract_runtime_assets() && asset_lists == lists && asset_reads == opens && hashes == hash_count);
+    assert(read(base / "minimal/external/MelonLoader/net6/Host.dll") == "local host edit");
+    std::cout << "PASS ordinary runtime installation needs neither payload/Interop manifests nor identity JSON and cached start performs no scans\n";
+    ++update_time;
+    assets["LemonLoader/runtime/loader/net6/Host.dll"] = "updated host";
+    assets.erase("LemonLoader/runtime/interop/Game.dll");
+    assets["LemonLoader/runtime/interop/NewGame.dll"] = "updated interop";
+    assert(extract_runtime_assets());
+    assert(read(base / "minimal/external/MelonLoader/net6/Host.dll") == "updated host");
+    assert(!std::filesystem::exists(base / "minimal/external/MelonLoader/Il2CppAssemblies/Game.dll"));
+    assert(read(base / "minimal/external/MelonLoader/Il2CppAssemblies/NewGame.dll") == "updated interop");
+    std::cout << "PASS APK update replaces runtime trees and removes obsolete assemblies without regenerated metadata\n";
+    missing_update = true;
+    assert(extract_runtime_assets()); lists = asset_lists;
+    assert(extract_runtime_assets() && asset_lists > lists);
+    missing_update = false;
+    std::cout << "PASS unavailable package token retries runtime extraction rather than caching an empty stamp\n";
+    ++update_time;
+    assets.erase("LemonLoader/runtime/loader/net6/Host.dll");
+    assert(!extract_runtime_assets());
+    assert(read(base / "minimal/external/MelonLoader/net6/Host.dll") == "updated host");
+    std::cout << "PASS missing required runtime tree preserves the previous extraction and reports failure\n";
 }

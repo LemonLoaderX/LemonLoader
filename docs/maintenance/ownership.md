@@ -47,9 +47,10 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   domain hashes. These are not Patcher-only computations.
 - Patcher validates the release, adds generated Interop/deployment files and
   recomputes final domain identities and deployment revision/policies.
-- The native host retains runtime identity checks but reads deployment from
-  actual assets and optional path policies, ignoring declared hashes/revision.
-  Package lastUpdateTime supplies local freshness. Optional deployment errors
+- The native host checks actual CoreCLR/crypto loading and reads deployment from
+  actual assets and optional path policies, ignoring declared hashes/revision
+  and identity digests. Package lastUpdateTime supplies all extraction freshness.
+  Optional deployment errors
   disable Loader before symbol redirects; Unity remains loaded. Required runtime
   extraction and redirect failures retain their rollback path.
 - Candidate destination: a minimal Loader-owned file layout/extraction/update
@@ -60,7 +61,7 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   can change content and metadata together. The current consumer no longer uses
   it for admission or freshness. Per-file previous hashes support user-edit
   preservation only during updates or explicit enforcement.
-- Normal extraction compares a domain hash to its saved marker and directory
+- Normal extraction compares APK update time to its saved marker and directory
   existence; it does not recompute installed file hashes. Release validation
   separately checks individual files. Neither requires a new diagnostic framework.
 - Upstream MelonAssembly loads the file and reports exceptions; it also prints a

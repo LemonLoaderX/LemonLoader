@@ -13,7 +13,8 @@ The [crash-evidence investigation](../feature/2026-10-02-native-crash-evidence.m
 owns the narrower runtime-reporter/system-trace alternatives. This proposal
 retains the overall modernization sequence.
 The [editable-deployment decision](../../implemented/simplification/2026-10-02-editable-deployment.md)
-owns deployment consumer semantics; runtime admission and independent repository
+owns deployment consumer semantics. The [runtime-extraction decision](../../implemented/simplification/2026-10-02-runtime-extraction-without-digests.md)
+owns runtime digest subtraction; producer cleanup and independent repository
 ownership remain within this broader proposal.
 
 ## Proposal

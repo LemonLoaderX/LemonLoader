@@ -125,12 +125,11 @@ the adapter falls back to the application's internal files directory.
 
 - `JNI_OnLoad` must not start the managed runtime. It only registers native methods.
 - Unity's `JNI_OnLoad` runs before the common bootstrap installs IL2CPP hooks.
-- Runtime extraction uses independent loader, dotnet, and Interop domain hashes
-  in `assets/LemonLoader/payload.json`. A matching marker and existing owned
-  directory are sufficient on the normal startup path; complete file hashing is
-  confined to Release/APK validation. Deployment staging is verified on every
-  launch because an `enforce` policy may need to restore a changed file even
-  when the packaged revision has not changed.
+- Runtime and deployment extraction use Android's package update time. A matching
+  local marker and existing runtime directory take the cached path without
+  installed-file hashing. payload.json supplies optional RID/deployment policies,
+  not required generated digests. Only explicit enforce deployment policies
+  continuously compare destination bytes against locally saved ownership hashes.
 - Changed runtime directories are fully copied into a sibling staging directory
   before replacing the prior extraction, and obsolete files do not survive an
   update.

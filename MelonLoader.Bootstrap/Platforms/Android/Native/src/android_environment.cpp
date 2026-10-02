@@ -48,10 +48,11 @@ std::string get_file_path(JNIEnv* env, jobject file) {
     return result;
 }
 
-bool read_asset_text(const char* path, std::string& output) {
+bool read_optional_asset_text(const char* path, std::string& output) {
     AAsset* asset = AAssetManager_open(asset_manager, path, AASSET_MODE_BUFFER);
     if (asset == nullptr) {
-        return false;
+        output.clear();
+        return true;
     }
     const auto length = static_cast<size_t>(AAsset_getLength(asset));
     output.resize(length);
@@ -65,7 +66,7 @@ bool read_asset_text(const char* path, std::string& output) {
            (output.back() == '\r' || output.back() == '\n' || output.back() == ' ')) {
         output.pop_back();
     }
-    return !output.empty();
+    return true;
 }
 
 std::vector<std::string> list_asset_children(const std::string& asset_path) {
@@ -153,8 +154,8 @@ bool compute_file_sha256(const std::filesystem::path& path, std::string& output)
 bool copy_if_changed(
     const std::string& asset_path,
     const std::filesystem::path& destination,
-    const std::filesystem::path& hash_path,
-    const std::string& asset_hash) {
+    const std::filesystem::path& marker_path,
+    const std::string& update_stamp) {
     std::error_code error;
     const std::filesystem::path parent = destination.parent_path();
     const std::filesystem::path staging =
@@ -188,10 +189,9 @@ bool copy_if_changed(
         }
     }
 
-    // Package validation owns content integrity. The marker is the commit record
-    // for this atomic directory publication, so normal startup must not rescan it.
-    std::string existing_hash;
-    if (read_file(hash_path, existing_hash) && existing_hash == asset_hash) {
+    // APK installation invalidates extraction without an installer-generated digest.
+    std::string existing_stamp;
+    if (!update_stamp.empty() && read_file(marker_path, existing_stamp) && existing_stamp == update_stamp) {
         const std::filesystem::file_status status =
             std::filesystem::symlink_status(destination, error);
         if (!error && std::filesystem::is_directory(status)) {
@@ -250,25 +250,25 @@ bool copy_if_changed(
     std::filesystem::remove_all(staging, error);
     if (error) fail("Clean published extraction staging");
 
-    std::filesystem::create_directories(hash_path.parent_path(), error);
+    std::filesystem::create_directories(marker_path.parent_path(), error);
     if (error) {
         return fail("Create extraction marker directory");
     }
-    std::filesystem::path temporary_hash = hash_path;
-    temporary_hash += ".tmp";
+    std::filesystem::path temporary_marker = marker_path;
+    temporary_marker += ".tmp";
     {
-        std::ofstream hash_output(temporary_hash, std::ios::binary | std::ios::trunc);
-        hash_output << asset_hash;
-        if (!finish_output(hash_output, error)) {
-            log_error("Failed to write extraction marker '" + temporary_hash.string() + "': " + error.message());
-            std::filesystem::remove(temporary_hash, error);
+        std::ofstream marker_output(temporary_marker, std::ios::binary | std::ios::trunc);
+        marker_output << update_stamp;
+        if (!finish_output(marker_output, error)) {
+            log_error("Failed to write extraction marker '" + temporary_marker.string() + "': " + error.message());
+            std::filesystem::remove(temporary_marker, error);
             return false;
         }
     }
-    std::filesystem::rename(temporary_hash, hash_path, error);
+    std::filesystem::rename(temporary_marker, marker_path, error);
     if (error) {
         fail("Publish extraction marker");
-        std::filesystem::remove(temporary_hash, error);
+        std::filesystem::remove(temporary_marker, error);
         return false;
     }
     std::filesystem::remove_all(previous, error);
@@ -278,11 +278,7 @@ bool copy_if_changed(
 
 struct PayloadDescriptor {
     std::string runtime_rid = "android-arm64";
-    std::string loader_hash;
-    std::string dotnet_hash;
-    std::string interop_hash;
-    std::string managed_runtime_identity_hash;
-    std::string deployment_profile;
+    std::string deployment_profile = "editable";
     std::string deployment_stamp;
     std::vector<DeploymentFileDescriptor> deployment_files;
     bool deployment_valid = true;
@@ -301,7 +297,6 @@ bool read_deployment_options(JNIEnv* env, jclass json_class, jobject json, Paylo
         env->DeleteLocalRef(name);
         return text;
     };
-    descriptor.deployment_profile = "editable";
     auto name = new_java_string(env, "deploymentFiles");
     auto files = checked_object_call(env, json, opt_array, name);
     env->DeleteLocalRef(name);
@@ -335,11 +330,13 @@ bool read_deployment_options(JNIEnv* env, jclass json_class, jobject json, Paylo
 }
 
 bool read_payload_descriptor(PayloadDescriptor& descriptor) {
+    descriptor = PayloadDescriptor{};
     std::string json;
-    if (!read_asset_text("LemonLoader/payload.json", json)) {
-        log_error("APK asset 'LemonLoader/payload.json' is missing or empty");
+    if (!read_optional_asset_text("LemonLoader/payload.json", json)) {
+        log_error("Could not read APK payload options");
         return false;
     }
+    if (json.empty()) return true;
 
     JNIEnv* env = nullptr;
     if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK ||
@@ -356,11 +353,9 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     jmethodID constructor = required_method(env,
         json_class, "<init>", "(Ljava/lang/String;)V");
     jmethodID get_int = required_method(env,
-        json_class, "getInt", "(Ljava/lang/String;)I");
-    jmethodID get_string_method = required_method(env,
-        json_class, "getString", "(Ljava/lang/String;)Ljava/lang/String;");
+        json_class, "optInt", "(Ljava/lang/String;I)I");
     const bool method_resolution_failed = clear_exception(env, "Resolve JSONObject methods");
-    if (constructor == nullptr || get_int == nullptr || get_string_method == nullptr ||
+    if (constructor == nullptr || get_int == nullptr ||
         method_resolution_failed) {
         env->DeleteLocalRef(json_class);
         return false;
@@ -385,52 +380,12 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     env->DeleteLocalRef(default_rid);
     env->DeleteLocalRef(rid_name);
 
-    auto read_object_string = [&](jobject object, const char* name, std::string& value) {
-        jstring property_name = new_java_string(env, name);
-        auto property_value = static_cast<jstring>(
-            checked_object_call(env, object, get_string_method, property_name));
-        env->DeleteLocalRef(property_name);
-        const bool property_failed = clear_exception(env, "Read payload manifest property");
-        if (property_value == nullptr || property_failed) {
-            if (property_value != nullptr) {
-                env->DeleteLocalRef(property_value);
-            }
-            return false;
-        }
-        value = get_string(env, property_value);
-        env->DeleteLocalRef(property_value);
-        return !value.empty();
-    };
-    auto read_property = [&](const char* name, std::string& value) {
-        return read_object_string(json_object, name, value);
-    };
-
-    const auto is_sha256 = [](const std::string& value) {
-        return value.size() == 64 && std::all_of(
-            value.begin(), value.end(), [](unsigned char character) {
-                return std::isxdigit(character) != 0;
-            });
-    };
-
     jstring version_name = new_java_string(env, "formatVersion");
-    const jint format_version = env->CallIntMethod(json_object, get_int, version_name);
+    const jint format_version = env->CallIntMethod(json_object, get_int, version_name, 8);
     env->DeleteLocalRef(version_name);
-    std::string managed_runtime_backend;
     bool valid = !clear_exception(env, "Read payload manifest version") &&
         format_version == 8 &&
-        (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64") &&
-        read_property("loaderSha256", descriptor.loader_hash) &&
-        read_property("dotnetSha256", descriptor.dotnet_hash) &&
-        read_property("interopSha256", descriptor.interop_hash) &&
-        read_property("managedRuntimeBackend", managed_runtime_backend) &&
-        read_property(
-            "managedRuntimeIdentitySha256",
-            descriptor.managed_runtime_identity_hash) &&
-        is_sha256(descriptor.loader_hash) &&
-        is_sha256(descriptor.dotnet_hash) &&
-        is_sha256(descriptor.interop_hash) &&
-        is_sha256(descriptor.managed_runtime_identity_hash) &&
-        managed_runtime_backend == "coreclr";
+        (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64");
     if (valid) {
         if (env->PushLocalFrame(32) != JNI_OK) {
             clear_exception(env, "Prepare optional deployment policy frame");
@@ -1329,6 +1284,7 @@ bool extract_runtime_assets() {
         return false;
     }
     runtime_paths.runtime_rid = payload.runtime_rid;
+    payload.deployment_stamp = deployment_update_stamp();
 
     const std::filesystem::path base(runtime_paths.base_directory);
     const std::filesystem::path internal(runtime_paths.internal_data_directory);
@@ -1337,36 +1293,27 @@ bool extract_runtime_assets() {
                "LemonLoader/runtime/loader/net6",
                loader / "net6",
                base / ".lemonloader-loader-net6-hash",
-               payload.loader_hash) &&
+               payload.deployment_stamp) &&
            copy_if_changed(
                "LemonLoader/runtime/loader/Dependencies",
                loader / "Dependencies",
                base / ".lemonloader-loader-dependencies-hash",
-               payload.loader_hash) &&
+               payload.deployment_stamp) &&
            copy_if_changed(
                "LemonLoader/runtime/interop",
                loader / "Il2CppAssemblies",
                base / ".lemonloader-interop-hash",
-               payload.interop_hash) &&
+               payload.deployment_stamp) &&
            copy_if_changed(
                "LemonLoader/runtime/dotnet",
                internal / "dotnet",
                std::filesystem::path(runtime_paths.dotnet_directory) /
                    ".lemonloader-dotnet-hash",
-               payload.dotnet_hash);
+               payload.deployment_stamp);
     if (!runtime_extracted) {
         return false;
     }
 
-    const std::filesystem::path runtime_identity =
-        std::filesystem::path(runtime_paths.dotnet_directory) / "runtime-identity.json";
-    std::string runtime_identity_hash;
-    if (!compute_file_sha256(runtime_identity, runtime_identity_hash) ||
-        runtime_identity_hash != payload.managed_runtime_identity_hash) {
-        log_error("The extracted managed runtime identity does not match payload.json");
-        return false;
-    }
-    payload.deployment_stamp = deployment_update_stamp();
     bool deployed = false;
     if (payload.deployment_valid) {
         try { deployed = deploy_assets_if_changed(base, payload); }

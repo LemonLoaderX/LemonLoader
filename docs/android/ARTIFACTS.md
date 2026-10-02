@@ -91,24 +91,20 @@ assemblies, not unrelated NuGet cache files.
   linked statically so the game's public C++ runtime remains untouched.
 - Every shipped `.so`, including managed runtime dependencies, must support 16 KiB
   pages. Checking only `libmain.so` is insufficient.
-- Layout v8 `payload.json` records loader/dotnet/Interop domain hashes and the
-  deployment content hash. `lemonloader-release.json` records size/SHA-256 for
-  every Release file, and APK validation recomputes every domain hash; normal
-  startup uses each domain marker plus directory existence to avoid rehashing the
-  complete runtime. The payload also records a deployment
-  revision containing effective policies, the selected profile, and one policy
-  per packaged file for old-consumer compatibility. Patcher recomputes these
-  at packaging time. The current Loader ignores deployment hash/revision/size
-  metadata and derives editable deployment from actual assets plus optional
-  policy overrides; see [DEPLOYMENT.md](DEPLOYMENT.md). Runtime-domain extraction
-  and identity checks retain their separate contract.
+- Producers retain layout-v8 hashes/revisions for older Loader and tooling
+  compatibility. `lemonloader-release.json` validates individual Release files,
+  and existing APK tooling recomputes domain hashes. The current native host
+  ignores these digest fields: all extraction uses Android's package update time
+  and local markers. Cached startup checks marker/directory existence without
+  hashing installed runtime files. Deployment reads actual assets and optional
+  policies; see [DEPLOYMENT.md](DEPLOYMENT.md).
 - Android Release assembly omits desktop `runtime/loader/Documentation` and
   Release-mode DAC/DBI diagnostics at the staging source. Patcher and runtime
   consumers do not maintain path blacklists or delete historical copies merely
   to enforce that packaging policy.
 - Release assembly does not emit build-only `runtime-provenance.json` or build
-  command metadata; consumers validate required runtime identity fields and
-  otherwise tolerate additive metadata.
+  command metadata; Release tooling validates runtime identity fields and
+  tolerates additive metadata. The native host does not require identity JSON.
 - The deployment tree mirrors the runtime MelonLoader base directory. Files in
   `Mods`, `Plugins`, `UserLibs`, and `UserData` keep their relative paths. The
   default development profile preserves existing files; production profiles can
@@ -141,3 +137,28 @@ The exact Java/manifest patch remains the responsibility of the APK tool. Its
 observable contract is that loading the library named `main` invokes
 `JNI_OnLoad`, after which LemonLoader replaces Unity `NativeLoader.load` and
 continues the original `libunity.so` initialization.
+
+## Minimal Installed Configuration
+
+The current host needs the file layout above, not Patcher's digest-generation
+recipe. Android accepts absent/empty `payload.json` or `{}`. Bionic selects:
+
+```json
+{"runtimeRid":"linux-bionic-arm64"}
+```
+
+`deploymentFiles` is an optional path/policy list. If `formatVersion` is explicitly
+present it must be `8`; unknown fields are tolerated. A malformed JSON document or
+unsupported RID/layout is still an error. No `runtime-identity.json` or
+`interop-manifest.json` is required by native/managed loading. Game-specific
+Interop DLLs remain necessary for Mods using their generated surface.
+
+The existing extraction marker filenames ending in `-hash` now store the APK
+update token. Historical digest values trigger one replacement extraction. Every
+APK update replaces loader, dependency, Interop and private dotnet trees, even if
+only deployment changed. Missing update time retries extraction. Unchanged-package
+launches retain local runtime edits and do not scan for individual missing files;
+loading errors report such failures normally.
+
+Release/download validation remains the installer's responsibility. For manual
+APK editing without Patcher, see [USAGE.md](USAGE.md#manual-injection).
