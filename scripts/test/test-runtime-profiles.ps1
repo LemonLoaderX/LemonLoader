@@ -1,7 +1,9 @@
 [CmdletBinding()]
-param()
+param([string]$EmbeddedBootstrapPath, [string]$CryptoDexPath)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+if ([bool]$EmbeddedBootstrapPath -ne [bool]$CryptoDexPath) { throw 'Supply both bootstrap and helper DEX paths.' }
+if ($EmbeddedBootstrapPath) { Test-BootstrapEmbeddedCrypto -Bootstrap $EmbeddedBootstrapPath -Dex $CryptoDexPath }
 function Reject([scriptblock]$Action) {
     $failed=$false
     try { & $Action } catch { $failed=$true }
@@ -12,9 +14,24 @@ Reject { Get-RuntimeProfile -Name invalid }
 $android=Get-RuntimeProfile -Name android
 $bionic=Get-RuntimeProfile -Name bionic
 if($android.revision -cne $bionic.revision){throw 'Mainline targets must share one revision'}
+if($android.minimumApi -ne 26 -or $bionic.minimumApi -ne 26 -or (Get-RuntimeProfile -Name legacy).minimumApi -ne 23) {
+    throw 'Active products require API 26; frozen legacy must retain API 23.'
+}
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot ('../../Output/Tests/runtime-profiles-'+[Guid]::NewGuid().ToString('N'))))
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 try {
+    $dexBytes = [byte[]]::new(112)
+    [Text.Encoding]::ASCII.GetBytes("dex`n035`0").CopyTo($dexBytes, 0)
+    $dex = Join-Path $root 'helper.dex'
+    $bootstrap = Join-Path $root 'bootstrap.so'
+    [IO.File]::WriteAllBytes($dex, $dexBytes)
+    [IO.File]::WriteAllBytes($bootstrap, [byte[]](@(127,69,76,70) + $dexBytes + @(1,2,3)))
+    Test-BootstrapEmbeddedCrypto -Bootstrap $bootstrap -Dex $dex
+    $dexBytes[111] = 1
+    [IO.File]::WriteAllBytes($dex, $dexBytes)
+    Reject { Test-BootstrapEmbeddedCrypto -Bootstrap $bootstrap -Dex $dex }
+    [IO.File]::WriteAllBytes($dex, [byte[]]::new(112))
+    Reject { Test-BootstrapEmbeddedCrypto -Bootstrap $bootstrap -Dex $dex }
     foreach($profile in @($android,$bionic)) {
         $pack=Join-Path $root $profile.name
         $files=@('LICENSE.TXT','THIRD-PARTY-NOTICES.TXT','managed/System.Private.CoreLib.dll','managed/System.Net.Http.dll','native/libcoreclr.so','native/libclrjit.so')

@@ -119,6 +119,24 @@ $runtimeNative = Join-Path $managedRuntimeBuildRoot "native"
 $managedRuntimeEngine = Join-Path $runtimeNative "libcoreclr.so"
 
 $managedRuntimeEngineHash = $managedRuntimeProvenance.engineSha256
+$embeddedCrypto = $profile.name -eq 'android'
+$bootstrapIdentity = @{ minimumAndroidApi = $profile.minimumApi }
+if ($profile.channel -ne 'legacy') {
+    $bootstrapIdentity = Get-Content -LiteralPath (Join-Path $outputRoot 'bootstrap-crypto.json') -Raw | ConvertFrom-Json
+    if ($bootstrapIdentity.runtimeProfile -cne $profile.name -or
+        $bootstrapIdentity.minimumAndroidApi -lt $profile.minimumApi -or
+        $bootstrapIdentity.bootstrapSha256 -cne (Get-FileHash -LiteralPath $bootstrap).Hash.ToLowerInvariant()) {
+        throw 'Bootstrap identity does not match the selected product profile.'
+    }
+}
+if ($embeddedCrypto -and
+    ($bootstrapIdentity.cryptoDexSha256 -cne (Get-FileHash -LiteralPath (Join-Path $runtimeNative 'lemonloader-coreclr-crypto.dex')).Hash.ToLowerInvariant() -or
+     $bootstrapIdentity.cryptoLibrarySha256 -cne (Get-FileHash -LiteralPath (Join-Path $runtimeNative 'libSystem.Security.Cryptography.Native.Android.so')).Hash.ToLowerInvariant())) {
+    throw 'Bootstrap embedded crypto inputs differ from the selected runtime pack.'
+}
+if ($embeddedCrypto) {
+    Test-BootstrapEmbeddedCrypto -Bootstrap $bootstrap -Dex (Join-Path $runtimeNative 'lemonloader-coreclr-crypto.dex')
+}
 
 if (Test-Path -LiteralPath $packageRoot) {
     Remove-Item -LiteralPath $packageRoot -Recurse -Force
@@ -265,13 +283,13 @@ Get-ChildItem -LiteralPath $runtimeNative -File |
     } |
     Copy-Item -Destination $sharedRuntimeOutput -Force
 $coreClrCryptoDexSource = Join-Path $runtimeNative $coreClrCryptoDexName
-if (-not $useOpenSsl) {
-if (-not (Test-Path -LiteralPath $coreClrCryptoDexSource -PathType Leaf)) {
-    throw "The Android CoreCLR runtime pack is missing its crypto helper dex."
-}
-New-Item -ItemType Directory -Force -Path $patcherToolsOutput | Out-Null
-Copy-Item -LiteralPath $coreClrCryptoDexSource `
-    -Destination $coreClrCryptoDexOutput -Force
+if (-not $useOpenSsl -and -not $embeddedCrypto) {
+    if (-not (Test-Path -LiteralPath $coreClrCryptoDexSource -PathType Leaf)) {
+        throw "The Android CoreCLR runtime pack is missing its crypto helper dex."
+    }
+    New-Item -ItemType Directory -Force -Path $patcherToolsOutput | Out-Null
+    Copy-Item -LiteralPath $coreClrCryptoDexSource `
+        -Destination $coreClrCryptoDexOutput -Force
 }
 $coreLibSource = Join-Path $runtimeNative "System.Private.CoreLib.dll"
 if (-not (Test-Path -LiteralPath $coreLibSource -PathType Leaf)) {
@@ -281,7 +299,7 @@ Copy-Item -LiteralPath $coreLibSource `
     -Destination $sharedRuntimeOutput -Force
 Copy-Item -LiteralPath $managedRuntimeEngine `
     -Destination (Join-Path $sharedRuntimeOutput "libcoreclr.so") -Force
-[ordered]@{
+$runtimeIdentity = [ordered]@{
     formatVersion = 1
     runtimeVersion = $DotnetRuntimeVersion
     backend = $managedRuntimeBackendId
@@ -290,7 +308,9 @@ Copy-Item -LiteralPath $managedRuntimeEngine `
     engineSha256 = $managedRuntimeEngineHash
     runtimeRid = $profile.rid
     cryptoBackend = $profile.cryptoBackend
-} | ConvertTo-Json | Set-Content -LiteralPath $runtimeIdentityOutput -Encoding Utf8
+}
+if ($embeddedCrypto) { $runtimeIdentity.coreClrCryptoDexMode = 'embedded' }
+$runtimeIdentity | ConvertTo-Json | Set-Content -LiteralPath $runtimeIdentityOutput -Encoding Utf8
 
 $runtimeConfigs = Get-ChildItem -LiteralPath $melonOutput `
     -Filter "MelonLoader.runtimeconfig.json" -File -Recurse
@@ -442,6 +462,11 @@ $payloadDescriptor = [ordered]@{
     privateNativeLibraries = @()
 }
 $payloadDescriptor.runtimeRid = $profile.rid
+$payloadDescriptor.minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
+if ($embeddedCrypto) {
+    $payloadDescriptor.coreClrCryptoDexMode = 'embedded'
+    $payloadDescriptor.coreClrCryptoBootstrapSha256 = Get-StagedFileHash -Path $stagedBootstrap
+}
 $payloadDescriptor | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $payloadOutput "payload.json") -Encoding Utf8
 
@@ -472,7 +497,8 @@ $manifest = [ordered]@{
 $manifest.runtimeRid = $profile.rid
 $manifest.runtimeProfile = $profile.name
 $manifest.runtimeChannel = $profile.channel
-$manifest.minimumAndroidApi = $profile.minimumApi
+$manifest.minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
+if ($embeddedCrypto) { $manifest.coreClrCryptoDexMode = 'embedded' }
 $manifest.developmentBuild = [bool]$DevelopmentBuild
 if ($DevelopmentBuild) {
     $sourceStates = foreach ($source in $dependencySourceRoots.GetEnumerator()) {

@@ -1,7 +1,7 @@
 # Android port
 
 LemonLoader adds an Android ARM64 platform adapter to the MelonLoader 0.7
-desktop baseline. The target is Unity IL2CPP on Android API 24 or later, hosted
+desktop baseline. The target is Unity IL2CPP on Android API 26 or later, hosted
 by private .NET 11 CoreCLR. Android is the default runtime profile; Bionic is
 selectable. Both are preview distributions, not broad compatibility certification.
 
@@ -38,7 +38,7 @@ device configuration. LemonLoader.Patcher combines those inputs later.
 | Property | Value |
 | --- | --- |
 | ABI | `arm64-v8a` |
-| Android API | 24 or later |
+| Android API | 26 or later for active products |
 | Unity scripting backend | IL2CPP |
 | Managed runtime | .NET 11 CoreCLR: Android (default) or Bionic |
 | Native bootstrap | C++17, Android NDK r27d |

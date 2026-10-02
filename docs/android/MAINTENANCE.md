@@ -57,11 +57,13 @@ DEX, 16 KiB ELF alignment, and the standalone embedding probe. Publish the pack
 with its SHA-256 and source revision, then update LemonLoader's dependency
 manifest. Normal loader builds consume that artifact and do not rebuild CoreCLR.
 
-Android uses the JNI crypto library and helper DEX; Bionic uses private OpenSSL
-libraries and attribution. Loader Preview 5 requires Patcher 1.1.0 or later.
-The Release `files[]` inventory protects the helper DEX at its fixed path;
-Patcher writes `coreClrCryptoDexSha256` only into the final APK payload after
-promoting the DEX to `classesN.dex`. Asset layout remains v8.
+Android uses the JNI crypto library and an embedded helper DEX; Bionic uses
+private OpenSSL libraries and attribution. Active products require API 26.
+Bootstrap compilation verifies the runtime pack and the explicit ClassLoader
+initialization export, embeds the DEX, and records local input identities.
+Staging checks those identities and the full embedded bytes before omitting the
+standalone helper. APK verification checks `coreClrCryptoBootstrapSha256`.
+Asset layout remains v8; Patcher still supports older external-DEX Releases.
 
 ## Native dependency checks
 

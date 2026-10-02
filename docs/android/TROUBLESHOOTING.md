@@ -31,13 +31,15 @@ mask for those two errors.
 
 ## Managed cryptography fails
 
-For the Android profile, Patcher must promote the runtime artifact's helper DEX into the application
-class loader. The payload must contain
+For the active Android profile, `libmain.so` must embed the matching runtime
+helper DEX and the device must support API 26+. The payload must contain
 `libSystem.Security.Cryptography.Native.Android.so` and must not substitute a
 generic Linux OpenSSL shim.
 
-If the helper class is missing, verify that the Patcher selected the next unused
-top-level `classesN.dex` entry. If JNI state is missing, check that the bootstrap
+If `AndroidCryptoNative_InitWithClassLoader` is missing, rebuild the runtime fork
+and prepare a new matching pack; an old pack cannot initialize embedded helpers.
+Do not transplant a crypto SO from a different runtime. For older external-DEX
+Releases only, verify the next unused `classesN.dex` entry. If JNI state is missing, check that the bootstrap
 and CoreCLR resolve the same native cryptography module rather than loading a
 second namespace-local copy.
 

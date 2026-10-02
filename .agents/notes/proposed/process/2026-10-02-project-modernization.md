@@ -57,8 +57,8 @@ and runtime choices require consumer/version compatibility checks.
 
 ## Prior-note Audit
 
-The parent embedded-crypto implementation note remains relevant to P1; migrate
-it into Loader with its rationale intact when committing that implementation.
+The [embedded-crypto implementation note](../../implemented/architecture/2026-10-02-embedded-android-crypto.md)
+remains relevant to P1 and is migrated into Loader with its rationale intact.
 No other active crash/deployment/repository-migration notes were found. The
 unrelated root GAME_INTEROP_DLL_FREE_PLAN.md is preserved and is outside this
 roadmap; Interop-free architecture is not assumed by installation simplification.

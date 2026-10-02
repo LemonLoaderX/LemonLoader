@@ -77,7 +77,7 @@ mandatory umbrella repo under another name.
 
 - [x] Persist goals, constraints, sequence and acceptance gates in Loader.
 - [x] Inspect ownership and existing decisions; preserve unrelated proposal.
-- [ ] Commit the plan alone; record commit identities in the local progress record.
+- [x] Commit the plan alone (`87e1c2c0` in Loader).
 - [ ] Inventory current changes, scripts, CI callers, outputs and repository roots.
 
 Exit: a resumable plan exists in the primary product without requiring chat
@@ -85,17 +85,18 @@ history; runtime behavior has not been changed by planning.
 
 ### P1: Review and rebuild embedded crypto
 
-- [ ] Review native initialization, JNI references, ClassLoader parent, buffer
+- [x] Review native initialization, JNI references, ClassLoader parent, buffer
   lifetime, exception paths, P/Invoke handle reuse and compiler/linker exports.
-- [ ] Review build/staging identity, API declarations, legacy compatibility and
+- [x] Review build/staging identity, API declarations, legacy compatibility and
   new-mode APK verification. Fix defects with focused regressions.
-- [ ] Commit runtime changes in their source fork; use that real source identity
+- [x] Commit runtime changes in their source fork (`b85b9fbd264`); use that real source identity
   for rebuilds. Do not update pins to a fictitious/uncommitted revision.
 - [ ] Rebuild Android and Bionic from the reviewed common runtime source; preserve
   separate outputs and old packs. Normalize/import/package validated packs.
 - [ ] Update consuming pins, build matching Loader/Patcher artifacts, check no new
   top-level DEX and retain hashes/symbols/logs privately.
-- [ ] Commit Loader and Patcher separately after their automated gates.
+- [ ] Commit Loader after its automated gates; Patcher committed as `ccd329f`
+  after 19 regressions and published locally for win-x64.
 - [ ] Produce a device-acceptance checklist; maintainer performs installation and
   crypto/TLS/lifecycle/namespace tests later.
 
@@ -209,5 +210,9 @@ generated packs, private traces, APKs, symbols, keys or build evidence.
 
 ## Progress
 
-2026-10-02: Goals and plan recorded. P1 review/rebuild is next. P2-P5 are not
-implemented; no claim of new crash capture or editable-deployment behavior is made.
+2026-10-02: Plan committed as `87e1c2c0` in Loader. Runtime crypto host extension
+committed as `b85b9fbd264` after explicit/legacy host JNI regressions. Self-review
+fixed constructor-lookup JNI cleanup and a stale API table; bootstrap host tests
+pass. Both-profile runtime rebuild is in progress with isolated development
+outputs. P2-P5 are not implemented; no new crash capture or editable-deployment
+behavior is claimed.

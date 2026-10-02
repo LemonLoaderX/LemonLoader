@@ -2,7 +2,7 @@
 
 ## Current architecture
 
-LemonLoader develops an Android API 24+ ARM64 adapter for Unity IL2CPP games on
+LemonLoader develops an Android API 26+ ARM64 adapter for Unity IL2CPP games on
 the MelonLoader 0.7 baseline. A C++17 NDK `libmain.so` hosts a private .NET 11
 CoreCLR runtime and transfers control to the managed loader. CoreCLR is the only
 supported Android managed backend.
@@ -19,7 +19,7 @@ and CoreCLR sources remain independent, reviewable forks.
 
 ## Verified capabilities
 
-- Active bootstrap builds target `arm64-v8a`, API 24+ and 16 KiB-compatible ELF
+- Active bootstrap builds target `arm64-v8a`, API 26+ and 16 KiB-compatible ELF
   load segments.
 - CoreCLR is hosted directly, with JNI cryptography for Android or OpenSSL for Bionic.
 - Runtime, loader, Interop, and deployment content have separate identities and
@@ -37,7 +37,7 @@ and CoreCLR sources remain independent, reviewable forks.
 | Area | Supported |
 | --- | --- |
 | ABI | `arm64-v8a` |
-| Android API | 24 or later for development profiles |
+| Android API | 26 or later for active products; frozen legacy is unchanged |
 | Unity backend | IL2CPP |
 | Managed runtime | .NET 11 Android/Bionic CoreCLR |
 | Bootstrap | Android NDK r27d |
@@ -46,6 +46,9 @@ Android Mono games, 32-bit ABIs, and physical 16 KiB-page hardware have not been
 qualified. Automated startup does not replace manual application acceptance.
 
 ## Open qualification work
+
+- rebuild/pin the runtime with the explicit crypto ClassLoader initialization
+  export and qualify the embedded DEX path on devices before publication;
 
 - broaden private Unity version and application coverage;
 - validate physical 16 KiB-page devices;

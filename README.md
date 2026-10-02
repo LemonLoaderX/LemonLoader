@@ -14,7 +14,7 @@ with LavaGang, Unity Technologies, or a particular game.
 
 | Area | Support |
 | --- | --- |
-| Android | API 24 or later (development profiles) |
+| Android | API 26 or later (development profiles) |
 | ABI | `arm64-v8a` |
 | Unity backend | IL2CPP |
 | Managed runtime | .NET 11 CoreCLR, Android default / Bionic selectable |
@@ -84,6 +84,7 @@ unless runtime development is explicitly requested.
 
 ## Documentation
 
+- [Maintenance roadmap and reading guide](docs/maintenance/README.md)
 - [Android overview](docs/android/README.md)
 - [Current status](docs/android/STATUS.md)
 - [Architecture](docs/android/ARCHITECTURE.md)

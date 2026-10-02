@@ -110,15 +110,18 @@ assemblies, not unrelated NuGet cache files.
   `Mods`, `Plugins`, `UserLibs`, and `UserData` keep their relative paths. The
   default development profile preserves existing files; production profiles can
   upgrade, refresh, or enforce managed files. Unknown files are never removed.
-- An Android-profile Release must contain the Android crypto library and
-  `lemonloader-coreclr-crypto.dex`, without the generic Linux OpenSSL shim. It is
-  incomplete as an APK until the Patcher copies the helper to the next free
-  top-level `classesN.dex`. The helper remains a Release-side Patcher tool input,
-  is not copied into `runtime/dotnet`, and APK verification requires the promoted
-  entry to match `coreClrCryptoDexSha256` in the final APK `payload.json`.
-  Release payloads omit that redundant field: `lemonloader-release.json` already
-  protects the helper's fixed path. Patcher 1.1.0+ carries the verified digest
-  into the final APK; older Release payloads with a digest are still checked.
+- Active Android Releases contain the Android crypto SO and embed the complete
+  verified helper DEX in `libmain.so`; they contain no standalone helper DEX.
+  Release, runtime identity and payload agree on `coreClrCryptoDexMode: embedded`.
+  Release and payload declare `minimumAndroidApi` of at least 26. Payload
+  `coreClrCryptoBootstrapSha256` identifies the bootstrap containing the helper;
+  Release and APK verification check it against the actual `libmain.so` bytes.
+  Patcher adds no DEX entries for this mode. Layout remains v8: old Patchers
+  reject these Releases because their required external helper input is absent.
+- Older Android Releases without the embedded-mode declaration still require
+  `tools/android/lemonloader-coreclr-crypto.dex`. Patcher promotes this verified
+  input to the next free `classesN.dex` and carries its digest into final APK
+  `coreClrCryptoDexSha256`. Historical Release payload digests remain checked.
 - A Bionic-profile Release has no JNI crypto library or helper DEX. Its shared
   runtime contains `libSystem.Security.Cryptography.Native.OpenSsl.so`,
   `libssl.so` and `libcrypto.so`; the archive includes OpenSSL attribution under

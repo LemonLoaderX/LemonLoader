@@ -14,6 +14,8 @@ param(
     [string]$DobbyRevision,
 
     [string]$ExpectedNdkRevision,
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile,
+    [string]$CoreClrRuntimePackRoot,
     [switch]$AllowDirtyDependencies
 )
 
@@ -22,9 +24,12 @@ $ErrorActionPreference = "Stop"
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 . (Join-Path $PSScriptRoot "..\common\AndroidDependencies.ps1")
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+. (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+$profile = Get-RuntimeProfile -Name $RuntimeProfile
 if ($AndroidApiLevel -eq 0) {
-    $AndroidApiLevel = [int]$dependencies.AndroidApiLevel
+    $AndroidApiLevel = [int]$profile.minimumApi
 }
+if ($AndroidApiLevel -lt $profile.minimumApi) { throw 'Android API is below the product minimum.' }
 if ([string]::IsNullOrWhiteSpace($DobbyRevision)) {
     $DobbyRevision = [string]$dependencies.AndroidDobbyRevision
 }
@@ -100,6 +105,29 @@ $buildRoot = [System.IO.Path]::GetFullPath(
     (Join-Path $repositoryRoot "Output\NativeBuild\$Configuration\android-arm64"))
 $outputRoot = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic-arm64"
 
+$cryptoDex = ''
+$cryptoHash = $null
+$dexHash = $null
+if ($profile.name -eq 'android') {
+    if (!$CoreClrRuntimePackRoot) {
+        $CoreClrRuntimePackRoot = Join-Path $repositoryRoot "Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
+    }
+    Test-RuntimeProfilePack -Root $CoreClrRuntimePackRoot -Profile $profile -Development:$AllowDirtyDependencies
+    $cryptoDex = [IO.Path]::GetFullPath((Join-Path $CoreClrRuntimePackRoot 'native/lemonloader-coreclr-crypto.dex'))
+    $magic = [IO.File]::ReadAllBytes($cryptoDex)
+    if ($magic.Length -lt 112 -or [Text.Encoding]::ASCII.GetString($magic,0,4) -cne "dex`n") {
+        throw 'The embedded crypto input is not a DEX file.'
+    }
+    $cryptoLibrary = Join-Path $CoreClrRuntimePackRoot 'native/libSystem.Security.Cryptography.Native.Android.so'
+    $llvmNm = Get-AndroidNdkTool -AndroidNdkRoot $ndkRoot -Name 'llvm-nm'
+    $exports = (& $llvmNm -D --defined-only $cryptoLibrary 2>&1) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or $exports -notmatch '(?m)\bAndroidCryptoNative_InitWithClassLoader\s*$') {
+        throw 'Embedded crypto requires a rebuilt runtime pack with AndroidCryptoNative_InitWithClassLoader.'
+    }
+    $cryptoHash = (Get-FileHash -LiteralPath $cryptoLibrary).Hash.ToLowerInvariant()
+    $dexHash = (Get-FileHash -LiteralPath $cryptoDex).Hash.ToLowerInvariant()
+}
+
 $cmakeCache = Join-Path $buildRoot "CMakeCache.txt"
 if (Test-Path -LiteralPath $cmakeCache -PathType Leaf) {
     $cacheText = Get-Content -LiteralPath $cmakeCache -Raw
@@ -132,6 +160,7 @@ New-Item -ItemType Directory -Force -Path $buildRoot, $outputRoot | Out-Null
     "-DANDROID_PLATFORM=android-$AndroidApiLevel" `
     -DANDROID_STL=c++_static `
     "-DLEMON_DOBBY_SOURCE_DIR=$dobbyRoot" `
+    "-DLEMON_CRYPTO_DEX=$cryptoDex" `
     "-DCMAKE_BUILD_TYPE=$Configuration"
 if ($LASTEXITCODE -ne 0) {
     throw "Configuring the pure NDK bootstrap failed with exit code $LASTEXITCODE."
@@ -167,6 +196,12 @@ if ($Configuration -eq "Release") {
     -LibraryPath $outputLibrary `
     -AndroidNdkRoot $ndkRoot `
     -AndroidApiLevel $AndroidApiLevel
+
+if ($cryptoDex) { Test-BootstrapEmbeddedCrypto -Bootstrap $outputLibrary -Dex $cryptoDex }
+@{ runtimeProfile=$profile.name; minimumAndroidApi=$AndroidApiLevel;
+    bootstrapSha256=(Get-FileHash -LiteralPath $outputLibrary).Hash.ToLowerInvariant();
+    cryptoLibrarySha256=$cryptoHash; cryptoDexSha256=$dexHash } |
+    ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputRoot 'bootstrap-crypto.json') -Encoding Utf8
 
 Write-Host "Built pure NDK Android bootstrap:"
 Write-Host "  $outputLibrary"

@@ -40,11 +40,21 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     $AndroidNdkRoot = $env:ANDROID_NDK_HOME
 }
 
+if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
+    $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1") -RuntimeProfile legacy
+    if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
+        throw "Resolving the Android CoreCLR runtime artifact failed."
+    }
+    $CoreClrRuntimePackRoot = ($CoreClrRuntimePackRoot | Select-Object -Last 1).Trim()
+}
+
 & (Join-Path $PSScriptRoot "build-android-ndk-bootstrap.ps1") `
     -Configuration $Configuration `
     -AndroidApiLevel $AndroidApiLevel `
     -AndroidNdkRoot $AndroidNdkRoot `
     -DobbySourceRoot $DobbySourceRoot `
+    -RuntimeProfile $profile.name `
+    -CoreClrRuntimePackRoot $CoreClrRuntimePackRoot `
     -AllowDirtyDependencies:$AllowDirtyDependencies
 
 & (Join-Path $PSScriptRoot "build-android-managed.ps1") `
@@ -54,14 +64,6 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     -MonoModSourceRoot $MonoModSourceRoot `
     -HarmonyXSourceRoot $HarmonyXSourceRoot `
     -AllowDirtyDependencies:$AllowDirtyDependencies
-
-if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
-    $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1") -RuntimeProfile legacy
-    if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
-        throw "Resolving the Android CoreCLR runtime artifact failed."
-    }
-    $CoreClrRuntimePackRoot = ($CoreClrRuntimePackRoot | Select-Object -Last 1).Trim()
-}
 
 & (Join-Path $PSScriptRoot "stage-android-package.ps1") `
     -Configuration $Configuration `

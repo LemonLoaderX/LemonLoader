@@ -1,3 +1,16 @@
+function Test-BootstrapEmbeddedCrypto {
+    param([Parameter(Mandatory)][string]$Bootstrap, [Parameter(Mandatory)][string]$Dex)
+    $dexBytes = [IO.File]::ReadAllBytes($Dex)
+    if ($dexBytes.Length -lt 112 -or [Text.Encoding]::ASCII.GetString($dexBytes,0,4) -cne "dex`n") {
+        throw 'The embedded crypto input is not a DEX file.'
+    }
+    # Match the complete verified input, not a marker that stale builds can retain.
+    $elfHex = [Convert]::ToHexString([IO.File]::ReadAllBytes($Bootstrap))
+    if (!$elfHex.Contains([Convert]::ToHexString($dexBytes), [StringComparison]::Ordinal)) {
+        throw 'The bootstrap does not embed the selected runtime pack helper DEX.'
+    }
+}
+
 function Get-RuntimeProfile {
     param([string]$Name, [string]$RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')))
     $config = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'eng/runtime-profiles.json') -Raw | ConvertFrom-Json

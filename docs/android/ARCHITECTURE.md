@@ -1,7 +1,7 @@
 # Android architecture
 
 The port keeps Android-specific behavior behind a small platform layer while
-preserving the stable desktop implementation. It targets Android API 24+,
+preserving the stable desktop implementation. It targets Android API 26+,
 ARM64 IL2CPP, deterministic desktop-generated Interop assemblies, and
 pinned NDK r27d builds. APK patching, signing, Mono games, and 32-bit ABIs
 remain outside the LemonLoader runtime repository.
@@ -139,9 +139,10 @@ the adapter falls back to the application's internal files directory.
   changed managed files are backed up and the ownership-state tree is committed
   only after all file actions succeed.
 - The private dotnet path is supplied before the first `il2cpp_init` call.
-- For the Android profile, crypto helper classes must be promoted by the Patcher into the
-  application class loader, and all crypto P/Invokes must resolve to that one
-  `JNI_OnLoad`-initialized module.
+- The active Android profile embeds the validated runtime helper DEX in
+  `libmain.so` and uses `InMemoryDexClassLoader` (API 26+). The crypto shim receives
+  that loader explicitly; all crypto P/Invokes resolve to the same initialized
+  `dlopen` module. Legacy packages retain application-ClassLoader promotion.
 - Android initialization must return failure to Java rather than terminating
   the game process when the bootstrap cannot start.
 - Android consumes pre-generated Il2CppInterop assemblies. It does not execute

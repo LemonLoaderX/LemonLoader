@@ -5,6 +5,7 @@
 
 #include <cstring>
 #include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 
@@ -12,7 +13,11 @@ namespace lemon::bootstrap {
 namespace {
 
 void* android_crypto_module = nullptr;
-jclass android_crypto_loader_class = nullptr;
+jobject android_crypto_loader = nullptr;
+#ifdef LEMON_EMBEDDED_CRYPTO_DEX
+extern "C" const unsigned char lemon_crypto_dex_start[];
+extern "C" const unsigned char lemon_crypto_dex_end[];
+#endif
 
 bool clear_jni_exception(JNIEnv* env, const std::string& context) {
     return clear_java_exception(env, context.c_str());
@@ -80,6 +85,63 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
         return false;
     }
 
+#ifdef LEMON_EMBEDDED_CRYPTO_DEX
+    // The ELF byte storage and retained loader remain alive for the process.
+    jclass loader_class = env->FindClass("dalvik/system/InMemoryDexClassLoader");
+    if (clear_jni_exception(env, "finding InMemoryDexClassLoader (requires API 26+)") || !loader_class)
+        return false;
+    const auto constructor = env->GetMethodID(loader_class, "<init>",
+        "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V");
+    if (clear_jni_exception(env, "finding the in-memory crypto loader constructor") || !constructor) {
+        env->DeleteLocalRef(loader_class);
+        return false;
+    }
+    jobject buffer = env->NewDirectByteBuffer(const_cast<unsigned char*>(lemon_crypto_dex_start),
+        static_cast<jlong>(reinterpret_cast<uintptr_t>(lemon_crypto_dex_end) -
+                          reinterpret_cast<uintptr_t>(lemon_crypto_dex_start)));
+    if (clear_jni_exception(env, "creating embedded crypto DEX buffer") || !buffer) {
+        env->DeleteLocalRef(loader_class);
+        return false;
+    }
+    // Helpers depend only on platform classes; a null parent selects the boot
+    // loader and prevents game classes from shadowing the private helper types.
+    jobject loader = env->NewObject(loader_class, constructor, buffer, nullptr);
+    env->DeleteLocalRef(buffer);
+    env->DeleteLocalRef(loader_class);
+    if (clear_jni_exception(env, "loading embedded crypto DEX") || !loader)
+        return false;
+    void* module = dlopen(crypto_library.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (!module) {
+        const char* detail = dlerror();
+        log_error("Could not load Android crypto library '" + crypto_library.string() +
+                  "': " + (detail ? detail : "unknown linker error"));
+        env->DeleteLocalRef(loader);
+        return false;
+    }
+    using initialize_fn = jint (*)(JavaVM*, jobject);
+    auto initialize = reinterpret_cast<initialize_fn>(
+        dlsym(module, "AndroidCryptoNative_InitWithClassLoader"));
+    if (!initialize) {
+        log_error("Android crypto runtime lacks embedded-helper initialization; rebuild the matching runtime pack");
+        env->DeleteLocalRef(loader);
+        dlclose(module);
+        return false;
+    }
+    const jint result = initialize(java_vm, loader);
+    const bool failed = clear_jni_exception(env, "initializing crypto with embedded helper loader");
+    if (failed || result != JNI_VERSION_1_6) {
+        log_error("Android crypto embedded-helper initialization failed");
+        env->DeleteLocalRef(loader);
+        // Initialization may have published native/JNI state. Do not unload it.
+        return false;
+    }
+    android_crypto_loader = env->NewGlobalRef(loader);
+    env->DeleteLocalRef(loader);
+    if (clear_jni_exception(env, "retaining embedded crypto loader") || !android_crypto_loader)
+        return false;
+    android_crypto_module = module;
+    return true;
+#else
     jclass loader_class = env->FindClass(
         "net/dot/android/crypto/LemonLoaderCryptoBootstrap");
     if (clear_jni_exception(env, "finding the APK crypto bridge") || loader_class == nullptr) {
@@ -103,7 +165,7 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
             log_error("Could not retain Android crypto module '" + crypto_library.string() +
                       "': " + (detail ? detail : "unknown linker error"));
         }
-        android_crypto_loader_class = static_cast<jclass>(env->NewGlobalRef(loader_class));
+        android_crypto_loader = env->NewGlobalRef(loader_class);
     }
 
     if (library_path != nullptr) {
@@ -113,11 +175,12 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
 
     if (clear_jni_exception(env, "retaining the Android crypto bridge") ||
         load_failed || android_crypto_module == nullptr ||
-        android_crypto_loader_class == nullptr) {
+        android_crypto_loader == nullptr) {
         log_error("Android CoreCLR crypto native library initialization did not complete");
         return false;
     }
     return true;
+#endif
 }
 
 const void* resolve_android_crypto_pinvoke(

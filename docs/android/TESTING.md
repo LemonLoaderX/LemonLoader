@@ -83,7 +83,7 @@ was preserved.
     -PackageName com.example.game
 ```
 
-The device must advertise ARM64, use API 24+ for active profiles, use a 4 KiB or
+The device must advertise ARM64, use API 26+ for active profiles, use a 4 KiB or
 16 KiB page size, and already contain the selected package. A legacy preflight's
 API 23 acceptance does not qualify the .NET 11 runtime for that API.
 

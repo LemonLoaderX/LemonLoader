@@ -4,11 +4,14 @@ param(
 
     [string]$PackageName,
 
-    [string]$AndroidSdkRoot = $env:ANDROID_SDK_ROOT
+    [string]$AndroidSdkRoot = $env:ANDROID_SDK_ROOT,
+    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile
 )
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "..\common\AndroidToolchain.ps1")
+. (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
+$profile = Get-RuntimeProfile -Name $RuntimeProfile
 
 $adb = Get-AndroidAdb -AndroidSdkRoot $AndroidSdkRoot
 $Serial = Resolve-AndroidDeviceSerial -Adb $adb -Serial $Serial
@@ -39,8 +42,8 @@ if (-not [int]::TryParse($pageSizeText, [ref]$pageSize)) {
 if (($abiList -split ',') -notcontains "arm64-v8a") {
     throw "Device '$Serial' does not advertise the arm64-v8a ABI."
 }
-if ($sdkLevel -lt 23) {
-    throw "Device '$Serial' uses Android API $sdkLevel; API 23 or newer is required."
+if ($sdkLevel -lt $profile.minimumApi) {
+    throw "Device '$Serial' uses Android API $sdkLevel; profile '$($profile.name)' requires API $($profile.minimumApi) or newer."
 }
 if ($pageSize -notin @(4096, 16384)) {
     throw "Unexpected Android page size $pageSize on device '$Serial'."

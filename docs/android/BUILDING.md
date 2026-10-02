@@ -10,7 +10,7 @@ Unless a block says otherwise, run commands from the Loader repository root.
 | Product .NET SDK | Exact version in `global.json` (currently 10.0.204) |
 | Android SDK | CMake 3.22.1 or later and Ninja |
 | Android NDK | r27d (`27.3.13750724`) |
-| Target | Android API 24+, `arm64-v8a` |
+| Target | Android API 26+, `arm64-v8a` |
 
 Exact product dependency versions and source revisions are defined in
 `eng/AndroidDependencies.props`. Scripts read that file; revision hashes are not

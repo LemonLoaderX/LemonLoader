@@ -27,6 +27,23 @@ add_library(main SHARED
     src/logging.cpp
     src/runtime.cpp)
 
+set(LEMON_CRYPTO_DEX "" CACHE FILEPATH "Validated runtime pack crypto helper DEX")
+if(LEMON_CRYPTO_DEX)
+    if(ANDROID_PLATFORM_LEVEL LESS 26)
+        message(FATAL_ERROR "Embedded crypto requires Android API 26 or later")
+    endif()
+    if(NOT EXISTS "${LEMON_CRYPTO_DEX}")
+        message(FATAL_ERROR "Crypto helper DEX does not exist")
+    endif()
+    file(TO_CMAKE_PATH "${LEMON_CRYPTO_DEX}" LEMON_CRYPTO_DEX)
+    file(SHA256 "${LEMON_CRYPTO_DEX}" LEMON_CRYPTO_DEX_SHA256)
+    configure_file(src/crypto_dex.S.in "${CMAKE_CURRENT_BINARY_DIR}/crypto_dex.S" @ONLY)
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/crypto_dex.S"
+        PROPERTIES OBJECT_DEPENDS "${LEMON_CRYPTO_DEX}")
+    target_sources(main PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/crypto_dex.S")
+    target_compile_definitions(main PRIVATE LEMON_EMBEDDED_CRYPTO_DEX=1)
+endif()
+
 target_compile_features(main PRIVATE cxx_std_17)
 target_compile_options(main PRIVATE
     -fvisibility=hidden

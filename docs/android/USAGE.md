@@ -109,7 +109,7 @@ policy and transaction contract.
 ## Current limitations
 
 - Android ARM64 and Unity IL2CPP only.
-- Active runtime profiles require API 24+. Preflight accepts 4 KiB or 16 KiB pages;
+- Active runtime profiles require API 26+. Preflight accepts 4 KiB or 16 KiB pages;
   this does not replace physical 16 KiB-device qualification.
 - Game-specific Interop assemblies must be generated off device.
 - Coroutine hosting is validated with asynchronous AssetBundle operations.

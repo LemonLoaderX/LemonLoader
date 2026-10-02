@@ -1,0 +1,11 @@
+.section .rodata.lemon_crypto,"a",%progbits
+.balign 8
+.global lemon_crypto_dex_start
+.hidden lemon_crypto_dex_start
+lemon_crypto_dex_start:
+.incbin "@LEMON_CRYPTO_DEX@"
+.global lemon_crypto_dex_end
+.hidden lemon_crypto_dex_end
+lemon_crypto_dex_end:
+.section .note.GNU-stack,"",%progbits
+/* Crypto DEX SHA-256: @LEMON_CRYPTO_DEX_SHA256@ */

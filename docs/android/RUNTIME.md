@@ -53,12 +53,24 @@ device policies do not consistently permit native execution from shared storage.
 
 Android CoreCLR uses `libSystem.Security.Cryptography.Native.Android.so` and Java
 helper classes. The runtime artifact contains a deterministic helper DEX as a
-Patcher input. The Patcher promotes it into the application class loader; the
-bootstrap then initializes the native library once and supplies a CoreCLR
-P/Invoke override for that same module.
+verified build input. The active Android bootstrap embeds these bytes at compile
+time and creates an `InMemoryDexClassLoader` on API 26+. No DEX file is extracted
+or added to the application's top-level DEX entries.
+
+The native shim exports `AndroidCryptoNative_InitWithClassLoader(JavaVM*, jobject)`.
+The host calls it once, on an attached thread, before any crypto operation. Startup
+is serialized by the host. Helper classes are resolved through the supplied
+loader; platform classes still use JNI `FindClass`. The retained loader and ELF
+byte storage have process lifetime. The host uses `dlopen`, not Java `System.load`,
+and supplies the exact initialized module for every crypto P/Invoke.
 
 This avoids a second namespace-local copy with missing JNI state. This path
 applies to the Android profile only.
+
+Old Android Releases and frozen legacy use the application ClassLoader and
+top-level helper DEX. Patcher retains their injection and digest checks. Old
+runtime packs without the explicit host export cannot build embedded Android
+products: rebuild the runtime fork rather than substituting a legacy shim.
 
 Bionic instead uses `libSystem.Security.Cryptography.Native.OpenSsl.so` and
 private `libssl.so`/`libcrypto.so`. It uses the Android system CA directory and

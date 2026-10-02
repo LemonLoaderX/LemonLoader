@@ -38,11 +38,14 @@ cryptography library initialized through `JNI_OnLoad`. Loading that library from
 an isolated class loader created two native-library identities, leaving the copy
 used by CoreCLR without its Java VM state.
 
-The accepted design promotes one deterministic helper DEX into the application
-class loader and supplies a CoreCLR P/Invoke override so managed cryptography
-reuses that initialized native module. Runtime build provenance remains an
-internal build artifact; releases carry only the identity and hashes needed by
-their consumers.
+Legacy packages address this by promoting the helper DEX into the application
+ClassLoader. Active Android products instead embed the DEX in `libmain.so` and
+use `InMemoryDexClassLoader`, requiring API 26+. The runtime fork accepts the
+helper loader explicitly, initializes the host's `dlopen` module, and resolves
+helper classes through that loader. CoreCLR's P/Invoke override reuses the exact
+same module. Do not call `System.load` from the isolated loader or manipulate
+ART's private ClassLoader fields. Runtime build provenance stays private;
+releases carry only the consumed identity and hashes.
 
 ## Unity and IL2CPP
 
