@@ -8,8 +8,8 @@ CoreCLR runtime and transfers control to the managed loader. CoreCLR is the only
 supported Android managed backend.
 
 The active profiles are android (default) and bionic, selected in
-`eng/runtime-profiles.json`. They share one source revision. .NET 10 is frozen
-legacy, not the default. Preview 5 distributes both profiles and requires Patcher
+`eng/runtime-profiles.json`. They share one source revision. CoreCLR 10 recovery
+is retired. Preview 5 distributes both profiles and requires Patcher
 1.1.0 or later; it does not imply broad game or device qualification.
 
 The game-independent LemonLoader Release is consumed by LemonLoader.Patcher,
@@ -43,7 +43,7 @@ and CoreCLR sources remain independent, reviewable forks.
 | Area | Supported |
 | --- | --- |
 | ABI | `arm64-v8a` |
-| Android API | 26 or later for active products; frozen legacy is unchanged |
+| Android API | 26 or later |
 | Unity backend | IL2CPP |
 | Managed runtime | .NET 11 Android/Bionic CoreCLR |
 | Bootstrap | Android NDK r27d |

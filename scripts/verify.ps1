@@ -2,7 +2,7 @@
 [CmdletBinding()]
 param(
     [string]$AndroidNdkRoot = $env:ANDROID_NDK_ROOT,
-    [ValidateSet('android', 'bionic', 'legacy')][string]$RuntimeProfile,
+    [ValidateSet('android', 'bionic')][string]$RuntimeProfile,
     [string]$CoreClrRuntimePackRoot,
     [string]$DobbySourceRoot,
     [string]$Il2CppInteropSourceRoot,
@@ -29,7 +29,6 @@ if ($Development) {
 }
 & (Join-Path $PSScriptRoot 'test/test-scripts.ps1')
 & (Join-Path $PSScriptRoot 'test/test-source-dependencies.ps1')
-& (Join-Path $PSScriptRoot 'test/test-runtime-pack-resolver.ps1')
 foreach ($name in @('Il2CppInterop.Runtime.Tests', 'Il2CppInterop.Generator.Tests')) {
     & dotnet run --project (Join-Path $interop "$name/$name.csproj") --configuration Release
     if ($LASTEXITCODE -ne 0) { throw "$name failed with exit code $LASTEXITCODE." }

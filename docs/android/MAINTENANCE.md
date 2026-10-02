@@ -49,11 +49,11 @@ patch in LemonLoader or the Patcher.
 The runtime repository has a separate lifecycle because a complete Android
 CoreCLR build is expensive. Both active .NET 11 profiles use one reviewed
 upstream `main` commit from `eng/runtime-profiles.json`. Build Android ARM64 and
-Linux Bionic ARM64 from the same checkout with separate intermediates. The
-`release/10.0` fork is a frozen legacy fallback, not the default build input.
+Linux Bionic ARM64 from the same checkout with separate intermediates.
+CoreCLR 10 recovery is retired; do not select its historical branch for new builds.
 
 Validate architecture, Bionic imports, host exports, cryptography files, helper
-DEX, 16 KiB ELF alignment, and the standalone embedding probe. Publish the pack
+DEX, 16 KiB ELF alignment, and embedded application-context acceptance. Publish the pack
 with its SHA-256 and source revision, then update LemonLoader's dependency
 manifest. Normal loader builds consume that artifact and do not rebuild CoreCLR.
 

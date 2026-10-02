@@ -8,8 +8,8 @@ ignored local records; keep only stable decisions and commands in repository doc
 
 1. Finish rebuilding the embedded-DEX Android runtime and matching Loader/Patcher
    artifacts, independently review the changes, and prepare outputs for the
-   maintainer's later device acceptance. Active products require API 26+;
-   frozen legacy remains unchanged.
+   maintainer's later device acceptance. Supported products require API 26+;
+   CoreCLR 10 recovery is retired.
 2. Retain useful native crash evidence on the device without requiring a user
    to run logcat. Preserve previous-session logs and provide an accessible,
    bounded diagnostic export with offline symbolization inputs.
@@ -21,13 +21,18 @@ ignored local records; keep only stable decisions and commands in repository doc
    LemonLoader and Patcher independently own their dependencies and workflows.
 5. Reduce maintenance and onboarding cost: concise indexed documentation, a small
    set of supported scripts, and explicit ownership instead of duplicate rules.
+6. Remove obsolete runtime schemes and redundant compatibility after caller/test
+   inspection. Consolidate old references and unique investigation evidence into
+   ignored history; delete re-creatable stale work without following links.
 
 ## Confirmed scope and guardrails
 
 - The maintainer authorizes incremental local commits. Do not push, publish,
   install APKs, change signing state, uninstall or clear application data.
-- Preserve unrelated worktree edits, independent Git histories, private outputs,
-  successful runtime packs, signing material and application data.
+- Preserve unrelated worktree edits, independent Git histories, unique private
+  evidence, current runtime packs, acceptance symbols, signing material and
+  application data. Obsolete generated work may be removed; unique old evidence
+  and unused reference checkouts are consolidated, not kept as active inputs.
 - Keep unsafe ZIP paths, duplicate entries, ABI errors, native-name collisions,
   existing download/release hash or signature validation, and actionable runtime
   compatibility/missing-input errors. This does not require preserving every
@@ -79,6 +84,16 @@ path when two products require different revisions. Do not introduce a new
 mandatory umbrella repo under another name.
 
 ## Stages and exits
+
+### Cleanup boundary
+
+The [CoreCLR 10 retirement decision](../../.agents/notes/implemented/simplification/2026-10-03-retire-coreclr10-workflows.md)
+supersedes the former frozen recovery rule. Current builds support only .NET 11
+Android/Bionic and API 26+. Legacy input readers (layout 8, external DEX and
+historical MonoVM) are a separate removal boundary: retain active safety/policy
+tests and explicit unsupported-input errors when removing them. Desktop upstream
+code, Unity file-format support and required fork adaptations are not blanket
+cleanup targets. Local cleanup inventories/results belong outside Git.
 
 ### P0: Durable plan and baseline
 

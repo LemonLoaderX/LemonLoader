@@ -10,8 +10,8 @@ Build/packaging, Bionic startup and crypto investigation findings are in
 
 `eng/runtime-profiles.json` owns the runtime repository URL, version and exact
 revision. Android and Bionic share one reviewed source revision. The maintained
-fork is `LemonLoaderX/runtime`; common fixes belong on its main branch. The frozen
-.NET 10 branch is a separate recovery input, not the active setup target.
+fork is `LemonLoaderX/runtime`; common fixes belong on its main branch. CoreCLR 10
+recovery is retired; product setup resolves only the maintained profiles.
 
 ```powershell
 pwsh -NoProfile -File scripts/setup-runtime.ps1
@@ -142,5 +142,3 @@ assets and SHA-256 sidecars. Loader CI consumes those exact assets. Do not publi
 development packs or relabel them as formal builds. Upstream updates require
 reviewing one revision, updating both active pins, rebuilding/preparing both
 targets and repeating acceptance. Do not reapply legacy fixes already upstream.
-Frozen recovery uses build-android-managed-runtime.ps1 and
-publish-android-runtime-pack.ps1 with explicit -Legacy and a separate checkout.

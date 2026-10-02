@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Release',
-    [ValidateSet('android', 'bionic', 'legacy', 'all')][string]$RuntimeProfile,
+    [ValidateSet('android', 'bionic', 'all')][string]$RuntimeProfile,
     [string]$AndroidNdkRoot = $env:ANDROID_NDK_ROOT,
     [string]$CoreClrRuntimePackRoot,
     [string]$DobbySourceRoot,

@@ -134,8 +134,7 @@ pwsh -NoProfile -File scripts/build-runtime.ps1 -RuntimeProfile all
 
 The active builder uses WSL, one source checkout and separate per-RID outputs on
 the source drive. Prepare/import each resulting pack before building Loader.
-The old `build-android-managed-runtime.ps1 -Legacy` is for frozen .NET 10 recovery
-only. See [runtime source development](RUNTIME-DEVELOPMENT.md) for source iteration.
+See [runtime source development](RUNTIME-DEVELOPMENT.md) for source iteration.
 
 ## Release build
 
@@ -169,7 +168,7 @@ produces only its selected variant; the default also refreshes the alias.
 The historical staging folder name does not identify the runtime RID. Build
 variants sequentially because they share staging.
 
-The product entry accepts `-RuntimeProfile android|bionic|legacy|all` without a
+The product entry accepts `-RuntimeProfile android|bionic|all` without a
 parent repository or Patcher checkout. Use `all` only with per-profile pack caches.
 For local dependency edits, pass explicit source paths and `-Development`
 (alias `-AllowDirtyDependencies`) to isolate packages under

@@ -12,7 +12,7 @@ pwsh -NoProfile -File scripts/test/test-scripts.ps1
 ```
 
 This product-owned entry parses PowerShell scripts and tests profile selection,
-ADB argument/error handling, legacy metadata boundaries, cleanup, runtime pack
+ADB argument/error handling, retired-profile rejection, cleanup, runtime pack
 fixtures and publication scanner orchestration. No parent checkout or device is
 required. Bash parsing defaults on Linux and off on Windows; on Windows use
 `-SkipBash:$false -Distribution <WSL-distribution>` to include WSL Bash parsing.
@@ -138,9 +138,8 @@ was preserved.
     -PackageName com.example.game
 ```
 
-The device must advertise ARM64, use API 26+ for active profiles, use a 4 KiB or
-16 KiB page size, and already contain the selected package. A legacy preflight's
-API 23 acceptance does not qualify the .NET 11 runtime for that API.
+The device must advertise ARM64, use API 26+, use a 4 KiB or
+16 KiB page size, and already contain the selected package.
 
 ### Device smoke test
 

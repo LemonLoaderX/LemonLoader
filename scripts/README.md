@@ -19,13 +19,10 @@ without scanning one flat directory.
 | `build/build-android-ndk-bootstrap.ps1` | Build NDK `libmain.so`; active Android requires a validated matching runtime pack for embedded crypto |
 | `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
 | `build/stage-android-package.ps1` | Assemble and verify the unpacked APK payload |
-| `build/resolve-android-runtime-pack.ps1` | Download, verify, and cache the pinned CoreCLR artifact |
 | `build/prepare-runtime-pack.ps1` | Normalize a hash-verified .NET 11 nupkg and compile matching crypto inputs |
 | `build/import-runtime-pack.ps1` | Validate/import a normalized Android or Bionic pack |
 | `build/package-runtime.ps1` | Deterministically package validated active packs; supports all and OutputRoot |
 | `build/publish-android-release.ps1` | Package the staged Loader variant; refresh only the default alias |
-| `build/build-android-managed-runtime.ps1` | Frozen .NET 10 source recovery, requires -Legacy |
-| `build/publish-android-runtime-pack.ps1` | Frozen .NET 10 archive recovery, requires -Legacy |
 | `build/verify-android-bootstrap.ps1` | Verify an existing Android bootstrap ELF |
 
 ## Interop
@@ -56,7 +53,6 @@ without scanning one flat directory.
 | `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
 | `test/test-verification-entry.ps1` | Synthetic orchestration fixtures for selected sources, omitted builds, failure propagation and repacking |
 | `test/inspect-runtime-native.sh` | Explicit raw-nupkg native diagnostic: ARM64/alignment/glibc/host exports; not device qualification |
-| `test/test-android-coreclr-probe.ps1` | Historical explicit ADB shell-host probe for the old staged/provenanced layout; not current pack or embedded-DEX acceptance |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs
@@ -74,8 +70,8 @@ The NDK script is the only Android bootstrap build and writes
 satisfy the check.
 
 Normal builds use `eng/runtime-profiles.json`: Android is the default, Bionic is
-selectable, and all means both active profiles. .NET 10 properties in
-`eng/AndroidDependencies.props` are only for explicit legacy fallback. Source
+selectable, and all means both profiles. CoreCLR 10 and pre-26 recovery entries
+are retired. Source
 builds use scripts/build-runtime.ps1 and are separate from product builds; see
 [runtime source development](../docs/android/RUNTIME-DEVELOPMENT.md).
 
@@ -98,7 +94,7 @@ remain supported and are not replaced by Patcher release production.
 
 - One public entry per workflow; Bash backends run under WSL on Windows.
 - Common files only define helpers when dot-sourced; they do not start builds or devices.
-- Read active runtime pins from eng/runtime-profiles.json; all excludes frozen legacy.
+- Read runtime pins from eng/runtime-profiles.json; all selects Android and Bionic.
 - Check native exit codes immediately and pass arguments as arrays, not shell text.
 - Caller-controlled cache environment variables remain untouched.
 - Cleanup validates containment and links before deletion and supports WhatIf.

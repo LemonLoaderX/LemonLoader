@@ -27,8 +27,7 @@ foreach ($script in Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'scrip
 }
 if ($failures.Count) { throw ($failures -join "`n") }
 if (@(Get-RuntimeProfileSelection).Count -ne 1 -or
-    ((Get-RuntimeProfileSelection -Name all).name -join ',') -cne 'android,bionic' -or
-    (Get-RuntimeProfileSelection -Name legacy).name -cne 'legacy') { throw 'Runtime profile selection regression.' }
+    ((Get-RuntimeProfileSelection -Name all).name -join ',') -cne 'android,bionic') { throw 'Runtime profile selection regression.' }
 $rejected = $false
 try { Get-RuntimeProfileSelection -Name invalid | Out-Null } catch { $rejected = $true }
 if (!$rejected) { throw 'Invalid runtime profile was accepted.' }
@@ -47,17 +46,10 @@ try { Invoke-AndroidAdb -Adb Test-AdbFailure -Serial test-serial -Arguments @('g
 }
 if (!$rejected) { throw 'ADB exit status or diagnostics were lost.' }
 $global:LASTEXITCODE = 0
-$fixture = Join-Path $repositoryRoot ('Output/Tests/ScriptHelpers/' + [Guid]::NewGuid().ToString('N'))
-[void][IO.Directory]::CreateDirectory((Join-Path $fixture 'eng'))
-[xml]$manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/AndroidDependencies.props') -Raw
-foreach ($node in @($manifest.Project.PropertyGroup.ChildNodes)) {
-    if ($node.Name.StartsWith('AndroidDotnetRuntime')) { [void]$node.ParentNode.RemoveChild($node) }
-}
-$manifest.Save((Join-Path $fixture 'eng/AndroidDependencies.props'))
-Get-AndroidDependencies -RepositoryRoot $fixture | Out-Null
+Get-AndroidDependencies | Out-Null
 $rejected = $false
-try { Get-AndroidDependencies -RepositoryRoot $fixture -IncludeLegacyRuntime | Out-Null } catch { $rejected = $true }
-if (!$rejected) { throw 'Missing legacy metadata was accepted for legacy use.' }
+try { Get-RuntimeProfileSelection -Name legacy | Out-Null } catch { $rejected = $true }
+if (!$rejected) { throw 'Retired runtime profile was accepted.' }
 & (Join-Path $PSScriptRoot 'test-cleanup.ps1')
 & (Join-Path $PSScriptRoot 'test-runtime-profiles.ps1')
 & (Join-Path $PSScriptRoot 'test-publication-scan.ps1')

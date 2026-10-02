@@ -11,6 +11,9 @@ consumer requirements have been removed.
 
 ## Decision
 
+The [CoreCLR 10 retirement](2026-10-03-retire-coreclr10-workflows.md) supersedes
+frozen layout-8 staging below; Loader now produces only layout 9.
+
 Active products produce asset layout 9. Its payload.json contains formatVersion,
 runtimeRid and optional path/policy deploymentFiles overrides. Seed is the native
 default, so Patcher emits only non-seed overrides. Profiles remain packaging

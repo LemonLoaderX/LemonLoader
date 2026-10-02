@@ -1,14 +1,12 @@
 [CmdletBinding()]
 param(
-    [string]$SourceRoot,
-
-    [switch]$IncludeRuntime
+    [string]$SourceRoot
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 . (Join-Path $PSScriptRoot "common\AndroidDependencies.ps1")
-$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot -IncludeLegacyRuntime:$IncludeRuntime
+$dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 
 $sources = @(
     [pscustomobject]@{
@@ -36,14 +34,6 @@ $sources = @(
         Recursive = $true
     }
 )
-if ($IncludeRuntime) {
-    $sources += [pscustomobject]@{
-        Name = "runtime"
-        Url = [string]$dependencies.AndroidDotnetRuntimeRepositoryUrl
-        Revision = [string]$dependencies.AndroidDotnetRuntimeRevision
-        Recursive = $false
-    }
-}
 
 foreach ($source in $sources) {
     $destination = if ($SourceRoot) {

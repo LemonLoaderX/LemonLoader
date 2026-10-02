@@ -75,8 +75,7 @@ function Test-RuntimeProfilePack {
         $provenance.engineSha256 -cne $engineHash) {
         throw 'Runtime pack identity does not match the selected profile.'
     }
-    if ($Profile.channel -ne 'legacy' -and
-        ($provenance.runtimeRid -cne $Profile.rid -or $provenance.cryptoBackend -cne $Profile.cryptoBackend)) {
+    if ($provenance.runtimeRid -cne $Profile.rid -or $provenance.cryptoBackend -cne $Profile.cryptoBackend) {
         throw 'Runtime pack RID/cryptography does not match the selected profile.'
     }
     $required = @('LICENSE.TXT','THIRD-PARTY-NOTICES.TXT','managed/System.Net.Http.dll','native/libcoreclr.so','native/libclrjit.so')
@@ -99,27 +98,25 @@ function Test-RuntimeProfilePack {
         }
     }
     if (Test-Path -LiteralPath (Join-Path $Root $forbidden)) { throw 'Mixed cryptography pack.' }
-    if ($Profile.channel -ne 'legacy') {
-        $inventory = Get-Content -LiteralPath (Join-Path $Root 'pack-files.json') -Raw | ConvertFrom-Json
-        $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-        foreach ($file in $inventory) {
-            if ($file.path -match '(^/|\\|:|(^|/)\.\.(/|$))' -or !$seen.Add($file.path)) { throw 'Unsafe pack inventory.' }
-            $path = Join-Path $Root $file.path
-            if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Runtime pack file is missing: '$($file.path)'." }
-            $actualHash = if ($file.path -ceq 'native/libcoreclr.so') { $engineHash } else {
-                (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
-            }
-            if ($actualHash -cne $file.sha256) {
-                throw "Runtime pack integrity failed: '$($file.path)'."
-            }
+    $inventory = Get-Content -LiteralPath (Join-Path $Root 'pack-files.json') -Raw | ConvertFrom-Json
+    $seen = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in $inventory) {
+        if ($file.path -match '(^/|\\|:|(^|/)\.\.(/|$))' -or !$seen.Add($file.path)) { throw 'Unsafe pack inventory.' }
+        $path = Join-Path $Root $file.path
+        if (!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Runtime pack file is missing: '$($file.path)'." }
+        $actualHash = if ($file.path -ceq 'native/libcoreclr.so') { $engineHash } else {
+            (Get-FileHash -LiteralPath $path).Hash.ToLowerInvariant()
         }
-        $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object {
-            [IO.Path]::GetRelativePath($Root,$_.FullName) -cne 'pack-files.json'
-        })
-        if ($actual.Count -ne $seen.Count) { throw 'Unexpected runtime pack files.' }
-        foreach ($file in $actual) {
-            if (!$seen.Contains([IO.Path]::GetRelativePath($Root,$file.FullName).Replace('\','/'))) { throw 'Unlisted runtime pack file.' }
+        if ($actualHash -cne $file.sha256) {
+            throw "Runtime pack integrity failed: '$($file.path)'."
         }
+    }
+    $actual = @(Get-ChildItem -LiteralPath $Root -Recurse -File | Where-Object {
+        [IO.Path]::GetRelativePath($Root,$_.FullName) -cne 'pack-files.json'
+    })
+    if ($actual.Count -ne $seen.Count) { throw 'Unexpected runtime pack files.' }
+    foreach ($file in $actual) {
+        if (!$seen.Contains([IO.Path]::GetRelativePath($Root,$file.FullName).Replace('\','/'))) { throw 'Unlisted runtime pack file.' }
     }
     if ($PassThru) { return $provenance }
 }

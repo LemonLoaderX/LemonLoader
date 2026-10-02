@@ -74,10 +74,9 @@ workaround. See [native crash evidence](HARDENING.md) for retained report limits
   do not qualify Unity, Harmony, IL2CPP ABI, client certificates, cancellation,
   long sessions, API 26 or physical 16 KiB-page devices.
 
-CoreClrProbe remains under tests/Android for deliberately isolated investigations.
-Its GlobalSymbols/PerfMap switches are diagnostic only. The historical runner
-and fixed-version OpenSSL downloader are retired; they are not current build
-inputs or an authenticated OpenSSL build workflow. Product smoke/device acceptance
+The historical shell CoreClrProbe, runner and fixed-version OpenSSL downloader
+are retired; they are not current build inputs or an authenticated OpenSSL build
+workflow. Product smoke/device acceptance
 requires explicit application/device selection and never implies uninstalling,
 data clearing or signing changes.
 

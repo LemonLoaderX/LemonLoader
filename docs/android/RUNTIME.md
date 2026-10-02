@@ -6,17 +6,17 @@ with Android (default) and Linux Bionic profiles. MelonLoader remains targeted a
 runtime.
 
 The maintained version and source revision are defined once in
-`eng/runtime-profiles.json`. The .NET 10 entries in AndroidDependencies.props
-are frozen legacy inputs only. Release manifests record the artifact identity
+`eng/runtime-profiles.json`. CoreCLR 10 recovery is retired.
+Release manifests record the artifact identity
 and hashes produced by that dependency, not a second set of hand-maintained
 revision constants.
 
-Select `build-android.ps1 -RuntimeProfile android|bionic|legacy`. Both active
+Select `build-android.ps1 -RuntimeProfile android|bionic`. Both
 profiles use the same upstream source revision. Android uses JNI crypto and
 retains official synchronous HTTP rejection. Bionic uses a private OpenSSL pair
 and system CA directory; its current verification is not production security
 qualification. Runtime packs are prepared with prepare-runtime-pack.ps1 and
-validated before staging. .NET 10 is retained only as an explicit legacy input.
+validated before staging.
 
 ## Hosting model
 
@@ -38,7 +38,6 @@ not expose a MonoVM identity. There is no fallback backend.
 
 ```text
 <application-data>/dotnet/
-  runtime-identity.json          # frozen layout-8 payloads only
   shared/Microsoft.NETCore.App/<version>/
     System.Private.CoreLib.dll
     libcoreclr.so
@@ -67,8 +66,8 @@ and supplies the exact initialized module for every crypto P/Invoke.
 This avoids a second namespace-local copy with missing JNI state. This path
 applies to the Android profile only.
 
-Old Android Releases and frozen legacy use the application ClassLoader and
-top-level helper DEX. Patcher retains their injection and digest checks. Old
+Historical Android Releases used the application ClassLoader and
+top-level helper DEX. The older Patcher input path is separate from current builds. Old
 runtime packs without the explicit host export cannot build embedded Android
 products: rebuild the runtime fork rather than substituting a legacy shim.
 
@@ -81,9 +80,8 @@ does not inject Java crypto helpers. Never mix the two profiles' crypto inputs.
 The source repository is maintained at `LemonLoaderX/runtime`. Both active
 profiles use one pinned official-main revision on `main`. The old
 CPU discovery, affinity and NULL-handle fixes are already upstream and are not
-reapplied. Optional PAL/host diagnostics from `legacy/net10` are not ported.
-The legacy branch's `PATCHES.md` describes that old patch stack, not the active
-runtime's behavior. Source setup/build, toolchain and publication commands are in
+reapplied. Optional PAL/host diagnostics from the retired .NET 10 patch stack
+are not required startup markers. Source setup/build, toolchain and publication commands are in
 [runtime source development](RUNTIME-DEVELOPMENT.md).
 
 The normal LemonLoader build consumes a versioned runtime artifact. A full

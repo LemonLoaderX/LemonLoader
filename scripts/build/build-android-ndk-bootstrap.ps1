@@ -14,7 +14,7 @@ param(
     [string]$DobbyRevision,
 
     [string]$ExpectedNdkRevision,
-    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile,
+    [ValidateSet('android','bionic')][string]$RuntimeProfile,
     [string]$CoreClrRuntimePackRoot,
     [switch]$AllowDirtyDependencies
 )

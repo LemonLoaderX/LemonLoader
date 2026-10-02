@@ -52,7 +52,7 @@ This inventory identifies authorities and retirement boundaries, not local progr
 
 - Loader staging creates Release file inventories and source/runtime audit
   identity. Active layout-9 payload configuration contains only format/RID;
-  frozen layout-8 staging retains the historical recipe.
+  CoreCLR 10 and layout-8 staging are retired.
 - Patcher validates the Release and adds Interop DLLs/deployment files. Layout 9
   emits non-seed policy overrides without generated digests, revision or copied
   Interop manifest. Its layout-8 compatibility path retains the old computations.
@@ -99,5 +99,7 @@ This inventory identifies authorities and retirement boundaries, not local progr
 
 Before deleting a script/doc, search every caller and CI reference, confirm its
 replacement or intentionally unsupported workflow, move unique rationale into
-its owner and run the affected entry point. Historical artifacts/private inputs
-are not deletion targets. See [roadmap](modernization.md) for stage gates.
+its owner and run the affected entry point. Unique historical artifacts/private
+inputs are consolidated outside maintained repositories; obsolete generated build
+trees may be deleted after checking links and recovery inputs.
+See [roadmap](modernization.md) for stage gates.

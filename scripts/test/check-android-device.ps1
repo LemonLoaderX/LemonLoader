@@ -5,7 +5,7 @@ param(
     [string]$PackageName,
 
     [string]$AndroidSdkRoot = $env:ANDROID_SDK_ROOT,
-    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile
+    [ValidateSet('android','bionic')][string]$RuntimeProfile
 )
 
 $ErrorActionPreference = "Stop"

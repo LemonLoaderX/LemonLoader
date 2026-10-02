@@ -35,9 +35,6 @@ Start with retained startup errors and the actual mapped `libcoreclr.so`.
 The runtime must export `coreclr_initialize`,
 `coreclr_create_delegate`, and `coreclr_shutdown` without a MonoVM identity.
 
-The frozen .NET 10 fork can emit `[CoreCLR.Android.Host]` and
-`[CoreCLR.Android.Thread]` diagnostics. Those optional patches are not carried
-into the current upstream-main profiles; their absence is not a startup failure.
 Investigate `EAGAIN` as a thread/PID limit or leak and `ENOMEM` as native address
 space or stack pressure. `EPERM` or `EACCES` from affinity calls can indicate a
 restricted Android kernel; the maintained runtime preserves the inherited valid

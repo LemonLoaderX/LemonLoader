@@ -5,6 +5,8 @@ Read only the document needed for the current task:
 - [Modernization roadmap](modernization.md): active goals, stage order, acceptance
   gates, commit policy and resumption checklist.
 - [Ownership inventory](ownership.md): current producers, paths and planned owners.
+- [Retired CoreCLR 10 workflows](../../.agents/notes/implemented/simplification/2026-10-03-retire-coreclr10-workflows.md):
+  maintained runtime boundary and private-history cleanup rules.
 - [Embedded crypto acceptance](embedded-crypto-acceptance.md): maintainer's later
   device matrix and evidence, without installation/signing changes.
 - [Crash evidence investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md):

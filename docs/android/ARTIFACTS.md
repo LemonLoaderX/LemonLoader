@@ -87,8 +87,8 @@ assemblies, not unrelated NuGet cache files.
 - Every shipped `.so`, including managed runtime dependencies, must support 16 KiB
   pages. Checking only `libmain.so` is insufficient.
 - Active producers emit layout 9 without domain hashes, deployment revision,
-  declared file digests or audit JSON. Frozen legacy staging and Patcher's older
-  Release path retain layout 8. Older Patchers must reject layout-9 Releases;
+  declared file digests or audit JSON. Patcher's older Release input path is
+  separate; Loader no longer stages layout 8. Older Patchers must reject layout-9 Releases;
   use a Patcher build supporting layout 9. `lemonloader-release.json` continues
   validating individual Release files. All extraction uses Android's package update time
   and local markers. Cached startup checks marker/directory existence without

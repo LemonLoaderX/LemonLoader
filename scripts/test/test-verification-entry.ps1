@@ -43,7 +43,7 @@ Copy-Item -LiteralPath (Join-Path $repositoryRoot 'eng/runtime-profiles.json') -
 [xml]$manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/AndroidDependencies.props') -Raw
 $manifest.Project.PropertyGroup.AndroidIl2CppInteropRevision = $first
 $manifest.Save((Join-Path $product 'eng/AndroidDependencies.props'))
-foreach ($name in @('test-scripts.ps1', 'test-source-dependencies.ps1', 'test-runtime-pack-resolver.ps1')) {
+foreach ($name in @('test-scripts.ps1', 'test-source-dependencies.ps1')) {
     Write-Fixture (Join-Path $product "scripts/test/$name") @'
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 [void][IO.Directory]::CreateDirectory((Join-Path $root 'Output'))
@@ -97,9 +97,10 @@ if ($arguments.RuntimeProfile -cne 'bionic' -or !$arguments.Development.IsPresen
 }
 if ($dotnetLog.Count -ne 3 -or !$dotnetLog[0].Contains($source) -or !$dotnetLog[1].Contains($source) -or
     !$dotnetLog[2].StartsWith('build|')) { throw 'Verification did not use selected sources and desktop boundary.' }
-& $entry -RuntimeProfile legacy -SkipDesktop
-if (!(Test-Path (Join-Path $product 'Output/Releases/LemonLoader-runtime-legacy-arm64.zip'))) {
-    throw 'Legacy verification selected the wrong archive.'
+Reject { & $entry -RuntimeProfile legacy -SkipDesktop } ''
+& $entry -RuntimeProfile android -SkipDesktop
+if (!(Test-Path (Join-Path $product 'Output/Releases/LemonLoader-runtime-android-arm64.zip'))) {
+    throw 'Android verification selected the wrong archive.'
 }
 $before = [IO.File]::ReadAllText((Join-Path $product 'Output/build-args.json'))
 $dotnetLog.Clear()
@@ -120,4 +121,4 @@ Reject { & $entry -RuntimeProfile bionic -Il2CppInteropSourceRoot $source -Devel
 Write-Fixture (Join-Path $product 'Output/change-repack') 'fixture'
 Reject { & $entry -RuntimeProfile bionic -Il2CppInteropSourceRoot $source -Development -SkipDesktop } 'not deterministic'
 $global:LASTEXITCODE = 0
-Write-Host 'PASS standalone Loader verification selection, explicit paths, legacy/development archives, skipped boundaries, source pins, failure propagation and repack checks'
+Write-Host 'PASS standalone Loader verification selection, explicit paths, retired-profile rejection, release/development archives, skipped boundaries, source pins, failure propagation and repack checks'

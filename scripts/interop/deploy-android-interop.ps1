@@ -53,10 +53,10 @@ if (-not (($packagePath -join "`n") -match "package:")) {
     throw "Package is not installed on ${Serial}: $PackageName"
 }
 
-$workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\.."))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 if ([string]::IsNullOrWhiteSpace($BackupDirectory)) {
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-    $BackupDirectory = Join-Path $workspaceRoot "temp\work\device-interop-backup-$stamp"
+    $BackupDirectory = Join-Path $repositoryRoot "Output\DeviceBackups\device-interop-backup-$stamp"
 }
 $backup = [System.IO.Path]::GetFullPath($BackupDirectory)
 New-Item -ItemType Directory -Force -Path $backup | Out-Null

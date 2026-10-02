@@ -11,6 +11,10 @@ without JNI state. See [porting notes](../../../../docs/android/PORTING.md).
 
 ## Decision
 
+The [CoreCLR 10 retirement](../simplification/2026-10-03-retire-coreclr10-workflows.md)
+supersedes the frozen pre-26 recovery described below. Embedded crypto remains
+the maintained Android mechanism.
+
 The bootstrap embeds the selected, validated runtime pack's complete helper DEX
 in libmain.so at build time. Active Android and Bionic products require API 26; frozen legacy
 retains its existing behavior. Android uses InMemoryDexClassLoader with no DEX

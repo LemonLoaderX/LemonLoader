@@ -11,6 +11,10 @@ sibling to satisfy one product can disrupt the other product or local work.
 
 ## Decision
 
+The [CoreCLR 10 retirement](../simplification/2026-10-03-retire-coreclr10-workflows.md)
+supersedes this note's frozen-profile selection and retained shell-probe decision.
+The independent source/build ownership below remains in force.
+
 Each product reads only its own dependency manifest. Default builds use a sibling
 checkout only when its HEAD matches that product's pin, otherwise a private
 .dependencies/name/revision checkout in that product. Explicit source roots keep
@@ -63,7 +67,7 @@ Runtime history scanning requires an explicit full upstream commit and ancestor
 validation, and scans only that base..HEAD patch range. Backup refs are excluded.
 Loader owns the reviewed upstream false-positive fingerprints; Patcher starts
 with no exceptions. These checks audit publication inputs, not installed files.
-Loader's scripts/verify.ps1 owns its host/script/runtime-resolver and Interop
+Loader's scripts/verify.ps1 owns its host/script and Interop
 source regressions, optional desktop build, and selected Android build/repack
 check. It uses the same source-root/development selection as product builds,
 without requiring Patcher or mutating process-wide caches. Patcher retains its

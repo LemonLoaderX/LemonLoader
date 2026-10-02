@@ -36,9 +36,9 @@ if ($deviceState -cne "device") {
 $relative = $RemoteRelativePath.Replace('\', '/')
 $runtime = "/sdcard/Android/data/$PackageName/files/MelonLoader"
 $remote = "$runtime/$relative"
-$workspaceRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\..\.."))
+$repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$backupRoot = Join-Path $workspaceRoot "temp\work\device-managed-backup-$stamp"
+$backupRoot = Join-Path $repositoryRoot "Output\DeviceBackups\device-managed-backup-$stamp"
 New-Item -ItemType Directory -Force -Path $backupRoot | Out-Null
 $backup = Join-Path $backupRoot ([System.IO.Path]::GetFileName($source))
 

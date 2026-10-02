@@ -39,8 +39,9 @@ Reject { & $PSCommandPath -Development }
 $android=Get-RuntimeProfile -Name android
 $bionic=Get-RuntimeProfile -Name bionic
 if($android.revision -cne $bionic.revision){throw 'Mainline targets must share one revision'}
-if($android.minimumApi -ne 26 -or $bionic.minimumApi -ne 26 -or (Get-RuntimeProfile -Name legacy).minimumApi -ne 23) {
-    throw 'Active products require API 26; frozen legacy must retain API 23.'
+Reject { Get-RuntimeProfile -Name legacy }
+if($android.minimumApi -ne 26 -or $bionic.minimumApi -ne 26) {
+    throw 'Supported products require API 26.'
 }
 $root=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot ('../../Output/Tests/runtime-profiles-'+[Guid]::NewGuid().ToString('N'))))
 New-Item -ItemType Directory -Force -Path $root | Out-Null

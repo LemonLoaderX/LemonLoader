@@ -18,7 +18,7 @@ param(
     [string]$DotnetRuntimeVersion,
 
     [string]$CoreClrRuntimePackRoot,
-    [ValidateSet('android','bionic','legacy')][string]$RuntimeProfile,
+    [ValidateSet('android','bionic')][string]$RuntimeProfile,
     [switch]$AllowDirtyDependencies
 )
 
@@ -29,7 +29,7 @@ if ($DotnetRuntimeVersion -and $DotnetRuntimeVersion -cne $profile.version) { th
 $DotnetRuntimeVersion = $profile.version
 if ($AndroidApiLevel -and $AndroidApiLevel -lt $profile.minimumApi) { throw 'Android API is below the runtime minimum.' }
 if (!$AndroidApiLevel) { $AndroidApiLevel = $profile.minimumApi }
-if (!$CoreClrRuntimePackRoot -and $profile.channel -ne 'legacy') {
+if (!$CoreClrRuntimePackRoot) {
     $CoreClrRuntimePackRoot = Join-Path $PSScriptRoot "../../Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
 }
 if ($CoreClrRuntimePackRoot -and !(Test-Path -LiteralPath $CoreClrRuntimePackRoot -PathType Container)) {
@@ -38,14 +38,6 @@ if ($CoreClrRuntimePackRoot -and !(Test-Path -LiteralPath $CoreClrRuntimePackRoo
 
 if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     $AndroidNdkRoot = $env:ANDROID_NDK_HOME
-}
-
-if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
-    $CoreClrRuntimePackRoot = & (Join-Path $PSScriptRoot "resolve-android-runtime-pack.ps1") -RuntimeProfile legacy
-    if ([string]::IsNullOrWhiteSpace($CoreClrRuntimePackRoot)) {
-        throw "Resolving the Android CoreCLR runtime artifact failed."
-    }
-    $CoreClrRuntimePackRoot = ($CoreClrRuntimePackRoot | Select-Object -Last 1).Trim()
 }
 
 & (Join-Path $PSScriptRoot "build-android-ndk-bootstrap.ps1") `

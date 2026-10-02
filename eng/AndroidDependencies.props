@@ -1,14 +1,7 @@
 <Project>
   <PropertyGroup>
     <AndroidNdkRevision>27.3.13750724</AndroidNdkRevision>
-    <AndroidApiLevel>23</AndroidApiLevel>
-
-    <!-- Frozen legacy artifact only. Active runtime selection lives in runtime-profiles.json. -->
-    <AndroidDotnetRuntimeVersion>10.0.13</AndroidDotnetRuntimeVersion>
-    <AndroidDotnetRuntimeRevision>437631999af1b7c3af90aabba545e6437b6e58a0</AndroidDotnetRuntimeRevision>
-    <AndroidDotnetRuntimeRepositoryUrl>https://github.com/LemonLoaderX/runtime.git</AndroidDotnetRuntimeRepositoryUrl>
-    <AndroidDotnetRuntimeArtifactUrl>https://github.com/LemonLoaderX/runtime/releases/download/android-coreclr-10.0.13/dotnet-runtime-10.0.13-android-arm64.zip</AndroidDotnetRuntimeArtifactUrl>
-    <AndroidDotnetRuntimeArtifactSha256>2411e80bf54ac6c0ab0bec256914c9730e80ad564f5b6a6a1e028713e01e5f0f</AndroidDotnetRuntimeArtifactSha256>
+    <AndroidApiLevel>26</AndroidApiLevel>
 
     <AndroidDobbyRevision>be22f55a2adab028bb2d3264589df1cb3f1aea9f</AndroidDobbyRevision>
     <AndroidDobbyRepositoryUrl>https://github.com/LemonLoaderX/Dobby.git</AndroidDobbyRepositoryUrl>
