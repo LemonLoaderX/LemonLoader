@@ -12,12 +12,12 @@ need local evidence, not a live logcat session.
 
 ## Proposal
 
-First preserve previous/early-session logs independently of managed startup.
-Then verify the already-built .NET 11 in-process crash reporter before adding a
-new native crash dependency. Configure its storage before coreclr_initialize,
-with finite retention and reporting before previous-handler chaining. Use a
-private writable root and copy completed evidence to the existing accessible
-Loader log area on the next launch. Do not upload automatically.
+Preserve previous/early-session logs independently of managed startup, using the
+[scoped rotation decision](../../implemented/bug-fix/2026-10-02-preserve-previous-log.md).
+Runtime report configuration follows the [scoped CoreCLR decision](../../implemented/feature/2026-10-02-runtime-crash-reports.md),
+which uses the existing log root without a separate private export pipeline.
+Evaluate its coverage before adding a new crash dependency. Do not upload
+automatically.
 
 Supplement with the application's own ApplicationExitInfo on API 30+. Native
 tombstone streams begin at API 31, contain protobuf rather than text, and may be
@@ -91,5 +91,6 @@ trace. Host JNI mocks do not qualify ART, OEM traces or real crash coexistence.
 The [modernization proposal](../process/2026-10-02-project-modernization.md)
 partially overlaps and retains the overall sequence. This note owns the narrower
 reporting investigation. The [embedded crypto decision](../../implemented/architecture/2026-10-02-embedded-android-crypto.md)
-is unrelated to signal ownership and still applies. No other active crash notes
-were found. No reporter integration is implemented by this proposal.
+is unrelated to signal ownership and still applies. The previous-log decision
+implements the logging concern, and the CoreCLR decision owns runtime report
+configuration. This proposal owns supplemental trace recovery and coverage.

@@ -1458,6 +1458,7 @@ bool prepare_android_runtime() {
         !set_environment("DOTNET_ROOT", runtime_paths.dotnet_directory.c_str()) ||
         !set_environment("PATH", path.c_str())) return false;
     configure_android_certificate_store();
+    configure_crash_reporting();
 
     using mallopt_fn = int (*)(int, int);
     auto mallopt_value = reinterpret_cast<mallopt_fn>(dlsym(RTLD_DEFAULT, "mallopt"));

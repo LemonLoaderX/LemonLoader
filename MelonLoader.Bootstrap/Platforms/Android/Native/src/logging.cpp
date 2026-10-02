@@ -7,8 +7,10 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <dlfcn.h>
 #include <filesystem>
@@ -222,13 +224,94 @@ void reset_latest_log() {
     if (runtime_paths.base_directory.empty()) {
         return;
     }
-    std::lock_guard<std::mutex> lock(log_mutex);
-    latest_log.close();
-    historical_log.close();
-    const std::filesystem::path log_path = melonloader_directory() / "Latest.log";
-    std::error_code error;
-    std::filesystem::create_directories(log_path.parent_path(), error);
-    latest_log.open(log_path, std::ios::binary | std::ios::trunc);
+    std::string warning;
+    {
+        std::lock_guard<std::mutex> lock(log_mutex);
+        latest_log.close();
+        historical_log.close();
+        const std::filesystem::path log_path = melonloader_directory() / "Latest.log";
+        const auto previous_path = log_path.parent_path() / "Previous.log";
+        std::error_code error;
+        std::filesystem::create_directories(log_path.parent_path(), error);
+        if (!error && std::filesystem::exists(log_path, error)) {
+            const auto size = std::filesystem::file_size(log_path, error);
+            if (!error && size > 0) {
+                std::filesystem::rename(log_path, previous_path, error);
+            }
+        }
+        if (error) {
+            warning = "Could not preserve previous session log at '" + previous_path.string() +
+                "': " + error.message() + "; keeping Latest.log in append mode";
+        }
+        latest_log.open(log_path, std::ios::binary | (error ? std::ios::app : std::ios::trunc));
+        if (!latest_log && warning.empty()) {
+            warning = "Could not open session log at '" + log_path.string() +
+                "'; previous session evidence was not truncated";
+        }
+    }
+    if (!warning.empty()) {
+        log_line("[WARNING] " + warning, ANDROID_LOG_WARN);
+    }
+}
+
+void configure_crash_reporting() {
+    if (!runtime_paths.base_directory.empty()) {
+        const auto directory = melonloader_directory();
+        const auto reports = directory / ".dotnet" / "crash-reports";
+        std::filesystem::path partial;
+        std::error_code error;
+        // CoreCLR removes interrupted reports at initialization. Keep the newest
+        // one outside its retention directory, without parsing corrupted JSON.
+        if (std::filesystem::exists(reports, error)) {
+            for (std::filesystem::directory_iterator iterator(reports, error), end;
+                 !error && iterator != end; iterator.increment(error)) {
+                const auto name = iterator->path().filename().string();
+                constexpr const char* suffix = ".crashreport.json.tmp";
+                constexpr size_t suffix_size = sizeof(".crashreport.json.tmp") - 1;
+                if (name.compare(0, 7, "report-") != 0 || name.size() < suffix_size ||
+                    name.compare(name.size() - suffix_size, suffix_size, suffix) != 0) continue;
+                if (!iterator->is_symlink(error) && iterator->is_regular_file(error) && iterator->file_size(error) > 0 &&
+                    !error && (partial.empty() || iterator->path().filename() > partial.filename())) {
+                    partial = iterator->path();
+                }
+            }
+        }
+        if (!error && !partial.empty()) {
+            std::filesystem::rename(partial, directory / "PreviousCrashReport.partial.json", error);
+        }
+        if (error) {
+            log_line("[WARNING] Could not preserve interrupted crash report at '" + reports.string() +
+                "': " + error.message(), ANDROID_LOG_WARN);
+        }
+    }
+    const auto configured = [](const char* name) {
+        return std::getenv((std::string("DOTNET_") + name).c_str()) != nullptr ||
+            std::getenv((std::string("COMPlus_") + name).c_str()) != nullptr;
+    };
+    const auto set_default = [&](const char* name, const std::string& value) {
+        if (!configured(name) && setenv((std::string("DOTNET_") + name).c_str(), value.c_str(), 0) != 0) {
+            const int code = errno;
+            log_line(std::string("[WARNING] Could not configure crash reporting: ") + name +
+                ": " + std::error_code(code, std::generic_category()).message(),
+                ANDROID_LOG_WARN);
+        }
+    };
+    if (!configured("EnableCrashReport") && !configured("EnableCrashReportOnly")) {
+        set_default("EnableCrashReportOnly", "1");
+    }
+    set_default("CrashReportMaxFileCount", "8");
+    set_default("CrashReportBeforeSignalChaining", "1");
+    if (!configured("CrashReportRootPath") && !runtime_paths.base_directory.empty()) {
+        const auto directory = melonloader_directory();
+        std::error_code error;
+        std::filesystem::create_directories(directory, error);
+        if (error) {
+            log_line("[WARNING] Could not prepare crash report storage at '" + directory.string() +
+                "': " + error.message(), ANDROID_LOG_WARN);
+        } else {
+            set_default("CrashReportRootPath", directory.string());
+        }
+    }
 }
 
 void configure_logging(uint32_t max_logs, bool should_capture_player_logs) {

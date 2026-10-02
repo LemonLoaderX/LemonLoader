@@ -78,9 +78,23 @@ trees keep the standard MelonLoader exclusion behavior.
 non-default `theme` value have been validated through an on-device load/save
 cycle. Preserve the file across replacement updates.
 
-Use `MelonLoader/Latest.log` for the current run and `MelonLoader/Logs` for
-retained logs. For startup failures also capture timestamped logcat, because
-native loader and linker errors may occur before managed logging starts.
+Use `MelonLoader/Latest.log` for the current run, `MelonLoader/Previous.log` for
+the previous nonempty session and `MelonLoader/Logs` for managed history.
+Previous.log is preserved before managed startup, including early failures;
+rotation failure keeps Latest.log in append mode instead of erasing it.
+For failures before storage discovery also capture timestamped logcat.
+CoreCLR crash reports are saved under `MelonLoader/.dotnet/crash-reports`, with
+eight completed reports retained by default. Reporting can be disabled with
+`DOTNET_EnableCrashReportOnly=0` before runtime startup; existing `DOTNET_` and
+`COMPlus_` reporter settings take precedence. Reports contain diagnostic names
+and paths; review them before sharing. Native-only reports need not include a
+complete native stack, and SIGKILL or faults before runtime startup may leave none.
+`MelonLoader/PreviousCrashReport.partial.json` retains the most recent nonempty
+interrupted default-root report before runtime cleanup. It may contain truncated
+JSON; preserve its original bytes rather than treating it as a complete report.
+Some P/Invoke faults can fail reporting before any bytes are written. Empty
+temporary reports cannot supply a trace; system tombstones/logcat are still
+needed for such cases.
 Set `loader.capture_player_logs = true` in `Loader.cfg` to mirror Android logcat
 messages tagged `Unity` into both current and retained logs. A successful setup
 records `Unity player log capture enabled` near the start of `Latest.log` and

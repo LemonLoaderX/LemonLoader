@@ -74,11 +74,12 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 ## Crash evidence baseline
 
 - Native normal logging writes Android logs and flushes Latest/history streams.
-  Startup reset truncates Latest before history configuration; early prior-session
-  evidence needs rotation independent of managed startup.
-- No new crash collector is implemented by this inventory. Signal handlers must
-  coexist with CoreCLR's handled faults and Android/Unity reporting. Capturing a
-  signal is not by itself proof of a fatal crash.
+  Startup reset preserves the previous nonempty session in Previous.log before
+  history configuration; failure falls back to append mode.
+- Loader configures CoreCLR's existing in-process reporter and retains one
+  nonempty interrupted default-root report. It installs no new signal handler.
+  Reporting must coexist with CoreCLR's handled faults and Android/Unity reporting;
+  capturing a signal is not by itself proof of a fatal crash.
 - Candidate evidence tiers: previous-session logs; minimal bounded crash/session
   context; maintained native trace tooling; API 30+ exit info (native tombstone
   streams start at API 31) as a supplement;

@@ -1,7 +1,7 @@
 # Android troubleshooting
 
 Start from a fresh reproduction. Preserve the input versions, timestamps,
-release and runtime manifests, logcat, `Latest.log`, and the observable
+release and runtime manifests, logcat, `Latest.log`, `Previous.log`, and the observable
 application result. A successful command or living PID is not sufficient.
 
 ## Bootstrap does not start

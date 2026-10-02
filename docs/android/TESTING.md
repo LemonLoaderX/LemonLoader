@@ -49,6 +49,20 @@ emitted only after a write; an I/O failure keeps the existing fallback behavior
 and error diagnostics. Fix the path/permissions and restart to leave fallback
 mode. Android logs use stripped text for file/logcat output and preserve WARN
 and ERROR priorities; native errors produce one logcat record.
+The native logging regression also exercises previous-session retention before
+managed history setup, empty-session handling, history limits and append fallback
+when rotation fails.
+
+Runtime report defaults and overrides are covered by that native logging test.
+To exercise the upstream reporter in isolated Linux host subprocesses:
+
+```bash
+DOTNET11="<dotnet-11-sdk>/dotnet" bash scripts/test/test-crash-reporting.sh
+```
+
+The probe checks handled faults, FailFast/native faults, report JSON, retention
+and explicit opt-out. It disables host core dumps and writes evidence below
+Output/Tests. It does not qualify Android signal coexistence or ARM64 crash traces.
 
 ```powershell
 ../LemonLoader.Patcher/scripts/test.ps1 -Configuration Release
