@@ -46,6 +46,23 @@ MonoMod.Common is a MonoMod submodule and must be initialized at the gitlink
 revision. Modified dependency binaries are never accepted without their
 producing source.
 
+### Relocating Existing Sources
+
+Stop builds and leave source directories in terminals/editors before moving them.
+Verify each checkout's absolute Git/common directory, refs, local status and links.
+A standalone .git directory moves with the checkout; a .git file pointing outside
+it needs separate Git-metadata migration. MonoMod's nested checkout must retain
+its relative pointer into MonoMod's own .git/modules and matching gitlink.
+Inspect WSL symlinks through WSL; Windows may expose a reparse point without its
+target. Preserve external artifacts, SDK links and private outputs without
+following or deleting them. Verify refs/config/status and link targets afterward.
+
+An access-denied move is not permission to force-close another process, change
+ACLs, copy over the destination or delete source. Resolve directory handles first
+and retry the unchanged checkout. Historical absolute-path CMake caches are not
+portable: keep them as evidence and use fresh build/output roots after relocation.
+Moving sources never changes the consuming products' independent pins.
+
 ## Runtime artifact
 
 Active builds consume a local pack matching the selected runtime profile. They

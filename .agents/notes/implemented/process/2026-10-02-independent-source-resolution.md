@@ -86,6 +86,16 @@ qualification remains separate from shell execution. No diagnostic assets are
 deleted as part of retirement.
 The all-SO raw-nupkg inspector retains a distinct glibc/native diagnostic boundary
 and lives under Loader scripts/test without the parent unzip cache assumption.
+Dependency source checkouts may live as independent siblings of both products.
+Physical relocation preserves the whole checkout, its refs/config/status and
+ignored outputs; it is not a reset, checkout or cleanup. Only checkouts with
+self-contained Git directories are moved directly. Nested submodule metadata
+must remain internal and use valid relative paths. Stop builds and hold the runtime
+source lock while moving; validate every absolute source/destination first.
+WSL reparse points are inspected through WSL because Windows APIs may not expose
+their targets. Preserve relative links and external artifact targets without
+following them. Old absolute-path CMake/runtime intermediates are evidence, not
+portable caches: select fresh output roots for rebuilds after relocation.
 Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
