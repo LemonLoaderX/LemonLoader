@@ -10,8 +10,9 @@ Output/Release/linux-bionic-arm64/package
 ```
 
 LemonLoader.Patcher 1.1.0 or later is the automated adapter for an original ARM64 Unity IL2CPP APK.
-It edits ZIP entries directly, generates Interop assemblies, and inserts the
-Android crypto DEX when required. Alignment and signing are explicit options.
+It edits ZIP entries directly, generates Interop assemblies, and inserts a helper
+DEX only for historical external-DEX Releases. Active Android Releases already
+embed it in libmain.so. Alignment and signing are explicit options.
 Do not extract/repack a complete APK on a case-insensitive filesystem.
 See [ARTIFACTS.md](ARTIFACTS.md) for the payload interface.
 

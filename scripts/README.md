@@ -33,7 +33,7 @@ without scanning one flat directory.
 | Script | Purpose |
 | --- | --- |
 | `interop/prepare-android-interop-input.ps1` | Normalize decoded APK IL2CPP inputs |
-| `interop/generate-android-interop.ps1` | Generate game-specific Il2CppInterop assemblies on desktop |
+| `interop/generate-android-interop.ps1` | Generate Interop on desktop; supply Unity libraries or use the optional Patcher source integration |
 | `interop/deploy-android-interop.ps1` | Back up and replace device Interop assemblies with hash checks |
 
 ## Test
@@ -56,6 +56,7 @@ without scanning one flat directory.
 | `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
 | `test/test-verification-entry.ps1` | Synthetic orchestration fixtures for selected sources, omitted builds, failure propagation and repacking |
 | `test/inspect-runtime-native.sh` | Explicit raw-nupkg native diagnostic: ARM64/alignment/glibc/host exports; not device qualification |
+| `test/test-android-coreclr-probe.ps1` | Historical explicit ADB shell-host probe for the old staged/provenanced layout; not current pack or embedded-DEX acceptance |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

@@ -19,7 +19,7 @@ Unity Java player
   -> extract MelonLoader and the private dotnet runtime from APK assets
   -> PLT redirect dlsym
   -> intercept il2cpp_init
-  -> verify the selected engine identity
+  -> load CoreCLR and check its required exports (reject MonoVM)
   -> initialize the selected cryptography backend (JNI for Android, OpenSSL for Bionic)
   -> initialize Android CoreCLR through its direct host API
   -> load MelonLoader.NativeHost.dll
@@ -160,9 +160,9 @@ the adapter falls back to the application's internal files directory.
 | RID, ABI, API, and constants | `Directory.Build.Android.props` |
 | Native bootstrap and CoreCLR startup | `MelonLoader.Bootstrap/Platforms/Android/Native` |
 | Managed Android environment | `MelonLoader/JNI`, `MelonLoader/Utils` |
-| Il2Cpp Android ABI and injection compatibility | Maintained Il2CppInterop fork resolved under `.dependencies/` |
+| Il2Cpp Android ABI and injection compatibility | Maintained Il2CppInterop fork selected by product pin (matching sibling or revision cache) |
 | MonoMod CoreCLR compatibility | Maintained MonoMod fork and its MonoMod.Common submodule |
-| HarmonyX .NET 9+ emit compatibility | Maintained HarmonyX fork resolved under `.dependencies/` |
+| HarmonyX .NET 9+ emit compatibility | Maintained HarmonyX fork selected by product pin (matching sibling or revision cache) |
 | Unity lifecycle adaptation | `Dependencies/SupportModules/Il2Cpp` |
 | Build orchestration | `scripts/build` |
 | APK contract | `docs/android/ARTIFACTS.md` |

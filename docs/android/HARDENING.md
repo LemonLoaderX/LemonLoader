@@ -30,8 +30,7 @@ contracts and the commands used to test them.
   includes operation context and the throwable description in Latest.log.
   A failure while obtaining that summary cannot replace the original Java stack.
 - JNI strings use UTF-16, preserving supplementary characters and embedded NULs.
-  Payload v8 revision ordering matches the producer's UTF-16 ordinal comparer;
-  no format bump is required.
+  Extraction freshness uses APK update time, not producer hash/revision ordering.
 - Local JNI references are disposed on their creating thread. Their CLR
   finalizers never call `DeleteLocalRef`. Use global references across threads,
   and explicitly dispose locals before leaving their JNI frame. Abandoned locals
@@ -141,8 +140,9 @@ this failure mode. Startup recovery has also been confirmed on an affected devic
 this does not qualify every device, system or game. Private diagnostic evidence
 remains outside this repository.
 
-For local source forks, run the normal Android native and managed build scripts
-with explicit workspace dependency roots and `-AllowDirtyDependencies`. Shared
+For local source forks, use scripts/build.ps1 with explicit dependency source
+roots and -Development. Narrow native/managed build scripts retain the
+AllowDirtyDependencies switch. Shared
 managed changes also need the desktop build described in [BUILDING.md](BUILDING.md).
 Dependency-specific regressions are documented in each fork's `PATCHES.md`.
 
@@ -153,8 +153,8 @@ Dependency-specific regressions are documented in each fork's `PATCHES.md`.
   and metadata-directory recovery are not a durable multi-file transaction.
   Before another deployment attempt after such an interruption, preserve the
   deployment state, staging and `.lemonloader-backups` alongside affected files;
-  compare them with the packaged manifest to plan recovery. Do not clear app
-  data or blindly delete state/backups. Durable journaling and crash injection
+  compare them with actual APK assets and path/policy overrides to plan recovery.
+  Do not clear app data or blindly delete state/backups. Durable journaling and crash injection
   remain separate work.
 - Native-bridge relay allocation must preserve translated-code compatibility.
   Allocator changes require tests on native ARM64 and native-bridge execution.

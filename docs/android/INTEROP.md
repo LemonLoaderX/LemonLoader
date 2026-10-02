@@ -39,7 +39,8 @@ runtime wrappers.
 
 ```powershell
 ./scripts/interop/generate-android-interop.ps1 `
-    -InteropInputPath ./Output/InteropInput
+    -InteropInputPath ./Output/InteropInput `
+    -UnityAssembliesPath "<matching-unity-managed-libraries>"
 ```
 
 The Loader selects its own pinned source fork through sibling/cache resolution.
@@ -69,9 +70,11 @@ Android device.
 The Android ELF is passed through `--game-assembly` so Il2CppInterop can detect
 exported runtime services such as `il2cpp_gc_wbarrier_set_field`. Generation also
 uses `--no-xref-cache`; runtime xref behavior must be evaluated per Mod.
-The generation script resolves matching Android Unity base libraries through
-`LemonLoader.Patcher` when `-UnityAssembliesPath` is not supplied. The primary
-source is `MelonLoader.UnityDependencies`; `unity.bepinex.dev` is the fallback.
+Provide UnityAssembliesPath for generation from a Loader-only checkout. When it
+is omitted, the script's optional integration resolves libraries through a sibling
+LemonLoader.Patcher source checkout, or an explicit -PatcherCliProject. This is
+not a Loader build dependency. Patcher's primary source is
+`MelonLoader.UnityDependencies`; `unity.bepinex.dev` is the fallback.
 The cache is content-validated and records its source, normalized Unity version,
 archive hash, and extracted content hash. The script then always passes
 `--unity` to Il2CppInterop, so the standalone workflow cannot silently skip
@@ -120,8 +123,10 @@ The patcher copies only top-level `.dll` files into the independent
 `assets/LemonLoader/runtime/interop` domain. At startup Android verifies that
 this directory contains assemblies, publishes it as runtime
 `MelonLoader/Il2CppAssemblies`, and skips the desktop generator module.
-`interop-manifest.json` is copied beside those DLLs to preserve input, tool,
-Unity dependency, and output hashes for later verification.
+For active layout 9, interop-manifest.json remains a host-side generation record;
+it is not copied into the APK or required for startup. Historical layout-8
+Patcher inputs retain the old manifest-copying recipe. Keep generation evidence
+with the developer outputs when investigating input or tool mismatches.
 
 Unstripping restores the managed API surface used to compile and run ordinary
 Mods. It does not synthesize native Unity ICalls that were omitted from the

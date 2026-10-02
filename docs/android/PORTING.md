@@ -19,9 +19,9 @@ host the private runtime without changing the desktop bootstrap.
 
 Android uses the CoreCLR host interface directly:
 
-1. extract a verified private runtime into application storage;
+1. extract the APK's private runtime transactionally into application storage;
 2. initialize the selected cryptography backend;
-3. load and identity-check `libcoreclr.so`;
+3. load `libcoreclr.so` and check the CoreCLR exports, rejecting MonoVM;
 4. build the trusted-platform-assembly and native-search paths;
 5. call `coreclr_initialize` and `coreclr_create_delegate`;
 6. transfer control to `MelonLoader.NativeHost`.
@@ -74,9 +74,13 @@ such as Dobby and plthook are built directly by CMake.
 ## Product separation
 
 LemonLoader produces a game-independent payload. The Patcher owns APK ZIP
-handling, Unity input extraction, Interop generation, DEX insertion, deployment
+handling, Unity input extraction, Interop generation, historical DEX insertion, deployment
 content, alignment, and signing. This keeps game material out of loader releases
 and lets CLI and GUI share one typed patch pipeline.
+
+Active Android payloads already embed the helper DEX in libmain.so. Release and
+download checks remain tooling boundaries; installed mixed hashes or revisions
+are not startup requirements. Other installers can use the documented file layout.
 
 ## Validation lessons
 

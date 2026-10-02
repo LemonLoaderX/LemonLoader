@@ -5,22 +5,11 @@ desktop baseline. The target is Unity IL2CPP on Android API 26 or later, hosted
 by private .NET 11 CoreCLR. Android is the default runtime profile; Bionic is
 selectable. Both are preview distributions, not broad compatibility certification.
 
-## Documentation map
+## Documentation
 
-- [Current status](STATUS.md): verified capabilities and remaining qualification.
-- [Architecture](ARCHITECTURE.md): startup sequence, module ownership, and hard
-  invariants.
-- [Building](BUILDING.md): prerequisites, dependency inputs, and outputs.
-- [Runtime](RUNTIME.md): CoreCLR hosting, Android cryptography, and managed
-  compatibility.
-- [Porting notes](PORTING.md): migration decisions and reusable lessons.
-- [Il2CppInterop](INTEROP.md): generation and Android ABI behavior.
-- [Payload contract](ARTIFACTS.md): the interface consumed by APK tooling.
-- [Deployment](DEPLOYMENT.md): packaged files, ownership policies, and recovery.
-- [Testing](TESTING.md): regression levels and success criteria.
-- [Maintenance](MAINTENANCE.md): upstream synchronization and dependency policy.
-- [Usage](USAGE.md): integrating and operating the payload.
-- [Troubleshooting](TROUBLESHOOTING.md): observable failures and evidence.
+Use the [task index](../README.md) for installation, building, troubleshooting and
+release work. [Current status](STATUS.md) defines the support boundary;
+[porting notes](PORTING.md) retain reusable engineering lessons.
 
 ## Repository model
 
@@ -55,7 +44,7 @@ Source dependency setup alone does not download active runtime packs.
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
 pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
-pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
+pwsh -NoProfile -File scripts/build.ps1 -Configuration Release
 ```
 
 The build produces the NDK bootstrap, managed host, Il2Cpp support module, and a

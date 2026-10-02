@@ -1,8 +1,22 @@
 # Android troubleshooting
 
-Start from a fresh reproduction. Preserve the input versions, timestamps,
-release and runtime manifests, logcat, `Latest.log`, `Previous.log`, and the observable
-application result. A successful command or living PID is not sufficient.
+Preserve existing evidence before attempting a fresh reproduction: input versions,
+timestamps, Release metadata, Latest.log, Previous.log and the observable application
+result. Collect logcat when available, but retained evidence can be shared without
+a live ADB session. A successful command or living PID is not sufficient.
+
+## Native crash evidence
+
+On the next launch, preserve MelonLoader/.dotnet/crash-reports,
+MelonLoader/PreviousCrashReport.partial.json and MelonLoader/SystemExit alongside
+the logs, when present. See [storage and retention](USAGE.md#configuration-and-logs)
+for API gates and limits. Review names and paths before sharing; keep partial
+reports unchanged even if their JSON is truncated. Exact-build private symbols
+must match the crashing module's ELF build ID for offline symbolization.
+
+No report is guaranteed for faults before initialization, SIGKILL/OOM or a reporter
+failure. Android may return no historical trace, and native-only CoreCLR reports
+may have incomplete stacks. Retaining a handled fault is not proof of a fatal crash.
 
 ## Bootstrap does not start
 
@@ -57,8 +71,9 @@ same-signer replacement installation, not editing the extracted runtime.
 ## Il2CppInterop startup or injection fails
 
 Confirm that Interop generation consumed the target `libil2cpp.so`, selected the
-correct Unity version, and used the revision recorded in
-`interop-manifest.json`. Android must use the ARM64 resolver and the hook matching
+correct Unity version, and used the intended generator revision. Consult the
+host-side interop-manifest.json when retained; active APKs do not need or contain
+that generation record. Android must use the ARM64 resolver and the hook matching
 the target's actual generic-method lookup signature; it must not use the desktop
 x86 scanner.
 
@@ -139,8 +154,9 @@ Deployment publication now copies regular-file contents with bounded `read` and
 `write` calls. It retries interrupted reads/writes, handles short writes, checks
 the copied size and output close, then renames the sibling temporary file. It
 does not require `sendfile` or copying filesystem metadata. Original destination
-files are retained when copying fails; hash, path, deployment-policy and rollback
-validation remain in place.
+files are retained when copying fails; path, deployment-policy, ownership-hash
+and rollback checks remain. Ownership hashes protect local edits during policy
+updates, not APK authenticity or startup admission.
 
 Older bootstraps emit only the destination path; that line alone cannot identify
 a permission, storage-space, missing-file or rename failure. First launch does not
