@@ -57,6 +57,12 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 - Candidate destination: Loader-owned public contract plus a reusable metadata
   tool/interface, consumed by Patcher and a minimal second installer. The precise
   packaging and editable-deployment policy remain P3 design tasks.
+- Declared deployment revision is not an authenticity boundary: an APK editor
+  can change content and metadata together. Its real consumers are refresh-once,
+  obsolete-file actions and the unchanged-deployment fast path. P3 evaluates
+  removing global revision and deriving update decisions locally; stale revision
+  validation must not gate game startup. Per-file previous hashes may still be
+  useful for preserving user modifications, independently of trust.
 
 ## Crash evidence baseline
 

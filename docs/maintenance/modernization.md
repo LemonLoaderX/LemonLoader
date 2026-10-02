@@ -28,6 +28,10 @@ Requested: 2026-10-02. Status: active, incremental work.
 - Keep unsafe ZIP paths, duplicate entries, ABI errors, native-name collisions,
   hash/signature mismatch on protected inputs and incomplete runtime detection.
   Usability improvements must not disable these checks globally.
+- Deployment revision is an update/cache hint, not an authenticity guarantee or
+  permission to start the game. A hash stored beside mutable content does not
+  establish trust. Distinguish download/build consistency checks, authenticated
+  inputs (where actually supported), per-file ownership and runtime compatibility.
 - Device qualification is the maintainer's later gate; host tests and NDK builds
   do not prove ART, TLS, crash unwinding or all target applications.
 - New work is owned by the relevant repository. The parent folder ultimately
@@ -132,13 +136,23 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
 
 - [ ] Map identity producers/consumers and separate immutable runtime integrity,
   installation/update freshness, deployment policy and local user content.
+- [ ] Remove deployment revision self-consistency as a startup prerequisite. Treat
+  legacy revision as an optional rollout hint or retire it when equivalent update
+  decisions are derived locally. Missing/stale declared revision must not prevent
+  the game from starting or require a manual installer to recalculate it.
+- [ ] Evaluate whether a global deployment revision is needed at all. Preserve
+  only the state needed for refresh-once, user-edit preservation, safe obsolete
+  file handling and transactional recovery. Per-file previous hashes can support
+  those decisions without pretending to authenticate the APK's editable content.
 - [ ] Specify a small public installation interface in Loader and reusable tooling
   for metadata generation/verification. Patcher consumes this interface rather
   than owning an undocumented recipe. Avoid duplicated generators in two repos.
-- [ ] Design an explicit editable deployment path versus protected/locked content.
+- [ ] Make ordinary deployment explicitly editable; do not introduce a mandatory
+  locked/verified path merely to keep the current manifest design. Evaluate
+  optional managed/locked policies for a demonstrated distribution need.
   Filename/content edits should not require manually recomputing revision fields.
-  No silent downgrade of locked/enforce policies or execution of mismatched
-  content claimed to be verified.
+  Existing locked/enforce policies require an explicit migration decision; they
+  are deployment behavior, not anti-tamper protection against an APK editor.
 - [ ] Isolate optional deployment failures from base game startup. Determine safe
   Loader-disable/fallback points before installing hooks or changing startup;
   do not continue from partially initialized runtime state.
@@ -153,6 +167,8 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
 
 Exit: a second minimal installer and ordinary local deployment edits work without
 Patcher internals, while protected runtime security checks remain enforced.
+Deployment revisions are not admission checks. Document what validation detects
+and its trust source; do not label colocated hashes as proof of authenticity.
 
 ### P4: Independent repositories and sibling layout
 
@@ -237,3 +253,9 @@ win-x64 is ready locally. Maintainer device acceptance remains pending. NuGet
 audit reported known high-severity advisories on the upstream DiaSymReader.Native
 build dependency; assess publication exposure separately rather than suppressing
 the warning or upgrading unrelated pins without review.
+
+2026-10-02 clarification: deployment revision has practical update semantics but
+is not a security identity. P3 prioritizes removing revision/hash metadata as an
+admission requirement for ordinary editable deployment, and evaluates eliminating
+the global revision rather than simply adding a second complex deployment mode.
+Current runtime behavior remains unchanged until that stage's migration/tests.

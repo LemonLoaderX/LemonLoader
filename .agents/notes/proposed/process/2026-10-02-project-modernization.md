@@ -23,13 +23,25 @@ authorizes scoped local commits, not pushing, release publication or device
 installation. Concrete crash-library and wire-format choices remain proposed
 until evaluated; the roadmap does not implicitly disable integrity checks.
 
+Deployment revision is only an update/cache hint. Its self-consistency check is
+not an authenticity guarantee because the content and manifest are editable
+together. Missing/stale declared revision must not become a game-startup gate.
+Evaluate removing the global revision, keeping only local/per-file state needed
+for rollout, user edits, obsolete files and rollback. Do not require a new locked
+mode solely to preserve the present validation design. Build/download checks and
+actual runtime compatibility remain separate concerns.
+
 ## Alternatives considered
 
 - Retaining the parent Git lock gives one coordinated snapshot, but requires an
   unpublished extra repo and hides product build ownership.
-- Removing all hashes would simplify manual edits, but loses protected-runtime
-  integrity and transactional-update guarantees. Separate editable user content
-  from protected content instead.
+- Removing every hash/state field would simplify manual edits, but also removes
+  useful evidence of whether a destination still matches its previous package.
+  Keep that information only when an update policy needs it. Colocated hashes
+  are consistency metadata, not proof of trust or a reason to reject startup.
+- Keeping global revision validation catches mismatched generated metadata, but
+  provides no anti-tamper guarantee and makes ordinary APK editing depend on
+  Patcher's recipe. Prefer local update decisions and optional legacy rollout hints.
 - Maintaining separate copies of metadata generators in both products allows
   local builds, but perpetuates drift. Loader should own a reusable installation
   interface/tool, with Patcher consuming a reviewed version.
