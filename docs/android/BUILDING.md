@@ -48,7 +48,8 @@ producing source.
 
 ### Relocating Existing Sources
 
-Stop builds and leave source directories in terminals/editors before moving them.
+Stop builds and release handles inside source directories before moving them.
+Editor Git watchers can hold nested .git directories even without a terminal there.
 Verify each checkout's absolute Git/common directory, refs, local status and links.
 A standalone .git directory moves with the checkout; a .git file pointing outside
 it needs separate Git-metadata migration. MonoMod's nested checkout must retain
@@ -59,8 +60,13 @@ following or deleting them. Verify refs/config/status and link targets afterward
 
 An access-denied move is not permission to force-close another process, change
 ACLs, copy over the destination or delete source. Resolve directory handles first
-and retry the unchanged checkout. Historical absolute-path CMake caches are not
-portable: keep them as evidence and use fresh build/output roots after relocation.
+and retry the unchanged checkout. Check the runtime build lock while builds stay
+stopped, then close that check's WSL handle before a Windows directory rename:
+an open child lock file can itself prevent the rename. This requires a maintenance
+window with no new builds, not a lock held throughout the move. After a partial
+move, verify the already-moved identities and resume only the remaining sources.
+Historical absolute-path CMake caches are not portable: keep them as evidence and
+use fresh build/output roots after relocation.
 Moving sources never changes the consuming products' independent pins.
 
 ## Runtime artifact

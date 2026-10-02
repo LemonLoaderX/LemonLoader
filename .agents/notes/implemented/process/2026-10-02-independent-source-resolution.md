@@ -90,13 +90,19 @@ Dependency source checkouts may live as independent siblings of both products.
 Physical relocation preserves the whole checkout, its refs/config/status and
 ignored outputs; it is not a reset, checkout or cleanup. Only checkouts with
 self-contained Git directories are moved directly. Nested submodule metadata
-must remain internal and use valid relative paths. Stop builds and hold the runtime
-source lock while moving; validate every absolute source/destination first.
+must remain internal and use valid relative paths. Stop builds and validate every
+absolute source/destination first. Check the runtime source lock while builds stay
+stopped, then close the check's WSL handle before a Windows rename; the open child
+lock file can itself prevent directory relocation. Keep builds stopped throughout
+this maintenance window. Editor Git watchers may also hold nested .git directories
+without a terminal there; release those handles without force-closing processes.
+After a partial move, compare already-moved identities to the original snapshot
+and move only remaining sources. Do not copy/delete around blocked renames.
 WSL reparse points are inspected through WSL because Windows APIs may not expose
 their targets. Preserve relative links and external artifact targets without
 following them. Old absolute-path CMake/runtime intermediates are evidence, not
 portable caches: select fresh output roots for rebuilds after relocation.
-Physical dependency moves remain a separate step of the
+Physical dependency relocation is governed by the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
 ## Alternatives considered
@@ -130,8 +136,8 @@ without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
 prepared. Existing runtime artifacts are not moved or deleted by script migration.
-Physical directory migration and remaining documentation/script consolidation
-still remain.
+Physical relocation does not retire parent compatibility wrappers or consolidate
+documentation; those have separate caller checks and retirement gates.
 Release maintainers must supply every source input to scanning;
 scanning the product alone does not certify a dependency or a release archive.
 The temporary parent cleanup delegates to product commands without dependency

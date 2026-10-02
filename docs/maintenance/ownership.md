@@ -1,6 +1,6 @@
 # Ownership inventory
 
-Status: migration inventory, not a completed move. Updated 2026-10-02.
+This inventory identifies authorities and retirement boundaries, not local progress.
 
 ## Current source authorities
 
