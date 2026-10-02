@@ -83,7 +83,8 @@ profiles use one pinned official-main revision on `main`. The old
 CPU discovery, affinity and NULL-handle fixes are already upstream and are not
 reapplied. Optional PAL/host diagnostics from `legacy/net10` are not ported.
 The legacy branch's `PATCHES.md` describes that old patch stack, not the active
-runtime's behavior.
+runtime's behavior. Source setup/build, toolchain and publication commands are in
+[runtime source development](RUNTIME-DEVELOPMENT.md).
 
 The normal LemonLoader build consumes a versioned runtime artifact. A full
 runtime source build is an explicit maintainer workflow and publishes the same

@@ -31,8 +31,16 @@ another checkout, which can trigger recursive lazy fetching from partial sources
 
 Loader's scripts/build.ps1 is the public product entry for profile selection and
 existing native/managed/staging orchestration. It does not inspect the parent
-gitlinks or require a Patcher checkout. Source runtime build migration and physical
-dependency moves remain separate steps of the
+gitlinks or require a Patcher checkout. Runtime setup/build also belongs to Loader:
+eng/runtime-profiles.json supplies the fork URL and active pins; setup uses the same
+sibling/cache rule without selecting branches or fetching upstream substitutes.
+The WSL backend keeps its source lock and per-RID isolation. Default output belongs
+to Loader Output/RuntimeDevelopment; an explicit output root preserves existing
+build trees. Temporary parent wrappers preserve old paths until retirement.
+Runtime setup checks tracked changes, matching the builder: its artifacts symlink
+and build lock are untracked source-side outputs. They and other untracked local
+files remain untouched. Generic dependency setup still rejects untracked files.
+Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
 ## Alternatives considered
@@ -52,11 +60,16 @@ Products build from standalone checkouts and may share correctly pinned siblings
 without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
-prepared. This decision does not migrate runtime artifacts or root scripts yet.
+prepared. Existing runtime artifacts are not moved or deleted by script migration.
+Remaining root audit/cleanup/test workflows still require ownership migration.
 
 Local Git fixtures cover matching/conflicting siblings, independent cache paths,
 explicit overrides, dirty/wrong checkouts and pinned setup without shared-source
-mutation. Product build and publish entries verify the actual manifests/inputs.
+mutation, including active runtime pins distinct from frozen legacy. WSL runtime
+fixtures exercise real launcher/backend path conversion, per-RID output isolation,
+development evidence, exclusive locking, existing-artifacts protection and failed
+build propagation using a small fixture build.sh. They do not compile CoreCLR.
+Product build and publish entries verify the actual manifests/inputs.
 
 ## Prior-note Audit
 

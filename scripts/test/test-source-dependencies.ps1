@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 . (Join-Path $repositoryRoot 'scripts/common/AndroidDependencies.ps1')
+. (Join-Path $repositoryRoot 'scripts/common/RuntimeProfiles.ps1')
 $fixture = Join-Path $repositoryRoot "Output/Tests/SourceDependencies/$([Guid]::NewGuid().ToString('N'))"
 [void][IO.Directory]::CreateDirectory($fixture)
 function Assert-Equal($Expected, $Actual) {
@@ -63,4 +64,35 @@ try {
     Initialize-AndroidSourceCheckout -Path $complete -Url $nestedOrigin -Revision $nestedRevision -Recursive
     Assert-AndroidSourceCheckout -Path $complete -Revision $nestedRevision -Recursive
 } finally { $env:GIT_ALLOW_PROTOCOL = $priorProtocols }
-Write-Host 'PASS independent Loader pins, matching/conflicting siblings, isolated caches, explicit roots and non-mutating setup'
+$runtimeConfig = Get-Content -LiteralPath (Join-Path $repositoryRoot 'eng/runtime-profiles.json') -Raw | ConvertFrom-Json
+$runtimeConfig.profiles.android.revision = $first
+$runtimeConfig.profiles.bionic.revision = $first
+$runtimeConfig.repositoryUrl = 'https://invalid.example/never-fetch'
+$runtimeConfig | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $product 'eng/runtime-profiles.json')
+$runtime = Join-Path $fixture 'dotnet-runtime'
+Initialize-AndroidSourceCheckout -Path $runtime -Url $origin -Revision $first
+$profile = Get-RuntimeProfile -RepositoryRoot $product -Name android
+Assert-Equal $runtime (Get-RuntimeSourceRoot -Profile $profile -RepositoryRoot $product)
+$fixtureScripts = Join-Path $product 'scripts'
+[void][IO.Directory]::CreateDirectory((Join-Path $fixtureScripts 'common'))
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts/setup-runtime.ps1') -Destination $fixtureScripts
+foreach ($helper in @('AndroidDependencies.ps1', 'RuntimeProfiles.ps1')) {
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot "scripts/common/$helper") -Destination (Join-Path $fixtureScripts 'common')
+}
+& (Join-Path $fixtureScripts 'setup-runtime.ps1')
+Assert-Equal $first ((& git -C $runtime rev-parse HEAD).Trim())
+[IO.File]::WriteAllText((Join-Path $runtime '.lemonloader-runtime-build.lock'), 'retained')
+& (Join-Path $fixtureScripts 'setup-runtime.ps1')
+Assert-Equal 'retained' ([IO.File]::ReadAllText((Join-Path $runtime '.lemonloader-runtime-build.lock')))
+Invoke-FixtureGit $runtime @('checkout', '--quiet', '--detach', $second)
+$runtimeCache = [IO.Path]::GetFullPath((Join-Path $product ".dependencies/dotnet-runtime/$first"))
+Assert-Equal $runtimeCache (Get-RuntimeSourceRoot -Profile $profile -RepositoryRoot $product)
+Assert-Equal $runtime (Get-RuntimeSourceRoot -Profile $profile -RepositoryRoot $product -SourceRoot $runtime)
+Assert-Rejected { & (Join-Path $fixtureScripts 'setup-runtime.ps1') -SourceRoot $runtime }
+Assert-Equal $second ((& git -C $runtime rev-parse HEAD).Trim())
+Initialize-AndroidSourceCheckout -Path $runtimeCache -Url $origin -Revision $first
+& (Join-Path $fixtureScripts 'setup-runtime.ps1') -RuntimeProfile bionic
+$runtimeConfig.repositoryUrl = 'http://invalid.example/insecure'
+$runtimeConfig | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $product 'eng/runtime-profiles.json')
+Assert-Rejected { Get-RuntimeRepositoryUrl -RepositoryRoot $product }
+Write-Host 'PASS independent Loader/runtime pins, matching/conflicting siblings, isolated caches, explicit roots and non-mutating setup'

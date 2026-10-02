@@ -30,6 +30,26 @@ function Get-RuntimeProfile {
     return $value
 }
 
+function Get-RuntimeRepositoryUrl {
+    param([string]$RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')))
+    $config = Get-Content -LiteralPath (Join-Path $RepositoryRoot 'eng/runtime-profiles.json') -Raw | ConvertFrom-Json
+    $uri = $null
+    if ($config.formatVersion -ne 1 -or
+        ![Uri]::TryCreate([string]$config.repositoryUrl, [UriKind]::Absolute, [ref]$uri) -or
+        $uri.Scheme -ne 'https') {
+        throw 'Runtime repositoryUrl must be an absolute HTTPS URL.'
+    }
+    return [string]$config.repositoryUrl
+}
+
+function Get-RuntimeSourceRoot {
+    param([Parameter(Mandatory)]$Profile,
+          [string]$RepositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..')),
+          [string]$SourceRoot)
+    return Get-PinnedSourceRoot -Name dotnet-runtime -Revision $Profile.revision `
+        -RepositoryRoot $RepositoryRoot -SourceRoot $SourceRoot
+}
+
 function Get-RuntimeProfileSelection {
     param([string]$Name)
 

@@ -19,8 +19,8 @@ before identity comparison. Clean-source and locked-revision checks remain;
 binary diff evidence is retained without content rewriting. Build isolation,
 the source lock and the Linux toolchain remain unchanged.
 
-The script remains in the local parent until the
-[roadmap's ownership migration](../../../../docs/maintenance/modernization.md).
+The backend is Loader's scripts/build/build-runtime.sh; see
+[runtime source development](../../../../docs/android/RUNTIME-DEVELOPMENT.md).
 
 ## Alternatives considered
 

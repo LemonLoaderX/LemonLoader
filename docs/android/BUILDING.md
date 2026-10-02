@@ -98,18 +98,17 @@ THIRD-PARTY-NOTICES.TXT
 licenses/OpenSSL/LICENSE.txt  # Bionic only
 ```
 
-Rebuilding CoreCLR is a separate maintainer action in the contributor workspace:
+Rebuilding CoreCLR is a separate maintainer action:
 
 ```powershell
-# Run from the workspace root, not the Loader repository.
 pwsh -NoProfile -File scripts/setup-runtime.ps1
 pwsh -NoProfile -File scripts/build-runtime.ps1 -RuntimeProfile all
 ```
 
 The active builder uses WSL, one source checkout and separate per-RID outputs on
-the workspace drive. Prepare/import each resulting pack before building Loader.
+the source drive. Prepare/import each resulting pack before building Loader.
 The old `build-android-managed-runtime.ps1 -Legacy` is for frozen .NET 10 recovery
-only. See the workspace `docs/RUNTIME-DEVELOPMENT.md` for source iteration.
+only. See [runtime source development](RUNTIME-DEVELOPMENT.md) for source iteration.
 
 ## Release build
 

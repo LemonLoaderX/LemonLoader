@@ -89,25 +89,35 @@ function Get-AndroidDependencySourceRoot {
     $revisionProperty = if ($Name -eq 'runtime') { 'AndroidDotnetRuntimeRevision' } else { "Android${Name}Revision" }
     $revision = [string]$dependencies.$revisionProperty
     $directoryName = if ($Name -eq 'runtime') { 'dotnet-runtime' } else { $Name }
-    $sibling = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot "../$directoryName"))
+    return Get-PinnedSourceRoot -Name $directoryName -Revision $revision -RepositoryRoot $RepositoryRoot
+}
+
+function Get-PinnedSourceRoot {
+    param([Parameter(Mandatory)][string]$Name,
+          [Parameter(Mandatory)][ValidatePattern('^[0-9a-f]{40}$')][string]$Revision,
+          [Parameter(Mandatory)][string]$RepositoryRoot, [string]$SourceRoot)
+    if ($SourceRoot) { return [IO.Path]::GetFullPath($SourceRoot) }
+    $sibling = [IO.Path]::GetFullPath((Join-Path $RepositoryRoot "../$Name"))
     if (Test-Path -LiteralPath (Join-Path $sibling '.git')) {
         $head = @(& git -c core.longpaths=true -C $sibling rev-parse HEAD 2>$null)
-        if ($LASTEXITCODE -eq 0 -and $head.Count -eq 1 -and $head[0].Trim() -ceq $revision) {
+        if ($LASTEXITCODE -eq 0 -and $head.Count -eq 1 -and $head[0].Trim() -ceq $Revision) {
             return $sibling
         }
     }
-    return [IO.Path]::GetFullPath((Join-Path $RepositoryRoot ".dependencies/$directoryName/$revision"))
+    return [IO.Path]::GetFullPath((Join-Path $RepositoryRoot ".dependencies/$Name/$Revision"))
 }
 
 function Assert-AndroidSourceCheckout {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Revision,
-          [switch]$Recursive)
+          [switch]$Recursive, [switch]$AllowUntracked)
     if (!(Test-Path -LiteralPath (Join-Path $Path '.git'))) { throw "Source is not a Git checkout: '$Path'." }
     $head = @(& git -c core.longpaths=true -C $Path rev-parse HEAD)
     if ($LASTEXITCODE -ne 0 -or $head.Count -ne 1 -or $head[0].Trim() -cne $Revision) {
         throw "Source '$Path' does not match pinned revision '$Revision'; use a separate checkout."
     }
-    $changes = @(& git -c core.longpaths=true -C $Path status --porcelain)
+    $statusArguments = @('status', '--porcelain')
+    if ($AllowUntracked) { $statusArguments += '--untracked-files=no' }
+    $changes = @(& git -c core.longpaths=true -C $Path @statusArguments)
     if ($LASTEXITCODE -ne 0 -or $changes.Count) { throw "Source '$Path' has local changes; setup will not modify it." }
     if ($Recursive) {
         $submodules = @(& git -c core.longpaths=true -C $Path submodule status --recursive)
@@ -119,9 +129,9 @@ function Assert-AndroidSourceCheckout {
 
 function Initialize-AndroidSourceCheckout {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Url,
-          [Parameter(Mandatory)][string]$Revision, [switch]$Recursive)
+          [Parameter(Mandatory)][string]$Revision, [switch]$Recursive, [switch]$AllowUntracked)
     if (Test-Path -LiteralPath $Path) {
-        Assert-AndroidSourceCheckout -Path $Path -Revision $Revision -Recursive:$Recursive
+        Assert-AndroidSourceCheckout -Path $Path -Revision $Revision -Recursive:$Recursive -AllowUntracked:$AllowUntracked
         return
     }
     $Path = [IO.Path]::GetFullPath($Path)

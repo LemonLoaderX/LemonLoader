@@ -1,5 +1,6 @@
 {
   "formatVersion": 1,
+  "repositoryUrl": "https://github.com/LemonLoaderX/runtime.git",
   "defaultProfile": "android",
   "profiles": {
     "android": {

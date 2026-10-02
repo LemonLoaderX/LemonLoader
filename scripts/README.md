@@ -9,6 +9,9 @@ without scanning one flat directory.
 | --- | --- |
 | `setup-android-dependencies.ps1` | Resolve maintained source forks at their manifest revisions |
 | `build.ps1` | Product build entry, profile selection and explicit development source roots; no parent workspace required |
+| `setup-runtime.ps1` | Resolve the active runtime fork at Loader's own pin without changing existing sources |
+| `build-runtime.ps1` | WSL runtime source entry; serialized Android/Bionic builds and read-only Plan |
+| `build/build-runtime.sh` | Internal WSL backend, per-RID artifacts and source lock |
 | `build/build-android.ps1` | Full CoreCLR Android orchestration |
 | `build/build-android-ndk-bootstrap.ps1` | Build NDK `libmain.so`; active Android requires a validated matching runtime pack for embedded crypto |
 | `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
@@ -43,6 +46,7 @@ without scanning one flat directory.
 | `test/test-android-bootstrap.sh` | Run Linux/WSL regressions for instruction bounds, JNI failures, embedded crypto, asset I/O and runtime process locking; requires NDK headers |
 | `test/test-android-deployment.sh` | Run the Linux/WSL file-publication regression for preserved destinations and failure diagnostics |
 | `test/test-source-dependencies.ps1` | Local Git fixtures for independent pins, sibling/cache selection and setup preservation |
+| `test/test-runtime-source-build.ps1` | WSL fixtures for runtime output isolation, source protection and failure propagation |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs
@@ -62,7 +66,8 @@ satisfy the check.
 Normal builds use `eng/runtime-profiles.json`: Android is the default, Bionic is
 selectable, and all means both active profiles. .NET 10 properties in
 `eng/AndroidDependencies.props` are only for explicit legacy fallback. Source
-builds use workspace scripts/build-runtime.ps1 and are separate from product builds.
+builds use scripts/build-runtime.ps1 and are separate from product builds; see
+[runtime source development](../docs/android/RUNTIME-DEVELOPMENT.md).
 
 `build.ps1 -Development` with explicit source paths enables local source
 iteration, including a different HEAD. Its Loader archives go to

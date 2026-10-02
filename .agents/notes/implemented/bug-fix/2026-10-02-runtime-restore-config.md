@@ -16,8 +16,8 @@ The runtime build backend passes RestoreConfigFile with the absolute source
 NuGet.config path. This is an existing supported Arcade extension, applies to
 tool and project restores, and preserves reviewed tool versions and source feed
 configuration. No package version downgrade or machine-level config change is
-used. The script remains in the parent until the
-[ownership migration](../../../../docs/maintenance/modernization.md).
+used. Loader's scripts/build/build-runtime.sh owns the backend; see
+[runtime source development](../../../../docs/android/RUNTIME-DEVELOPMENT.md).
 
 ## Alternatives considered
 

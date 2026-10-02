@@ -12,14 +12,14 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Parent checkout lock | parent `.gitmodules` and gitlinks | retired after standalone validation |
 | Loader release CI | Loader `.github/workflows/android.yml` | Loader, retained |
 | Patcher release CI | Patcher workflows and scripts | Patcher, retained |
-| Runtime source build | parent `build-runtime.ps1/.sh` | Loader runtime-build workflow |
-| Runtime setup | parent `setup-runtime.ps1` | Loader dependency workflow |
+| Runtime source build | Loader `build-runtime.ps1` and WSL backend | Loader; parent wrapper retained during migration |
+| Runtime setup | Loader `setup-runtime.ps1` | Loader; non-mutating pinned source setup |
 | Product build entry | Loader `scripts/build.ps1`; parent wrapper retained during migration | Loader |
 | Source setup/audit/status | parent scripts | per-product manifest validation |
 | Syntax/helper verification | parent `test-scripts.ps1` | per-product tests |
 | Source/archive secret scan | parent `scan-publication.ps1` | owned release checks |
 | Cleanup | parent `clean.ps1` | per-product output cleanup |
-| Runtime current docs | parent `RUNTIME-DEVELOPMENT.md` | Loader runtime docs |
+| Runtime current docs | Loader `docs/android/RUNTIME-DEVELOPMENT.md` | Loader, retained |
 | Runtime historical evidence prose | parent `RUNTIME-EXPERIMENT.md` | compact Loader history/notes |
 | Parent operations/status | parent docs | current facts merged into Loader docs |
 | Historical device/OpenSSL probes | parent diagnostic scripts | inventory callers before retaining/retiring |
@@ -32,8 +32,10 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   still override Loader paths with `dependencies/*` during physical migration.
 - Loader release CI operates from the Loader checkout and downloads reviewed
   runtime artifacts; it does not require the parent Git lock. Local runtime
-  source build/setup/test/audit still do.
-- Runtime builds use an artifacts symlink and per-RID outputs under parent temp.
+  source build/setup is also Loader-owned; remaining parent audit/test coordination
+  still needs migration.
+- Runtime builds use an artifacts symlink and per-RID outputs under Loader Output
+  or an explicit output root; parent wrappers retain historical temp paths.
   Move only after builds stop; preserve the existing target and avoid a recursive
   cleanup following a link.
 - Nested dependency Git metadata must be inspected before physical moves. A
