@@ -3,19 +3,26 @@
 param(
     [ValidateSet('android', 'bionic', 'all')]
     [string]$RuntimeProfile = 'all',
-    [string]$OutputRoot
+    [string]$OutputRoot,
+    [string]$RuntimePackRoot,
+    [switch]$Development
 )
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-if (!$OutputRoot) { $OutputRoot = Join-Path $repositoryRoot 'Output/RuntimeArtifacts' }
+if ($RuntimePackRoot -and $RuntimeProfile -eq 'all') { throw 'An explicit runtime pack requires a single profile.' }
+if (!$OutputRoot) {
+    $OutputRoot = Join-Path $repositoryRoot $(if ($Development) { 'Output/DevelopmentRuntimeArtifacts' } else { 'Output/RuntimeArtifacts' })
+}
 $OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 [void][IO.Directory]::CreateDirectory($OutputRoot)
 foreach ($profile in Get-RuntimeProfileSelection -Name $RuntimeProfile) {
-    $pack = Join-Path $repositoryRoot "Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
-    Test-RuntimeProfilePack -Root $pack -Profile $profile
+    $pack = if ($RuntimePackRoot) { [IO.Path]::GetFullPath($RuntimePackRoot) } else {
+        Join-Path $repositoryRoot "Output/RuntimePacks/$($profile.revision)/$($profile.rid)"
+    }
+    Test-RuntimeProfilePack -Root $pack -Profile $profile -Development:$Development
     $path = Join-Path $OutputRoot "dotnet-runtime-$($profile.version)-$($profile.rid).zip"
     $temporary = "$path.$([Guid]::NewGuid().ToString('N')).staging"
     try {

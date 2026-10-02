@@ -65,6 +65,19 @@ Use a new destination, not `-Force`, when retrying an incomplete extraction.
 Existing valid packs can be reused. The archive checksum detects corruption; it
 is not an independent source signature.
 
+Package an imported pack with `scripts/build/package-runtime.ps1`. For an explicit
+local development pack:
+
+```powershell
+pwsh -NoProfile -File scripts/build/package-runtime.ps1 -RuntimeProfile android `
+    -RuntimePackRoot "<development-pack>" -Development
+```
+
+This validates the pack and writes a reproducible archive plus checksum under
+`Output/DevelopmentRuntimeArtifacts`, without replacing formal runtime archives.
+Use one profile when specifying a pack path. Development identity is retained;
+packaging does not turn an unqualified build into a published runtime.
+
 Use `-CoreClrRuntimePackRoot <directory>` for a reviewed local/offline pack. A
 runtime pack contains:
 

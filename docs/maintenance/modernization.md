@@ -102,7 +102,7 @@ history; runtime behavior has not been changed by planning.
   separate outputs and old packs. Normalize/import/package validated packs.
 - [ ] Update consuming pins, build matching Loader/Patcher artifacts, check no new
   top-level DEX and retain hashes/symbols/logs privately.
-- [ ] Commit Loader after its automated gates; Patcher committed as `ccd329f`
+- [x] Commit Loader implementation after its automated gates (`a6c5e65d`); Patcher committed as `ccd329f`
   after 19 regressions and published locally for win-x64.
 - [x] Produce a [device-acceptance checklist](embedded-crypto-acceptance.md); maintainer performs installation and
   crypto/TLS/lifecycle/namespace tests later.
@@ -246,15 +246,21 @@ DrvFS/Linux-Git stat bottleneck; native Windows Git preserves source checks and
 lets compilation begin. The required SDK downloads from the official CI feed
 when the primary SDK feed has no copy. Original packs remain untouched.
 
-Rebuild recovery: official SDK installation and full Android restore now pass.
+Rebuild recovery: official SDK installation and full Android restore pass.
 The external-artifacts feed-discovery fix is committed in the temporary parent
-as `f0fec60` (native Git preflight fix: `14b14ab`). Full both-profile build has
-restarted using `b85b9fbd264`; no completed runtime packs or Loader release are
-claimed yet. Check the active background build before rerunning or moving any
+as `f0fec60` (native Git preflight fix: `14b14ab`). The both-profile build
+uses `b85b9fbd264`. Android has completed with zero errors; its isolated pack and
+matching Loader development archive are built and validated by Patcher's actual
+ReleaseValidator, alongside all 19 regressions. Bootstrap contains the complete
+matching helper DEX; the Release contains no standalone helper DEX. Runtime pack
+packaging/round-trip/reproducibility tests pass, and an isolated development
+runtime archive is ready. Private unstripped bootstrap symbols and runtime symbol
+nupkgs are retained. Bionic is still building. Check the active background build
+before rerunning or moving any
 dependency directory. Outputs are under parent `temp/runtime-development/local/`
 by exact source revision and RID; failure logs and exit-code files remain there.
 
-Next P1 actions: obtain successful nupkgs, normalize/import new isolated packs,
+Next P1 actions: finish Bionic, normalize/import its isolated pack,
 update both product runtime pins to the reviewed common revision, build/check
 matching Loader archives, and record artifact identities outside Git. Patcher
 win-x64 is ready locally. Maintainer device acceptance remains pending. NuGet

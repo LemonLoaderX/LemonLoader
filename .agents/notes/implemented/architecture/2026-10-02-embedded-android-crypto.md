@@ -50,8 +50,13 @@ public Loader archives do not carry a standalone helper in embedded mode.
   passes for the bootstrap and the complete Android crypto shim, including the
   explicit export. The compiled bootstrap contains the exact verified DEX bytes.
   Runtime profile tests and workspace PowerShell/Bash script checks pass.
-- Device crypto/TLS and namespace acceptance remains a separate, non-installing
-  gate. The full runtime pack and product release have not been rebuilt.
+- Patcher's test entry can additionally validate actual Release ZIPs using its
+  production ReleaseValidator, without game inputs or APK installation. Runtime
+  packaging accepts an explicit development pack, validates it and preserves its
+  development identity in isolated output. Regressions cover locked-mode rejection,
+  archive round-trip and reproducibility.
+- The Android runtime pack and matching Loader development archive are rebuilt.
+  Bionic rebuilding and device crypto/TLS/namespace acceptance remain incomplete.
 
 ## Consequences
 
@@ -77,6 +82,10 @@ escaped local-ref cleanup through required_method's C++ exception. The loader
 now checks that lookup directly, clears the pending Java exception and releases
 the local class reference; the host regression verifies no buffer or module is
 created on this failure. The Android overview API table is corrected to API 26.
+Actual rebuilt-pack inspection also exposed an upstream raw crypto DEX copied
+by the old staging extension filter. Embedded staging now publishes only native
+SO inputs from that directory, rather than maintaining a historical filename
+denylist; all helper DEX bytes stay build inputs, not runtime release files.
 
 Remaining limitations: ART loading and real TLS are unqualified; native runtime
 initialization still inherits upstream fatal checks for incompatible Java method

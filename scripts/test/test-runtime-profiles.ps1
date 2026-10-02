@@ -65,6 +65,18 @@ try {
         & $import -RuntimeProfile $profile.name -SourceRoot $pack -Destination $imported -OpenSslLicense $license -Development | Out-Null
         Test-RuntimeProfilePack -Root $imported -Profile $profile -Development
         Reject { Test-RuntimeProfilePack -Root $imported -Profile $profile }
+        $package = Join-Path $PSScriptRoot '../build/package-runtime.ps1'
+        $archives = Join-Path $root ('archives-' + $profile.name)
+        Reject { & $package -RuntimeProfile all -RuntimePackRoot $imported -OutputRoot $archives -Development }
+        Reject { & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives }
+        & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives -Development
+        $zip = Join-Path $archives "dotnet-runtime-$($profile.version)-$($profile.rid).zip"
+        $firstHash = (Get-FileHash -LiteralPath $zip).Hash
+        & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives -Development
+        if ((Get-FileHash -LiteralPath $zip).Hash -cne $firstHash) { throw 'Runtime archive is not reproducible.' }
+        $unpacked = Join-Path $root ('unpacked-' + $profile.name)
+        Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
+        Test-RuntimeProfilePack -Root $unpacked -Profile $profile -Development
         $identity.sourceRevision = $profile.revision
         $identity.developmentBuild = $false
         $identity | ConvertTo-Json | Set-Content "$pack/runtime-provenance.json"
@@ -81,7 +93,7 @@ try {
         Remove-Item -LiteralPath "$pack/managed/System.Net.Http.dll"
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
     }
-    Write-Host 'PASS: profile selection, development import isolation, identity, RID, missing/tampered/unexpected inputs'
+    Write-Host 'PASS: profile selection, development import/package isolation, reproducibility, identity, RID, missing/tampered/unexpected inputs'
 } finally {
     $allowed=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../../Output/Tests'))+[IO.Path]::DirectorySeparatorChar
     if(!$root.StartsWith($allowed,[StringComparison]::OrdinalIgnoreCase)){throw 'Unsafe test cleanup'}

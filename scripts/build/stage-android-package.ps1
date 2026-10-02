@@ -274,7 +274,7 @@ Get-ChildItem -LiteralPath $runtimeManaged -File |
     Copy-Item -Destination $sharedRuntimeOutput -Force
 Get-ChildItem -LiteralPath $runtimeNative -File |
     Where-Object {
-        $_.Extension -in @(".so", ".dex") -and
+        ($_.Extension -eq ".so" -or (!$embeddedCrypto -and $_.Extension -eq ".dex")) -and
         $_.Name -ne "libhostfxr.so" -and
         ($useOpenSsl -or $_.Name -ne "libSystem.Security.Cryptography.Native.OpenSsl.so") -and
         $_.Name -ne $coreClrCryptoDexName -and
