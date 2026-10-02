@@ -36,3 +36,8 @@ ulimit -c 0
     -I"$native_root/include" -I"$native_root/src" \
     "$test_root/system_exit_test.cpp" -o "$build_root/system-exit-test"
 "$build_root/system-exit-test" "$fixture/system-exit"
+"${CXX:-c++}" -std=c++17 -ffunction-sections -fdata-sections \
+    -I"$build_root/include" -I"$test_root/stubs" -I"$repository_root/tests/Android/Logging/stubs" \
+    -I"$native_root/include" -I"$native_root/src" \
+    "$test_root/editable_deployment_test.cpp" -Wl,--gc-sections -o "$build_root/editable-deployment-test"
+"$build_root/editable-deployment-test" "$fixture/editable-deployment"

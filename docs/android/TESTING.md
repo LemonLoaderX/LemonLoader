@@ -26,6 +26,9 @@ The native bootstrap host suite includes system-exit recovery tests against
 the NDK JNI interface: API gating, current-process selection, exact trace bytes,
 stream errors/closure, retry, capacity limits and safe retention. These fake-JNI
 tests do not establish OEM tombstone availability or Android permission behavior.
+The same suite exercises editable deployment through real extraction/transaction
+code with fake APK/JNI inputs: stale/absent metadata, add/edit/delete, user-edit
+protection, no unchanged-package scan and pre-hook Loader disabling on failure.
 
 For native-hook changes, run the maintained Dobby far-target regression on both
 a native ARM64 device and any supported native-bridge emulator:

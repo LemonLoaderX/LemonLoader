@@ -50,7 +50,8 @@ ignored local records; keep only stable decisions and commands in repository doc
   an explicit runtime initialization export; earlier runtime packs lack it.
 - Identity generation is not entirely in Patcher: Loader staging produces
   runtime/payload identities; Patcher finishes game-specific deployment and
-  Interop identities; the native host verifies deployment revisions and files.
+  Interop identities. The native host reads actual deployment assets and optional
+  policies without declared revision/hash checks; runtime-domain gates remain.
 - Native logging flushes normal writes, but resetting Latest.log and configuring
   history are separate startup stages. A flush alone is not a crash recorder.
 - Product repos already have dependency manifests. Parent scripts/gitlinks and

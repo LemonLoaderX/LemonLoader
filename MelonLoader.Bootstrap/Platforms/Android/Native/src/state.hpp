@@ -14,6 +14,7 @@ struct RuntimePaths {
     std::string internal_data_directory;
     std::string dotnet_directory;
     std::string runtime_rid = "android-arm64";
+    bool loader_disabled = false;
 };
 
 extern JavaVM* java_vm;

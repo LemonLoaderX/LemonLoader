@@ -4,7 +4,9 @@
 struct AAssetManager {};
 struct AAsset {};
 constexpr int AASSET_MODE_STREAMING = 2;
+constexpr int AASSET_MODE_BUFFER = 3;
 AAsset* AAssetManager_open(AAssetManager*, const char*, int);
 int AAsset_read(AAsset*, void*, size_t);
 int64_t AAsset_getLength64(AAsset*);
+int64_t AAsset_getLength(AAsset*);
 void AAsset_close(AAsset*);

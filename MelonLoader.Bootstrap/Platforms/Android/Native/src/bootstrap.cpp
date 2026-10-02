@@ -107,12 +107,14 @@ jboolean native_load_impl(JNIEnv* env, jstring native_library_directory) {
     }
     reset_latest_log();
     recover_system_exit(env);
-    if (!extract_runtime_assets() || !install_symbol_redirect()) {
+    if (!extract_runtime_assets() || (!runtime_paths.loader_disabled && !install_symbol_redirect())) {
         return JNI_FALSE;
     }
     unity_load_guard.release();
     native_load_state = NativeLoadState::loaded;
-    log_line("Pure NDK Android bootstrap initialized");
+    log_line(runtime_paths.loader_disabled
+        ? "LemonLoader disabled for this process; continuing with the original game"
+        : "Pure NDK Android bootstrap initialized");
     return JNI_TRUE;
 }
 

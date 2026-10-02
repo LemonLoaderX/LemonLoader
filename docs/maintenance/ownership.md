@@ -47,23 +47,19 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   domain hashes. These are not Patcher-only computations.
 - Patcher validates the release, adds generated Interop/deployment files and
   recomputes final domain identities and deployment revision/policies.
-- The native host parses these identities, computes deployment revision and
-  verifies staged content. Deployment invalidity currently shares the payload
-  failure path; this needs a behavioral separation, not just a helper relocation.
-  In bootstrap native_load_impl, extraction/redirect failure returns JNI_FALSE
-  while the Unity rollback guard remains active. Optional deployment isolation
-  must occur before hooks/runtime startup or use a separately verified fallback;
-  simply changing that return to success is unsafe.
+- The native host retains runtime identity checks but reads deployment from
+  actual assets and optional path policies, ignoring declared hashes/revision.
+  Package lastUpdateTime supplies local freshness. Optional deployment errors
+  disable Loader before symbol redirects; Unity remains loaded. Required runtime
+  extraction and redirect failures retain their rollback path.
 - Candidate destination: a minimal Loader-owned file layout/extraction/update
   contract, with optional Patcher. Remove unnecessary metadata requirements first;
   do not assume shared metadata-generation tooling is needed. No per-file
   diagnostic system or routine startup scan is requested.
 - Declared deployment revision is not an authenticity boundary: an APK editor
-  can change content and metadata together. Its real consumers are refresh-once,
-  obsolete-file actions and the unchanged-deployment fast path. P3 evaluates
-  removing global revision and deriving update decisions locally; stale revision
-  validation must not gate game startup. Per-file previous hashes may still be
-  useful for preserving user modifications, independently of trust.
+  can change content and metadata together. The current consumer no longer uses
+  it for admission or freshness. Per-file previous hashes support user-edit
+  preservation only during updates or explicit enforcement.
 - Normal extraction compares a domain hash to its saved marker and directory
   existence; it does not recompute installed file hashes. Release validation
   separately checks individual files. Neither requires a new diagnostic framework.

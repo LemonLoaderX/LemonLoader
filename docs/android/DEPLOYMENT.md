@@ -1,25 +1,26 @@
 # Packaged deployment
 
-This document defines the layout v8 deployment contract for files preloaded below the
-runtime MelonLoader base directory. It is the design authority for deployment
-profiles, per-file policies, ownership state, and failure recovery.
+Packaged files below `assets/LemonLoader/deployment` are installed into the
+runtime MelonLoader base directory. Actual APK files are the input; a generated
+file inventory, mixed hash or deployment revision is not an installation gate.
 
-## Packaging interface
+## Editable Inputs
 
-Deployment profiles (`development`, `production`, `locked`) control installed
-file policies. They are independent of the runtime profile (`android`, `bionic`)
-and the build's development-source switch. Choosing a deployment policy neither
-changes the runtime nor qualifies a development build for release.
+Files can be added, edited or removed from that tree with another installer or
+APK editor. Reinstall the edited APK as an Android update with the same package
+and signing identity. No deployment hash/revision regeneration is required.
+Local destinations retain their policy's user-edit behavior.
 
-Developers select one profile and may add a small number of exact-file or
-`directory/**` overrides. LemonLoader.Patcher resolves those rules at package
-time and writes one concrete policy for every file in `payload.json`. Native
-code never reimplements profile defaults.
+`payload.json` may contain a `deploymentFiles` array with optional per-path
+policies. Only `path` and `policy` are consumed; `policy` defaults to `seed`.
+Files absent from the array also use `seed`. Old entries for removed assets do
+not make those assets required. Declared `size`, `sha256`, `deploymentSha256`,
+`deploymentRevisionSha256` and `deploymentProfile` are ignored by this consumer.
+Unsafe/duplicate paths, file/directory conflicts and unknown policies are errors.
+Bootstrap-reserved paths and symbolic-link destinations remain prohibited.
 
-Rule precedence is exact file, longest matching directory, profile default,
-then `seed`. Paths are case-sensitive normalized relative paths. File/directory
-target conflicts and paths reserved by the bootstrap are rejected before the
-APK is produced.
+Patcher continues producing legacy metadata for compatibility with older Loader
+consumers. Its packaging profiles resolve concrete policies:
 
 | Profile | Mods, Plugins, UserLibs | UserData | Other directories |
 | --- | --- | --- | --- |
@@ -27,71 +28,58 @@ APK is produced.
 | `production` | `refresh` | `upgrade` | `seed` |
 | `locked` | `enforce` | `upgrade` | `seed` |
 
-The manifest keeps two independent hashes:
+These profiles are independent of Android/Bionic runtime selection and the
+development-source build switch. Enforce is an update policy, not anti-tamper
+protection against an APK editor. Release/download consistency checks remain
+separate from editable installed deployment.
 
-- `deploymentSha256` proves the deployment asset tree's paths and bytes.
-- `deploymentRevisionSha256` also includes every effective file policy. It is
-  the rollout identity used by `refresh` and obsolete-file handling.
+## Updates And Policies
 
-Changing only a profile label without changing any effective file policy does
-not create a new rollout.
+Android's `PackageInfo.lastUpdateTime` invalidates the private deployment cache.
+The first launch of a new APK processes its assets. Ordinary unchanged-package
+startup does not traverse the deployment tree or hash files. Explicit `enforce`
+overrides retain continuous checks using locally saved packaged hashes.
 
-## File policies
+- `seed`: install a missing file when processing an APK update, otherwise preserve.
+- `upgrade`: replace only if the destination still matches the previous packaged
+  hash. Preserve user modifications.
+- `refresh`: replace on each APK update, then preserve user changes until the next
+  update. An update unrelated to Mods still starts a new refresh rollout.
+- `enforce`: restore packaged bytes when missing or different; continuously checked
+  against prior locally recorded packaged content.
 
-`seed` installs a missing file and otherwise preserves the destination.
+A locally deleted seed/refresh file is not reseeded on every unchanged launch.
+Reinstall/update the APK to process packaged inputs again. When update time is
+unavailable, Loader retries the transaction instead of trusting a stale cache.
 
-`upgrade` replaces an existing file only when it still matches the hash from
-the last package that managed it. A user-modified file is preserved.
+When a previously managed file disappears from the APK, seed preserves it,
+upgrade removes it only if unchanged, and refresh/enforce removes it on the next
+APK update. Files never managed by Loader are never removed.
 
-`refresh` replaces a mismatching file once when the deployment revision
-changes. ADB or user changes made after that rollout survive later launches
-until another deployment revision is installed.
+## Ownership And Transactions
 
-`enforce` restores the packaged bytes on every launch when the destination is
-missing or has a different hash.
+`.lemonloader-deployment-state` stores prior packaged hashes and policies only
+for owned files. Its `.revision` filename is retained for local-state migration,
+but now contains the APK update token, not a declared deployment digest. Old
+digest state triggers one normal update transaction; it is not an admission check.
 
-Files not represented in deployment state are never removed. When a previously
-managed file disappears from a new manifest, `seed` preserves it, `upgrade`
-removes it only if it is unchanged, and `refresh` or `enforce` removes it on the
-new rollout. Every replacement or removal is backed up first.
+A file becomes owned when installed/replaced or when a preexisting file equals
+the actual packaged bytes. Merely observing a different user-owned file does
+not claim it. Local hashes support upgrade/ownership decisions, not routine
+integrity scans or per-file corruption diagnostics.
 
-## Ownership state
+1. Recover prior state, then extract actual APK deployment assets into owned staging.
+2. Validate relative/reserved paths and destination shapes; read staged bytes for
+   the existing update-policy comparisons.
+3. Read prior ownership, plan changes and back up replacements/removals.
+4. Apply changes with sibling temporary files and POSIX rename.
+5. Atomically publish the next ownership state, clean staging and prune backups.
 
-State is stored below `.lemonloader-deployment-state` in the MelonLoader base
-directory. A file becomes managed when the bootstrap installs or replaces it,
-or when an existing file already equals the packaged hash. Merely seeing a
-different pre-existing file does not claim it.
+An apply or state-commit failure rolls back completed operations in reverse order.
+Old state remains authoritative. If deployment parsing/extraction/publication
+fails, Loader is disabled before installing symbol redirects or starting managed
+code; Unity remains loaded and the original game can start. Mods do not execute
+against a possibly incomplete deployment. Errors remain in retained logs.
 
-State records the last packaged hash and policy, not an assumption that the
-current destination is unchanged. This allows `upgrade` to detect user edits
-and allows `refresh` to preserve edits until the next rollout.
-
-Layout v4 has no ownership state. On the first v5 launch, `development` keeps
-existing files, while `production` and `locked` apply their resolved policies
-as a new rollout. No v4 state is guessed. Current startup does not inspect or
-delete the old v4 deployment-hash marker; ownership state is authoritative for
-the current layout, and historical files are otherwise left untouched.
-
-## Native transaction
-
-After crash-state recovery, a matching deployment revision takes a fast path.
-`seed`, `upgrade`, and `refresh` destinations are checked only for existence;
-`enforce` destinations additionally require a matching content hash. When every
-destination satisfies its policy, startup does not open APK deployment assets,
-create staging, read or rewrite per-file state, or scan backup generations.
-
-A new revision, missing destination, or changed `enforce` destination performs
-the full deployment transaction:
-
-1. Extract the complete APK deployment tree into bootstrap-owned staging.
-2. Validate every path, size, SHA-256, reserved name, and file/directory shape.
-3. Read prior ownership state, inspect destinations, and calculate all actions.
-4. Preflight parent paths and back up every destination that will change.
-5. Apply file changes with sibling temporary files and POSIX rename.
-6. Atomically publish the complete next ownership-state tree.
-7. Remove staging and prune old backup generations.
-
-State is not changed while files are being applied. If an apply or state-commit
-step fails, completed file actions are rolled back in reverse order and the old
-state remains authoritative. A later launch can therefore retry from a coherent
-starting point. Unknown files and user-owned files are outside the transaction.
+This document covers deployment only. Runtime/Interop metadata and required
+runtime extraction have their separate current contract in [ARTIFACTS.md](ARTIFACTS.md).

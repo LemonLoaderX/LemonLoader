@@ -116,14 +116,15 @@ uninstall or clear app data. External tooling should use the platform's replace
 installation path and should record `firstInstallTime` before and after the
 update. The value must remain unchanged.
 
-The runtime and deployment hashes in `assets/LemonLoader/payload.json`
-independently invalidate LemonLoader's extraction caches. A replacement runtime
+Runtime domain hashes in `assets/LemonLoader/payload.json` invalidate runtime
+extraction caches. Deployment uses Android's APK update time instead, without
+requiring deployment hash/revision regeneration for manual asset edits. A replacement runtime
 is copied into a staging directory before replacing the prior extraction, so
 files removed from the new payload do not survive indefinitely. The packaged
 deployment tree mirrors the MelonLoader base directory, so an APK can preload
-`Mods`, `Plugins`, `UserLibs`, or nested `UserData` files. Layout v8 additionally
-records a deployment revision and a concrete policy for every packaged file.
-Development packages seed only missing files; production and locked profiles can
+`Mods`, `Plugins`, `UserLibs`, or nested `UserData` files. Deployment policies are
+optional per-path overrides; undeclared assets use seed. On APK updates,
+development packages seed missing files; production and locked profiles can
 upgrade, refresh, or enforce selected directories without requiring a declaration
 for each file. Replacements and obsolete managed files are backed up, and unknown
 files are never removed. See [DEPLOYMENT.md](DEPLOYMENT.md) for the complete

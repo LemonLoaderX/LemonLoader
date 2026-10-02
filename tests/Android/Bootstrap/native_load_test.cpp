@@ -6,7 +6,7 @@
 
 namespace {
 enum class Failure { none, missing_export, unity_load, environment, environment_jni,
-                     extraction, extraction_jni, redirect };
+                     extraction, extraction_jni, redirect, optional_deployment };
 Failure failure = Failure::none;
 bool pending = false, throw_unload = false;
 int opens = 0, closes = 0, loads = 0, unloads = 0, global_deletes = 0;
@@ -81,6 +81,7 @@ bool initialize_android_environment(JNIEnv*) {
 bool extract_runtime_assets() {
     ++extraction_calls;
     if (failure == Failure::extraction_jni) fail_jni();
+    if (failure == Failure::optional_deployment) runtime_paths.loader_disabled = true;
     return failure != Failure::extraction;
 }
 bool install_symbol_redirect() {
@@ -136,4 +137,11 @@ int main() {
     assert(closes == 0 && unloads == 0 && global_deletes == 0);
     assert(unity_handle && asset_manager && asset_manager_object);
     std::cout << "PASS successful NativeLoader load remains process-scoped and idempotent\n";
+    reset(Failure::optional_deployment);
+    assert(native_load(&env, nullptr, nullptr) == JNI_TRUE);
+    assert(runtime_paths.loader_disabled && redirect_calls == 0);
+    assert(unloads == 0 && closes == 0 && unity_handle);
+    assert(native_load(&env, nullptr, nullptr) == JNI_TRUE && native_unload(&env, nullptr) == JNI_TRUE);
+    assert(extraction_calls == 1 && redirect_calls == 0);
+    std::cout << "PASS optional deployment failure keeps Unity and disables Loader before hooks\n";
 }

@@ -97,8 +97,11 @@ assemblies, not unrelated NuGet cache files.
   startup uses each domain marker plus directory existence to avoid rehashing the
   complete runtime. The payload also records a deployment
   revision containing effective policies, the selected profile, and one policy
-  per packaged file. Patcher recomputes all of these after adding game Interop
-  and deployment inputs.
+  per packaged file for old-consumer compatibility. Patcher recomputes these
+  at packaging time. The current Loader ignores deployment hash/revision/size
+  metadata and derives editable deployment from actual assets plus optional
+  policy overrides; see [DEPLOYMENT.md](DEPLOYMENT.md). Runtime-domain extraction
+  and identity checks retain their separate contract.
 - Android Release assembly omits desktop `runtime/loader/Documentation` and
   Release-mode DAC/DBI diagnostics at the staging source. Patcher and runtime
   consumers do not maintain path blacklists or delete historical copies merely

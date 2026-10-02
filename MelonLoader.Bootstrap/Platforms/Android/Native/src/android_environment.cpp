@@ -72,7 +72,7 @@ std::vector<std::string> list_asset_children(const std::string& asset_path) {
     JNIEnv* env = nullptr;
     if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK ||
         env == nullptr || asset_manager_object == nullptr) {
-        return {};
+        throw std::runtime_error("Could not access APK assets while listing a directory");
     }
 
     jclass manager_class = env->GetObjectClass(asset_manager_object);
@@ -84,7 +84,7 @@ std::vector<std::string> list_asset_children(const std::string& asset_path) {
     env->DeleteLocalRef(path);
     env->DeleteLocalRef(manager_class);
     if (clear_exception(env, "AssetManager.list") || values == nullptr) {
-        return {};
+        throw std::runtime_error("Could not list APK asset directory '" + asset_path + "'");
     }
 
     std::vector<std::string> result;
@@ -111,6 +111,11 @@ bool extract_asset_node(
             return false;
         }
         for (const std::string& child : children) {
+            if (child.empty() || child == "." || child == ".." ||
+                child.find('/') != std::string::npos || child.find('\\') != std::string::npos) {
+                log_error("APK asset contains an unsafe child name");
+                return false;
+            }
             if (!extract_asset_node(asset_path + '/' + child, destination / child)) {
                 return false;
             }
@@ -138,14 +143,12 @@ bool read_file(const std::filesystem::path& path, std::string& output) {
 
 struct DeploymentFileDescriptor {
     std::string path;
-    uint64_t size = 0;
     std::string hash;
     deployment::Policy policy = deployment::Policy::seed;
 };
 
 bool is_safe_relative_path(const std::string& value);
 bool compute_file_sha256(const std::filesystem::path& path, std::string& output);
-bool compute_text_sha256(const std::string& value, std::string& output);
 
 bool copy_if_changed(
     const std::string& asset_path,
@@ -278,12 +281,58 @@ struct PayloadDescriptor {
     std::string loader_hash;
     std::string dotnet_hash;
     std::string interop_hash;
-    std::string deployment_hash;
     std::string managed_runtime_identity_hash;
     std::string deployment_profile;
-    std::string deployment_revision;
+    std::string deployment_stamp;
     std::vector<DeploymentFileDescriptor> deployment_files;
+    bool deployment_valid = true;
 };
+
+bool read_deployment_options(JNIEnv* env, jclass json_class, jobject json, PayloadDescriptor& descriptor) {
+    const auto opt_array = required_method(env, json_class, "optJSONArray", "(Ljava/lang/String;)Lorg/json/JSONArray;");
+    const auto opt_string = required_method(env, json_class, "optString", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    const auto read_string = [&](jobject object, const char* key, const char* fallback) {
+        auto name = new_java_string(env, key);
+        auto default_value = new_java_string(env, fallback);
+        auto value = static_cast<jstring>(checked_object_call(env, object, opt_string, name, default_value));
+        const auto text = java_string(env, value);
+        env->DeleteLocalRef(value);
+        env->DeleteLocalRef(default_value);
+        env->DeleteLocalRef(name);
+        return text;
+    };
+    descriptor.deployment_profile = "editable";
+    auto name = new_java_string(env, "deploymentFiles");
+    auto files = checked_object_call(env, json, opt_array, name);
+    env->DeleteLocalRef(name);
+    descriptor.deployment_files.clear();
+    if (!files) return true;
+    auto array_class = env->GetObjectClass(files);
+    const auto length = required_method(env, array_class, "length", "()I");
+    const auto get = required_method(env, array_class, "getJSONObject", "(I)Lorg/json/JSONObject;");
+    const auto count = env->CallIntMethod(files, length);
+    if (clear_exception(env, "Read deployment policy count") || count < 0) return false;
+    std::map<std::string, bool> paths;
+    for (jint index = 0; index < count; ++index) {
+        auto file = checked_object_call(env, files, get, index);
+        DeploymentFileDescriptor entry;
+        entry.path = read_string(file, "path", "");
+        const auto policy = read_string(file, "policy", "seed");
+        env->DeleteLocalRef(file);
+        if (!is_safe_relative_path(entry.path) || !deployment::parse(policy, entry.policy) ||
+            !paths.emplace(entry.path, true).second) return false;
+        descriptor.deployment_files.push_back(std::move(entry));
+    }
+    for (const auto& file : descriptor.deployment_files) {
+        for (auto separator = file.path.find('/'); separator != std::string::npos;
+             separator = file.path.find('/', separator + 1)) {
+            if (paths.count(file.path.substr(0, separator))) return false;
+        }
+    }
+    env->DeleteLocalRef(array_class);
+    env->DeleteLocalRef(files);
+    return true;
+}
 
 bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     std::string json;
@@ -310,13 +359,9 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         json_class, "getInt", "(Ljava/lang/String;)I");
     jmethodID get_string_method = required_method(env,
         json_class, "getString", "(Ljava/lang/String;)Ljava/lang/String;");
-    jmethodID get_long = required_method(env,
-        json_class, "getLong", "(Ljava/lang/String;)J");
-    jmethodID get_array = required_method(env,
-        json_class, "getJSONArray", "(Ljava/lang/String;)Lorg/json/JSONArray;");
     const bool method_resolution_failed = clear_exception(env, "Resolve JSONObject methods");
     if (constructor == nullptr || get_int == nullptr || get_string_method == nullptr ||
-        get_long == nullptr || get_array == nullptr || method_resolution_failed) {
+        method_resolution_failed) {
         env->DeleteLocalRef(json_class);
         return false;
     }
@@ -377,102 +422,27 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         read_property("loaderSha256", descriptor.loader_hash) &&
         read_property("dotnetSha256", descriptor.dotnet_hash) &&
         read_property("interopSha256", descriptor.interop_hash) &&
-        read_property("deploymentSha256", descriptor.deployment_hash) &&
         read_property("managedRuntimeBackend", managed_runtime_backend) &&
         read_property(
             "managedRuntimeIdentitySha256",
             descriptor.managed_runtime_identity_hash) &&
-        read_property("deploymentProfile", descriptor.deployment_profile) &&
-        read_property("deploymentRevisionSha256", descriptor.deployment_revision) &&
         is_sha256(descriptor.loader_hash) &&
         is_sha256(descriptor.dotnet_hash) &&
         is_sha256(descriptor.interop_hash) &&
-        is_sha256(descriptor.deployment_hash) &&
         is_sha256(descriptor.managed_runtime_identity_hash) &&
-        managed_runtime_backend == "coreclr" &&
-        is_sha256(descriptor.deployment_revision) &&
-        (descriptor.deployment_profile == "development" ||
-         descriptor.deployment_profile == "production" ||
-         descriptor.deployment_profile == "locked");
-
-    jstring files_name = new_java_string(env, "deploymentFiles");
-    jobject files = valid
-        ? checked_object_call(env, json_object, get_array, files_name)
-        : nullptr;
-    env->DeleteLocalRef(files_name);
-    if (valid && (clear_exception(env, "Read deployment file manifest") || files == nullptr)) {
-        valid = false;
-    }
-    jclass array_class = nullptr;
-    jmethodID array_length = nullptr;
-    jmethodID array_object = nullptr;
+        managed_runtime_backend == "coreclr";
     if (valid) {
-        array_class = env->GetObjectClass(files);
-        array_length = required_method(env, array_class, "length", "()I");
-        array_object = required_method(env,
-            array_class, "getJSONObject", "(I)Lorg/json/JSONObject;");
-        valid = array_length != nullptr && array_object != nullptr &&
-            !clear_exception(env, "Resolve JSONArray methods");
-    }
-    std::map<std::string, bool> unique_paths;
-    const jint file_count = valid ? env->CallIntMethod(files, array_length) : 0;
-    if (valid && clear_exception(env, "Read deployment file count")) {
-        valid = false;
-    }
-    descriptor.deployment_files.clear();
-    descriptor.deployment_files.reserve(valid ? static_cast<size_t>(file_count) : 0);
-    for (jint index = 0; valid && index < file_count; ++index) {
-        jobject file = checked_object_call(env, files, array_object, index);
-        if (clear_exception(env, "Read deployment file entry") || file == nullptr) {
-            env->DeleteLocalRef(file);
-            valid = false;
-            break;
-        }
-        DeploymentFileDescriptor entry;
-        std::string policy;
-        jstring size_name = new_java_string(env, "size");
-        const jlong size = env->CallLongMethod(file, get_long, size_name);
-        env->DeleteLocalRef(size_name);
-        valid = !clear_exception(env, "Read deployment file size") && size >= 0 &&
-            read_object_string(file, "path", entry.path) &&
-            read_object_string(file, "sha256", entry.hash) &&
-            read_object_string(file, "policy", policy) &&
-            is_safe_relative_path(entry.path) &&
-            is_sha256(entry.hash) &&
-            deployment::parse(policy, entry.policy) &&
-            unique_paths.emplace(entry.path, true).second;
-        entry.size = size >= 0 ? static_cast<uint64_t>(size) : 0;
-        env->DeleteLocalRef(file);
-        if (valid) {
-            descriptor.deployment_files.push_back(std::move(entry));
-        }
-    }
-    if (array_class != nullptr) {
-        env->DeleteLocalRef(array_class);
-    }
-    if (files != nullptr) {
-        env->DeleteLocalRef(files);
-    }
-    if (valid) {
-        std::string revision_input = "deployment-revision=1";
-        for (const DeploymentFileDescriptor& file : descriptor.deployment_files) {
-            size_t separator = file.path.find('/');
-            while (valid && separator != std::string::npos) {
-                valid = unique_paths.find(file.path.substr(0, separator)) == unique_paths.end();
-                separator = file.path.find('/', separator + 1);
+        if (env->PushLocalFrame(32) != JNI_OK) {
+            clear_exception(env, "Prepare optional deployment policy frame");
+            descriptor.deployment_valid = false;
+        } else {
+            try { descriptor.deployment_valid = read_deployment_options(env, json_class, json_object, descriptor); }
+            catch (...) {
+                if (env->ExceptionCheck()) env->ExceptionClear();
+                descriptor.deployment_valid = false;
             }
+            env->PopLocalFrame(nullptr);
         }
-        std::sort(
-            descriptor.deployment_files.begin(),
-            descriptor.deployment_files.end(),
-            [](const auto& left, const auto& right) { return utf16_ordinal_less(left.path, right.path); });
-        for (const DeploymentFileDescriptor& file : descriptor.deployment_files) {
-            revision_input += '\n' + file.path + '|' + std::to_string(file.size) + '|' +
-                file.hash + '|' + deployment::name(file.policy);
-        }
-        std::string actual_revision;
-        valid = valid && compute_text_sha256(revision_input, actual_revision) &&
-            actual_revision == descriptor.deployment_revision;
     }
     env->DeleteLocalRef(json_object);
     env->DeleteLocalRef(json_class);
@@ -729,21 +699,17 @@ bool deploy_assets_if_changed(
            (installed_revision.back() == '\r' || installed_revision.back() == '\n')) {
         installed_revision.pop_back();
     }
-    const bool revision_changed = installed_revision != payload.deployment_revision;
+    const bool revision_changed = payload.deployment_stamp.empty() || installed_revision != payload.deployment_stamp;
 
     const std::string asset_path = "LemonLoader/deployment";
-    const std::filesystem::path staging = base / ".packaged-deployment";
-    std::filesystem::remove_all(staging, error);
-    if (error) {
-        log_error("Failed to clean packaged deployment staging: " + error.message());
-        return false;
-    }
-
     if (!revision_changed) {
         bool deployment_current = true;
         for (const DeploymentFileDescriptor& file : payload.deployment_files) {
+            if (!deployment::requires_continuous_content_check(file.policy)) continue;
             const std::filesystem::path relative(file.path);
             const std::filesystem::path destination = base / relative;
+            InstalledDeploymentFile prior;
+            if (!read_deployment_state(state_root / relative, prior)) continue;
             bool exists = false;
             if (!validate_destination_path(base, relative, exists)) {
                 log_error("Packaged deployment file has an unsafe destination: '" +
@@ -761,7 +727,7 @@ bool deploy_assets_if_changed(
                               destination.string() + "'");
                     return false;
                 }
-                if (current_hash != file.hash) {
+                if (current_hash != prior.hash) {
                     deployment_current = false;
                     break;
                 }
@@ -772,19 +738,25 @@ bool deploy_assets_if_changed(
         }
     }
 
+    const std::filesystem::path staging = base / ".packaged-deployment";
+    std::filesystem::remove_all(staging, error);
+    if (error) {
+        log_error("Failed to clean packaged deployment staging: " + error.message());
+        return false;
+    }
     const std::vector<std::string> children = list_asset_children(asset_path);
-    if ((!children.empty() || !payload.deployment_files.empty()) &&
+    if (!children.empty() &&
         !extract_asset_node(asset_path, staging)) {
         log_error("Failed to extract packaged deployment files");
         std::filesystem::remove_all(staging, error);
         return false;
     }
 
-    std::map<std::string, const DeploymentFileDescriptor*> manifest_files;
+    std::map<std::string, deployment::Policy> policies;
     for (const DeploymentFileDescriptor& file : payload.deployment_files) {
-        manifest_files.emplace(file.path, &file);
+        policies.emplace(file.path, file.policy);
     }
-    size_t staged_count = 0;
+    std::vector<DeploymentFileDescriptor> deployment_files;
     error.clear();
     const bool staging_exists = std::filesystem::exists(staging, error);
     if (!error && staging_exists && !std::filesystem::is_directory(staging, error)) {
@@ -801,20 +773,30 @@ bool deploy_assets_if_changed(
             if (!regular) continue;
             const std::filesystem::path relative =
                 std::filesystem::relative(iterator->path(), staging, error);
-            if (error ||
-                manifest_files.find(relative.generic_string()) == manifest_files.end()) {
-                log_error("Packaged deployment contains a file not declared in payload.json");
+            DeploymentFileDescriptor file;
+            file.path = relative.generic_string();
+            if (error || !is_safe_relative_path(file.path)) {
+                log_error("Packaged deployment contains an unsafe file path");
                 std::filesystem::remove_all(staging, error);
                 return false;
             }
-            ++staged_count;
+            if (!compute_file_sha256(iterator->path(), file.hash)) {
+                log_error("Could not read packaged deployment file '" + file.path + "'");
+                std::filesystem::remove_all(staging, error);
+                return false;
+            }
+            const auto policy = policies.find(file.path);
+            if (policy != policies.end()) file.policy = policy->second;
+            deployment_files.push_back(std::move(file));
         }
     }
-    if (error || staged_count != manifest_files.size()) {
-        log_error("Packaged deployment does not match its payload.json file manifest");
+    if (error) {
+        log_error("Could not enumerate packaged deployment assets: " + error.message());
         std::filesystem::remove_all(staging, error);
         return false;
     }
+    std::map<std::string, const DeploymentFileDescriptor*> manifest_files;
+    for (const auto& file : deployment_files) manifest_files.emplace(file.path, &file);
 
     std::map<std::string, InstalledDeploymentFile> previous_states;
     error.clear();
@@ -861,7 +843,7 @@ bool deploy_assets_if_changed(
     std::filesystem::remove_all(next_state_root, error);
     if (!error) std::filesystem::create_directories(next_state_root, error);
     if (error || !write_text_file(
-            next_state_root / ".revision", payload.deployment_revision + "\n")) {
+            next_state_root / ".revision", payload.deployment_stamp + "\n")) {
         log_error("Failed to prepare packaged deployment state");
         std::filesystem::remove_all(staging, error);
         return false;
@@ -869,22 +851,10 @@ bool deploy_assets_if_changed(
 
     std::vector<DeploymentOperation> operations;
     size_t preserved_count = 0;
-    for (const DeploymentFileDescriptor& file : payload.deployment_files) {
+    for (const DeploymentFileDescriptor& file : deployment_files) {
         const std::filesystem::path relative(file.path);
         const std::filesystem::path staged = staging / relative;
         const std::filesystem::path destination = base / relative;
-        if (std::filesystem::file_size(staged, error) != file.size || error) {
-            log_error("Packaged deployment size mismatch for '" + file.path + "'");
-            std::filesystem::remove_all(staging, error);
-            return false;
-        }
-        std::string staged_hash;
-        if (!compute_file_sha256(staged, staged_hash) || staged_hash != file.hash) {
-            log_error("Packaged deployment SHA-256 mismatch for '" + file.path + "'");
-            std::filesystem::remove_all(staging, error);
-            return false;
-        }
-
         bool exists = false;
         if (!validate_destination_path(base, relative, exists)) {
             log_error("Packaged deployment file has an unsafe destination: '" +
@@ -957,7 +927,7 @@ bool deploy_assets_if_changed(
     }
 
     const std::filesystem::path backup_root =
-        base / ".lemonloader-backups" / payload.deployment_revision;
+        base / ".lemonloader-backups" / (payload.deployment_stamp.empty() ? "unknown-update" : payload.deployment_stamp);
     if (reject_metadata_symlink(backup_root)) {
         log_error("Packaged deployment backup generation is a symbolic link");
         std::filesystem::remove_all(staging, error);
@@ -1200,87 +1170,6 @@ bool compute_file_sha256(const std::filesystem::path& path, std::string& output)
     return true;
 }
 
-bool compute_text_sha256(const std::string& value, std::string& output) {
-    if (value.size() > static_cast<size_t>(std::numeric_limits<jsize>::max())) {
-        return false;
-    }
-    JNIEnv* env = nullptr;
-    if (java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK ||
-        env == nullptr) {
-        return false;
-    }
-    jclass digest_class = env->FindClass("java/security/MessageDigest");
-    if (clear_exception(env, "FindClass(MessageDigest)") || digest_class == nullptr) {
-        return false;
-    }
-    jmethodID get_instance = required_static_method(env,
-        digest_class,
-        "getInstance",
-        "(Ljava/lang/String;)Ljava/security/MessageDigest;");
-    jmethodID digest_method = required_method(env, digest_class, "digest", "([B)[B");
-    if (get_instance == nullptr || digest_method == nullptr ||
-        clear_exception(env, "Resolve MessageDigest methods")) {
-        env->DeleteLocalRef(digest_class);
-        return false;
-    }
-    jstring algorithm = new_java_string(env, "SHA-256");
-    jobject digest = checked_static_object_call(env, digest_class, get_instance, algorithm);
-    env->DeleteLocalRef(algorithm);
-    if (clear_exception(env, "Create SHA-256 MessageDigest") || digest == nullptr) {
-        env->DeleteLocalRef(digest_class);
-        return false;
-    }
-    jbyteArray input = env->NewByteArray(static_cast<jsize>(value.size()));
-    if (input != nullptr && !value.empty()) {
-        env->SetByteArrayRegion(
-            input,
-            0,
-            static_cast<jsize>(value.size()),
-            reinterpret_cast<const jbyte*>(value.data()));
-    }
-    if (clear_exception(env, "Create deployment revision input") || input == nullptr) {
-        if (input != nullptr) {
-            env->DeleteLocalRef(input);
-        }
-        env->DeleteLocalRef(digest);
-        env->DeleteLocalRef(digest_class);
-        return false;
-    }
-    auto digest_bytes = static_cast<jbyteArray>(
-        checked_object_call(env, digest, digest_method, input));
-    env->DeleteLocalRef(input);
-    const bool digest_failed =
-        clear_exception(env, "Hash deployment revision") || digest_bytes == nullptr;
-    const bool digest_length_invalid =
-        !digest_failed && env->GetArrayLength(digest_bytes) != 32;
-    if (digest_failed || digest_length_invalid) {
-        if (digest_bytes != nullptr) {
-            env->DeleteLocalRef(digest_bytes);
-        }
-        env->DeleteLocalRef(digest);
-        env->DeleteLocalRef(digest_class);
-        return false;
-    }
-    std::array<jbyte, 32> result{};
-    env->GetByteArrayRegion(digest_bytes, 0, 32, result.data());
-    if (clear_exception(env, "Read deployment revision hash")) {
-        env->DeleteLocalRef(digest_bytes);
-        env->DeleteLocalRef(digest);
-        env->DeleteLocalRef(digest_class);
-        return false;
-    }
-    static constexpr char hex[] = "0123456789abcdef";
-    output.resize(64);
-    for (size_t index = 0; index < result.size(); ++index) {
-        const auto byte = static_cast<unsigned char>(result[index]);
-        output[index * 2] = hex[byte >> 4];
-        output[index * 2 + 1] = hex[byte & 0x0f];
-    }
-    env->DeleteLocalRef(digest_bytes);
-    env->DeleteLocalRef(digest);
-    env->DeleteLocalRef(digest_class);
-    return true;
-}
 
 // Keep the process-wide default on both runtime profiles. Android CoreCLR's
 // Java trust store does not cover other OpenSSL consumers loaded by a game/Mod.
@@ -1391,6 +1280,49 @@ bool initialize_android_environment(JNIEnv* env) {
     return true;
 }
 
+std::string deployment_update_stamp() {
+    JNIEnv* env = nullptr;
+    if (!java_vm || java_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK || !env)
+        return {};
+    if (env->PushLocalFrame(16) != JNI_OK) {
+        clear_exception(env, "Prepare package update lookup");
+        return {};
+    }
+    std::string stamp;
+    try {
+        auto player = env->FindClass("com/unity3d/player/UnityPlayer");
+        if (clear_exception(env, "Find Unity activity for package update") || !player)
+            throw std::runtime_error("Cannot find Unity activity");
+        auto field = env->GetStaticFieldID(player, "currentActivity", "Landroid/app/Activity;");
+        if (clear_exception(env, "Resolve Unity activity for package update") || !field)
+            throw std::runtime_error("Cannot resolve Unity activity");
+        auto activity = env->GetStaticObjectField(player, field);
+        if (clear_exception(env, "Read Unity activity for package update") || !activity)
+            throw std::runtime_error("Cannot read Unity activity");
+        auto context = env->FindClass("android/content/Context");
+        auto get_manager = required_method(env, context, "getPackageManager", "()Landroid/content/pm/PackageManager;");
+        auto manager = checked_object_call(env, activity, get_manager);
+        auto manager_class = env->FindClass("android/content/pm/PackageManager");
+        auto get_info = required_method(env, manager_class, "getPackageInfo", "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;");
+        auto package = new_java_string(env, runtime_paths.package_name);
+        auto info = checked_object_call(env, manager, get_info, package, 0);
+        auto info_class = env->FindClass("android/content/pm/PackageInfo");
+        if (clear_exception(env, "Find PackageInfo for package update") || !info_class || !info)
+            throw std::runtime_error("Cannot read package information");
+        auto update_field = env->GetFieldID(info_class, "lastUpdateTime", "J");
+        if (clear_exception(env, "Resolve package lastUpdateTime") || !update_field || !info)
+            throw std::runtime_error("Cannot resolve package update time");
+        const auto updated = env->GetLongField(info, update_field);
+        if (clear_exception(env, "Read package lastUpdateTime")) throw std::runtime_error("Cannot read package update time");
+        if (updated > 0) stamp = "apk-" + std::to_string(updated);
+    } catch (...) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        log_line("[WARNING] Could not read APK update time; packaged deployment will be retried");
+    }
+    env->PopLocalFrame(nullptr);
+    return stamp;
+}
+
 bool extract_runtime_assets() {
     PayloadDescriptor payload;
     if (!read_payload_descriptor(payload)) {
@@ -1434,9 +1366,18 @@ bool extract_runtime_assets() {
         log_error("The extracted managed runtime identity does not match payload.json");
         return false;
     }
-    // Deployment mirrors the MelonLoader base directory. The APK manifest
-    // assigns each file an explicit ownership and replacement policy.
-    return deploy_assets_if_changed(base, payload);
+    payload.deployment_stamp = deployment_update_stamp();
+    bool deployed = false;
+    if (payload.deployment_valid) {
+        try { deployed = deploy_assets_if_changed(base, payload); }
+        catch (const std::exception& error) {
+            log_error(std::string("Packaged deployment failed: ") + error.what());
+        } catch (...) { log_error("Packaged deployment failed"); }
+    } else {
+        log_error("Packaged deployment policy options are invalid");
+    }
+    if (!deployed) runtime_paths.loader_disabled = true;
+    return true;
 }
 
 bool prepare_android_runtime() {
