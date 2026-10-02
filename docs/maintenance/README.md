@@ -7,6 +7,8 @@ Read only the document needed for the current task:
 - [Ownership inventory](ownership.md): current producers, paths and planned owners.
 - [Embedded crypto acceptance](embedded-crypto-acceptance.md): maintainer's later
   device matrix and evidence, without installation/signing changes.
+- [Crash evidence investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md):
+  existing runtime reporter and Android trace boundaries; not implemented yet.
 - [Android status](../android/STATUS.md): current implemented/qualified behavior.
 - [Build guide](../android/BUILDING.md): current supported product commands.
 - [Testing](../android/TESTING.md): automated and device validation ownership.

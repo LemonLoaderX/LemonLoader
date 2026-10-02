@@ -80,8 +80,13 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
   coexist with CoreCLR's handled faults and Android/Unity reporting. Capturing a
   signal is not by itself proof of a fatal crash.
 - Candidate evidence tiers: previous-session logs; minimal bounded crash/session
-  context; maintained native trace tooling; API 30+ exit traces as a supplement;
+  context; maintained native trace tooling; API 30+ exit info (native tombstone
+  streams start at API 31) as a supplement;
   private exact-build symbols and an accessible next-launch export.
+- The rebuilt .NET 11 source already enables an in-process reporter for both
+  target profiles. Prefer validating this before adding signal handlers or a
+  new crash library. Native-only faults may have just a synthesized crash-site
+  frame, not full native unwinding. See the [scoped investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md).
 
 ## Retirement rule
 

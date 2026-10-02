@@ -9,6 +9,10 @@ critical build documentation and pins, and is not published as the project entry
 point. Installation metadata couples optional deployment edits to startup, while
 normal logs alone do not reliably retain native crash evidence on other devices.
 
+The [crash-evidence investigation](../feature/2026-10-02-native-crash-evidence.md)
+owns the narrower runtime-reporter/system-trace alternatives. This proposal
+retains the overall modernization sequence.
+
 ## Proposal
 
 Execute the maintainer's five goals in the staged

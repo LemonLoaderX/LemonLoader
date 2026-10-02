@@ -117,6 +117,8 @@ Do not label them device-qualified or publish them before device acceptance.
 - [ ] Evaluate a maintained Android crash library against a minimal recorder;
   select based on handler coexistence, APK/bootstrap integration, reliability
   and maintenance cost, not the attractiveness of a full dump alone.
+  Existing .NET 11 in-process reporting is a third candidate; see the
+  [scoped investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md).
 - [ ] Preserve last-session logs before truncation, including early-startup
   failures. Prepare bounded report storage before a fault can occur.
 - [ ] Persist crash/session identity, signal/code/fault address, register context,
