@@ -12,18 +12,20 @@ This inventory identifies authorities and retirement boundaries, not local progr
 | Historical parent lock | retained parent `.gitmodules` and gitlinks | no active setup/build authority; preserve for recovery |
 | Loader release CI | Loader `.github/workflows/android.yml` | Loader, retained |
 | Patcher release CI | Patcher workflows and scripts | Patcher, retained |
-| Runtime source build | Loader `build-runtime.ps1` and WSL backend | Loader; parent wrapper retained during migration |
+| Runtime source build | Loader `build-runtime.ps1` and WSL backend | Loader; explicit output roots |
 | Runtime setup | Loader `setup-runtime.ps1` | Loader; non-mutating pinned source setup |
-| Product build entry | Loader `scripts/build.ps1`; parent wrapper retained during migration | Loader |
-| Source setup/checks | product setup/build helpers | parent setup delegates; umbrella status/audit retired |
-| Loader verification | Loader `scripts/verify.ps1`; Patcher retains `scripts/test.ps1` | independent product boundaries; parent delegate temporary |
-| Syntax/helper verification | Loader `scripts/test/test-scripts.ps1`; Patcher `scripts/test-scripts.ps1` | product tests/CI; parent delegate retained temporarily |
+| Product build entry | Loader `scripts/build.ps1` | Loader |
+| Source setup/checks | product setup/build helpers | independent product pins; umbrella commands retired |
+| SDK selection | each product global.json | product-specific policy, no parent SDK input |
+| Loader verification | Loader `scripts/verify.ps1`; Patcher retains `scripts/test.ps1` | independent product boundaries |
+| Syntax/helper verification | Loader `scripts/test/test-scripts.ps1`; Patcher `scripts/test-scripts.ps1` | product tests/CI |
+| Runtime pack reproducibility | Loader `scripts/test/test-runtime-profiles.ps1` | fixtures or explicit actual pack; isolated output |
 | Source/archive secret scan | each product `scripts/scan-publication.ps1` and .gitleaksignore | explicit product publication inputs; no parent gitlink discovery |
-| Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup; parent delegate retained temporarily |
+| Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup |
 | Agent rules | each product `AGENTS.md` | per-product rules; Loader owns main rationale |
 | Runtime current docs | Loader `docs/android/RUNTIME-DEVELOPMENT.md` | Loader, retained |
 | Runtime investigation lessons | Loader `docs/android/RUNTIME-TROUBLESHOOTING.md` | stable root causes; local timelines/evidence kept privately |
-| Parent operations/status | parent docs | current facts merged into Loader docs |
+| Parent operations/status | local redirects to product docs | no duplicate command/status authority |
 | Historical runtime scripts | retired raw-pack verifier, shell runner and fixed OpenSSL downloader | preserved privately; current product pack/build/probe validation retained |
 | Native nupkg inspection | Loader `scripts/test/inspect-runtime-native.sh` | retained explicit diagnostic; no parent tool cache |
 
@@ -31,15 +33,15 @@ This inventory identifies authorities and retirement boundaries, not local progr
 
 - Both products select a matching sibling HEAD or a private per-revision cache.
   Loader reads its props; Patcher independently reads generator URL/revision from
-  its own props. Setup never switches shared or existing checkouts. Parent builds
-  no longer override Loader paths with historical `dependencies/*` or inspect
-  umbrella gitlinks. Use explicit source paths for retained old checkouts.
+  its own props. Setup never switches shared or existing checkouts. No parent
+  build overrides source paths or inspects umbrella gitlinks. Use explicit source
+  paths for retained old checkouts.
 - Loader release CI operates from the Loader checkout and downloads reviewed
   runtime artifacts; it does not require the parent Git lock. Local runtime
-  source build/setup and verification are also Loader-owned. Parent wrappers only
-  invoke product entries; status/audit gitlink gates and cache overrides are retired.
+  source build/setup and verification are also Loader-owned. Parent wrappers,
+  status/audit gitlink gates and cache overrides are retired.
 - Runtime builds use an artifacts symlink and per-RID outputs under Loader Output
-  or an explicit output root; parent wrappers retain historical temp paths.
+  or an explicit output root for retained historical build trees.
   Move only after builds stop; preserve the existing target and avoid a recursive
   cleanup following a link.
 - Nested dependency Git metadata must be inspected before physical moves. A

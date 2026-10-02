@@ -13,6 +13,12 @@ the failing behavior.
 4. Avoid game-specific branches in framework code. Private test games are
    integration inputs, not project dependencies.
 
+Inspect each affected worktree with Git and preserve existing edits. Dependency
+fixes come first, then each consumer updates its own pin; there is no workspace
+gitlink update. Keep fork PATCHES.md entries scoped to the upstream base, root
+cause, regression and removal condition. Nontrivial decisions belong in
+.agents/notes, updating the existing topic before adding a new one.
+
 ## Validation
 
 Run the narrowest relevant test first. Cross-platform managed changes also need

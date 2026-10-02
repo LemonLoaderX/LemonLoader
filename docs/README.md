@@ -1,9 +1,20 @@
 # Project documentation
 
-The repository contains the MelonLoader 0.7.3 desktop baseline and a maintained
-Android adapter. Upstream desktop behavior is documented in the root
-`README.md`; the documents below describe the Android fork and the rules for
-keeping it mergeable with desktop upstream.
+The repository contains the MelonLoader desktop baseline and a maintained
+Android adapter. Start with the task below, then read only the relevant contract.
+
+## By task
+
+- Install or edit an APK: [usage and manual injection](android/USAGE.md),
+  [payload layout](android/ARTIFACTS.md), [deployment policies](android/DEPLOYMENT.md).
+- Build Loader: [building](android/BUILDING.md). APK generation belongs to
+  [Patcher](https://github.com/LemonLoaderX/LemonLoader.Patcher).
+- Develop CoreCLR: [source workflow](android/RUNTIME-DEVELOPMENT.md),
+  [runtime troubleshooting](android/RUNTIME-TROUBLESHOOTING.md).
+- Diagnose a failure: [troubleshooting](android/TROUBLESHOOTING.md),
+  [test boundaries](android/TESTING.md).
+- Maintain or release: [maintenance](android/MAINTENANCE.md),
+  [release notes](releases/README.md), [modernization](maintenance/README.md).
 
 ## Android documentation
 
@@ -30,9 +41,10 @@ keeping it mergeable with desktop upstream.
   messages.
 - Keep device evidence outside Git and update support claims only after the
   corresponding regression has been reviewed.
-- Treat generated `payload.json`, `lemonloader-release.json`, and
-  `interop-manifest.json` as the source of truth for current versions and hashes.
-  Do not copy ordinary local-build hashes into maintained documentation.
+- Product dependency manifests own source pins; Release manifests/checksums
+  describe distributable inputs. Installed payload configuration is not a digest
+  admission gate, and active layouts need no Interop generation manifest.
+  Keep local build hashes, job status and acceptance progress outside tracked docs.
 - Keep commands parameterized and free of machine-specific paths. Small
   implementation changes do not require synchronized edits to every overview
   document.

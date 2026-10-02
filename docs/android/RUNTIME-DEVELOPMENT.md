@@ -118,6 +118,17 @@ pwsh -NoProfile -File scripts/test/test-runtime-profiles.ps1
 pwsh -NoProfile -File scripts/test/test-runtime-source-build.ps1
 ```
 
+For a real imported pack, the existing profile test validates it, packages it
+twice in an isolated Output/Tests directory, checks its SHA-256 sidecar and
+validates the unpacked archive. It does not replace retained release outputs:
+
+```powershell
+pwsh -NoProfile -File scripts/test/test-runtime-profiles.ps1 `
+    -RuntimeProfile android -RuntimePackRoot "<validated-pack>"
+```
+
+Run separately for Bionic; add -Development for an explicitly selected local pack.
+
 Host/source fixtures verify orchestration and contracts, not ART or real TLS.
 Use the [device procedure](../maintenance/embedded-crypto-acceptance.md) for crypto,
 handler coexistence, application lifecycle and exact-build symbol matching.

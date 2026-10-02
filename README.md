@@ -62,7 +62,7 @@ From this repository, after obtaining the matching pack using
 $env:ANDROID_SDK_ROOT = "<android-sdk>"
 $env:ANDROID_NDK_ROOT = "<android-ndk-r27d>"
 pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
-pwsh -NoProfile -File scripts/build/build-android.ps1 -Configuration Release
+pwsh -NoProfile -File scripts/build.ps1 -Configuration Release
 ```
 
 The release archive is written to:
@@ -78,24 +78,16 @@ local packages; GitHub publication is owned by the version-tag workflow.
 
 Build scripts validate dependency identity, architecture, Android imports,
 required exports, 16 KiB ELF alignment, and release manifests before publishing
-the archive. Source forks are checked out at their manifest revisions below the
-ignored `.dependencies/` directory; CoreCLR remains a versioned release artifact
-unless runtime development is explicitly requested.
+the archive. Matching sibling source forks are reused; other pins use isolated
+ignored `.dependencies/<name>/<revision>` checkouts without switching shared sources.
+CoreCLR remains a versioned release artifact unless runtime development is
+explicitly requested.
 
 ## Documentation
 
-- [Maintenance roadmap and reading guide](docs/maintenance/README.md)
-- [Android overview](docs/android/README.md)
-- [Current status](docs/android/STATUS.md)
-- [Architecture](docs/android/ARCHITECTURE.md)
-- [Building](docs/android/BUILDING.md)
-- [Runtime](docs/android/RUNTIME.md)
-- [Il2CppInterop integration](docs/android/INTEROP.md)
-- [Payload contract](docs/android/ARTIFACTS.md)
-- [Testing](docs/android/TESTING.md)
-- [Maintenance](docs/android/MAINTENANCE.md)
-- [Troubleshooting](docs/android/TROUBLESHOOTING.md)
-- [Porting notes](docs/android/PORTING.md)
+- [Documentation by task](docs/README.md): install, build, diagnose and release.
+- [Maintenance roadmap](docs/maintenance/README.md): ownership and active decisions.
+- [Android status](docs/android/STATUS.md): architecture and support boundary.
 
 ## Contributing
 

@@ -1,9 +1,31 @@
 [CmdletBinding()]
-param([string]$EmbeddedBootstrapPath, [string]$CryptoDexPath)
+param(
+    [string]$EmbeddedBootstrapPath,
+    [string]$CryptoDexPath,
+    [ValidateSet('android', 'bionic')][string]$RuntimeProfile,
+    [string]$RuntimePackRoot,
+    [switch]$Development
+)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
 if ([bool]$EmbeddedBootstrapPath -ne [bool]$CryptoDexPath) { throw 'Supply both bootstrap and helper DEX paths.' }
 if ($EmbeddedBootstrapPath) { Test-BootstrapEmbeddedCrypto -Bootstrap $EmbeddedBootstrapPath -Dex $CryptoDexPath }
+if ([bool]$RuntimeProfile -ne [bool]$RuntimePackRoot -or ($Development -and !$RuntimePackRoot)) {
+    throw 'Supply RuntimeProfile and RuntimePackRoot together; Development requires an explicit pack.'
+}
+function Test-PackArchive([string]$Pack, $Profile, [string]$Archives, [switch]$Development) {
+    $package = Join-Path $PSScriptRoot '../build/package-runtime.ps1'
+    & $package -RuntimeProfile $Profile.name -RuntimePackRoot $Pack -OutputRoot $Archives -Development:$Development
+    $zip = Join-Path $Archives "dotnet-runtime-$($Profile.version)-$($Profile.rid).zip"
+    $firstHash = (Get-FileHash -LiteralPath $zip).Hash.ToLowerInvariant()
+    & $package -RuntimeProfile $Profile.name -RuntimePackRoot $Pack -OutputRoot $Archives -Development:$Development
+    if ((Get-FileHash -LiteralPath $zip).Hash.ToLowerInvariant() -cne $firstHash) { throw 'Runtime archive is not reproducible.' }
+    $sidecar = (Get-Content -LiteralPath "$zip.sha256" -Raw).Trim()
+    if ($sidecar -cne "$firstHash  $([IO.Path]::GetFileName($zip))") { throw 'Runtime checksum sidecar mismatch.' }
+    $unpacked = Join-Path $Archives 'unpacked'
+    Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
+    Test-RuntimeProfilePack -Root $unpacked -Profile $Profile -Development:$Development
+}
 function Reject([scriptblock]$Action) {
     $failed=$false
     try { & $Action } catch { $failed=$true }
@@ -11,6 +33,9 @@ function Reject([scriptblock]$Action) {
 }
 if((Get-RuntimeProfile).name -cne 'android'){throw 'Unexpected default profile'}
 Reject { Get-RuntimeProfile -Name invalid }
+Reject { & $PSCommandPath -RuntimeProfile android }
+Reject { & $PSCommandPath -RuntimePackRoot 'missing-pack' }
+Reject { & $PSCommandPath -Development }
 $android=Get-RuntimeProfile -Name android
 $bionic=Get-RuntimeProfile -Name bionic
 if($android.revision -cne $bionic.revision){throw 'Mainline targets must share one revision'}
@@ -69,14 +94,7 @@ try {
         $archives = Join-Path $root ('archives-' + $profile.name)
         Reject { & $package -RuntimeProfile all -RuntimePackRoot $imported -OutputRoot $archives -Development }
         Reject { & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives }
-        & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives -Development
-        $zip = Join-Path $archives "dotnet-runtime-$($profile.version)-$($profile.rid).zip"
-        $firstHash = (Get-FileHash -LiteralPath $zip).Hash
-        & $package -RuntimeProfile $profile.name -RuntimePackRoot $imported -OutputRoot $archives -Development
-        if ((Get-FileHash -LiteralPath $zip).Hash -cne $firstHash) { throw 'Runtime archive is not reproducible.' }
-        $unpacked = Join-Path $root ('unpacked-' + $profile.name)
-        Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
-        Test-RuntimeProfilePack -Root $unpacked -Profile $profile -Development
+        Test-PackArchive -Pack $imported -Profile $profile -Archives $archives -Development
         $identity.sourceRevision = $profile.revision
         $identity.developmentBuild = $false
         $identity | ConvertTo-Json | Set-Content "$pack/runtime-provenance.json"
@@ -92,6 +110,11 @@ try {
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
         Remove-Item -LiteralPath "$pack/managed/System.Net.Http.dll"
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }
+    }
+    if ($RuntimePackRoot) {
+        Test-PackArchive -Pack ([IO.Path]::GetFullPath($RuntimePackRoot)) -Profile (Get-RuntimeProfile -Name $RuntimeProfile) `
+            -Archives (Join-Path $root 'actual-pack') -Development:$Development
+        Write-Host 'PASS: selected runtime pack validation, repeated packaging, checksum sidecar and archive round-trip'
     }
     Write-Host 'PASS: profile selection, development import/package isolation, reproducibility, identity, RID, missing/tampered/unexpected inputs'
 } finally {

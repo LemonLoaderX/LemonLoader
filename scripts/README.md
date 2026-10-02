@@ -50,6 +50,7 @@ without scanning one flat directory.
 | `test/test-android-deployment.sh` | Run the Linux/WSL file-publication regression for preserved destinations and failure diagnostics |
 | `test/test-source-dependencies.ps1` | Local Git fixtures for independent pins, sibling/cache selection and setup preservation |
 | `test/test-runtime-source-build.ps1` | WSL fixtures for runtime output isolation, source protection and failure propagation |
+| `test/test-runtime-profiles.ps1` | Pack/embedded-crypto fixtures; optional actual pack reproducibility, checksum sidecar and archive round-trip |
 | `test/test-cleanup.ps1` | Standalone cleanup fixtures for output retention, preview and linked-tree rejection |
 | `test/test-scripts.ps1` | Product script parsing and profile/ADB/cleanup/pack/publication helper regressions |
 | `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
@@ -91,3 +92,13 @@ Device callers pass the executable and serial explicitly; no helper changes the
 selected device implicitly. Checks that intentionally inspect nonzero ADB status
 remain local rather than using the throwing helper. Interop and device workflows
 remain supported and are not replaced by Patcher release production.
+
+## Script conventions
+
+- One public entry per workflow; Bash backends run under WSL on Windows.
+- Common files only define helpers when dot-sourced; they do not start builds or devices.
+- Read active runtime pins from eng/runtime-profiles.json; all excludes frozen legacy.
+- Check native exit codes immediately and pass arguments as arrays, not shell text.
+- Caller-controlled cache environment variables remain untouched.
+- Cleanup validates containment and links before deletion and supports WhatIf.
+- Shell scripts use LF; generated diagnostics belong in ignored output.

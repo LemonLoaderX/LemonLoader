@@ -36,7 +36,8 @@ eng/runtime-profiles.json supplies the fork URL and active pins; setup uses the 
 sibling/cache rule without selecting branches or fetching upstream substitutes.
 The WSL backend keeps its source lock and per-RID isolation. Default output belongs
 to Loader Output/RuntimeDevelopment; an explicit output root preserves existing
-build trees. Temporary parent wrappers preserve old paths until retirement.
+build trees. Historical output roots require an explicit OutputRoot; there is no
+parent wrapper supplying paths or SDK/cache policy.
 Runtime setup checks tracked changes, matching the builder: its artifacts symlink
 and build lock are untracked source-side outputs. They and other untracked local
 files remain untouched. Generic dependency setup still rejects untracked files.
@@ -70,10 +71,15 @@ own scripts/test.ps1. SkipDesktop/SkipAndroid explicitly narrow verification;
 completion reports the omitted boundaries rather than claiming full coverage.
 The release reproducibility check selects profile/development output from the
 staged manifest and repacks that same tree, including frozen legacy selection.
-Parent setup/build/verify are temporary delegates, not a second policy. Setup
-requires already-cloned products and calls each product's non-mutating pinned
-setup; it never initializes or switches products from umbrella gitlinks.
-Parent status/audit and the shared environment-cache override are retired;
+Parent setup/build/verify/test/cleanup/publication delegates are retired after
+caller inspection; product entries are the only supported commands. Setup
+requires an independently cloned product, never umbrella gitlink initialization.
+Loader owns its exact SDK policy; Patcher owns a stable .NET 10 latest-feature-band
+policy matching its CI, so neither needs a parent global.json.
+Actual runtime pack reproducibility, checksum-sidecar and round-trip checks live
+in the existing Loader profile test with explicit pack/profile/development inputs
+and isolated Output/Tests outputs. No new wrapper or actual-pack startup scan is
+introduced. Parent status/audit and the shared environment-cache override are retired;
 ordinary git status and existing source/setup/build checks replace them.
 Stable historical runtime causes and recovery steps belong to Loader's
 RUNTIME-TROUBLESHOOTING.md. Chronological build/device/publication states stay in
@@ -128,6 +134,12 @@ Physical dependency relocation is governed by the
   but retains obsolete paths, duplicate validation and an old OpenSSL download
   recipe without authenticated inputs. Keep useful lessons/probe source and
   privately preserve exact old scripts instead of presenting them as supported.
+- Keeping parent delegates preserves old command names but keeps a second catalog
+  and parent path/output defaults to maintain. Product commands and a small local
+  redirect index retain discoverability without a new umbrella interface.
+- Applying Loader's exact SDK pin to Patcher is reproducible but couples two
+  products with different existing CI policies. Patcher follows its own stable
+  .NET 10 feature-band policy; Loader retains its stricter existing pin.
 
 ## Consequences
 
@@ -140,8 +152,7 @@ Physical relocation does not retire parent compatibility wrappers or consolidate
 documentation; those have separate caller checks and retirement gates.
 Release maintainers must supply every source input to scanning;
 scanning the product alone does not certify a dependency or a release archive.
-The temporary parent cleanup delegates to product commands without dependency
-cleanup. Product cleanup does not reclaim shared dependency build caches or
+Product cleanup does not reclaim shared dependency build caches or
 runtime source build space; those need deliberate owner-specific maintenance.
 
 Local Git fixtures cover matching/conflicting siblings, independent cache paths,

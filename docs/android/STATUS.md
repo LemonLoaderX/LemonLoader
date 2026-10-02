@@ -22,8 +22,14 @@ and CoreCLR sources remain independent, reviewable forks.
 - Active bootstrap builds target `arm64-v8a`, API 26+ and 16 KiB-compatible ELF
   load segments.
 - CoreCLR is hosted directly, with JNI cryptography for Android or OpenSSL for Bionic.
-- Runtime, loader, Interop, and deployment content have separate identities and
-  transactional update behavior.
+- Runtime extraction and deployment updates use APK update time and transactional
+  publication, not mixed installed-content hashes or declared revisions.
+- IL2CPP calls and injection scans reuse Unity's initialized library handle;
+  host regressions cover duplicate-loading failures and JNI ownership.
+- Android crypto helpers are embedded in libmain.so and loaded in memory;
+  historical external-DEX inputs retain a separate compatibility path.
+- Previous-session logs, bounded CoreCLR reports and API-gated Android exit traces
+  are retained; exact-build native symbols stay private for offline diagnostics.
 - Il2CppInterop covers Android ARM64 aggregate ABI and multiple generic-method
   lookup forms.
 - Failed short-function hooks leave original instructions unchanged.
@@ -47,13 +53,11 @@ qualified. Automated startup does not replace manual application acceptance.
 
 ## Open qualification work
 
-- rebuild/pin the runtime with the explicit crypto ClassLoader initialization
-  export and qualify the embedded DEX path on devices before publication;
-
+- qualify embedded DEX loading, TLS and native handler coexistence on devices;
 - broaden private Unity version and application coverage;
 - validate physical 16 KiB-page devices;
 - expand deployment rollback and recovery fault injection;
-- remove checkout-path and line-ending dependence from compiled artifact hashes;
+- verify reproducibility when changing source roots, build flags or toolchains;
 - upstream loader-neutral dependency fixes where maintainers accept them;
 - validate a second loader adapter before extracting generic APK tooling APIs.
 

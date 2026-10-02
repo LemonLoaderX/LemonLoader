@@ -24,9 +24,8 @@ Read only the document needed for the current task:
 - [Proposed modernization decision](../../.agents/notes/proposed/process/2026-10-02-project-modernization.md):
   rationale and alternatives. Proposed documents do not change runtime contracts.
 
-This directory belongs to LemonLoader, not the parent workspace. During
-migration, existing commands still use the parent workspace where documented;
-the roadmap tracks their relocation rather than presenting future paths as
-working commands. Keep private inputs, build logs and device evidence outside Git.
+This directory belongs to LemonLoader, not a required parent workspace. Run each
+workflow from its owning product repository; parent compatibility commands are
+retired. Keep private inputs, build logs and device evidence outside Git.
 Local build status, artifact hashes and acceptance progress also stay in ignored
 records, not this index, the roadmap or design notes.
