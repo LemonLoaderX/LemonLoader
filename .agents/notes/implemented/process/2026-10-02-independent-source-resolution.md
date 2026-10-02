@@ -23,6 +23,10 @@ and never switched, fetched or reset; missing revisions use separate cache paths
 Matching shared siblings are verified without submodule mutation. Local edits,
 wrong HEADs and uninitialized nested dependencies receive actionable errors.
 Patcher owns its generator URL and revision; Loader does not supply them.
+New clones enable long paths locally, and dependency inspection passes the option
+before Git's -C path handling so deep staging roots work on Windows. Blob filtering applies to HTTPS clones;
+local offline fixture/source clones do not create a filtered remote pointing at
+another checkout, which can trigger recursive lazy fetching from partial sources.
 
 Loader's scripts/build.ps1 is the public product entry for profile selection and
 existing native/managed/staging orchestration. It does not inspect the parent
