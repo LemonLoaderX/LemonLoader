@@ -98,7 +98,7 @@ history; runtime behavior has not been changed by planning.
   top-level DEX and retain hashes/symbols/logs privately.
 - [ ] Commit Loader after its automated gates; Patcher committed as `ccd329f`
   after 19 regressions and published locally for win-x64.
-- [ ] Produce a device-acceptance checklist; maintainer performs installation and
+- [x] Produce a [device-acceptance checklist](embedded-crypto-acceptance.md); maintainer performs installation and
   crypto/TLS/lifecycle/namespace tests later.
 
 Exit: matching, locally verified artifacts and exact commands are available.

@@ -5,6 +5,8 @@ Read only the document needed for the current task:
 - [Modernization roadmap](modernization.md): active goals, stage order, acceptance
   gates, commit policy and resumption checklist.
 - [Ownership inventory](ownership.md): current producers, paths and planned owners.
+- [Embedded crypto acceptance](embedded-crypto-acceptance.md): maintainer's later
+  device matrix and evidence, without installation/signing changes.
 - [Android status](../android/STATUS.md): current implemented/qualified behavior.
 - [Build guide](../android/BUILDING.md): current supported product commands.
 - [Testing](../android/TESTING.md): automated and device validation ownership.
