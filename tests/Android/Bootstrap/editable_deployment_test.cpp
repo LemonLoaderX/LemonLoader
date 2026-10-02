@@ -254,6 +254,9 @@ int main(int argc, char** argv) {
     root->fields = {{"formatVersion", "7"}}; assert(!read_payload_descriptor(payload));
     root->fields.clear();
     assert(read_payload_descriptor(payload) && payload.runtime_rid == "android-arm64");
+    root->fields["formatVersion"] = "9";
+    assert(read_payload_descriptor(payload) && payload.runtime_rid == "android-arm64");
+    root->fields.clear();
     short_read = true; assert(!read_payload_descriptor(payload)); short_read = false;
     assets.erase("LemonLoader/payload.json");
     assert(read_payload_descriptor(payload));

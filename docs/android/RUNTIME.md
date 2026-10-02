@@ -38,7 +38,7 @@ not expose a MonoVM identity. There is no fallback backend.
 
 ```text
 <application-data>/dotnet/
-  runtime-identity.json
+  runtime-identity.json          # frozen layout-8 payloads only
   shared/Microsoft.NETCore.App/<version>/
     System.Private.CoreLib.dll
     libcoreclr.so
@@ -113,10 +113,11 @@ command and normalized content hash. Runtime publication creates a minimal
 hosting model, engine hash, runtime RID and crypto backend. Staging validates
 that identity but does not copy the provenance file into the APK.
 
-The published payload instead carries `runtime-identity.json` with only the
-runtime version, backend, hosting model, engine filename/hash, RID and crypto
-backend.
-Consumers validate these required values and tolerate additional metadata.
+Active layout-9 Releases record engine/source/profile audit identity in
+`lemonloader-release.json`, whose file inventory verifies runtime bytes before
+injection. They do not copy identity JSON into the APK. Older layout-8 Releases
+retain their historical `runtime-identity.json` checks. Native startup checks
+actual CoreCLR exports and crypto initialization rather than colocated digests.
 
 ## Failure handling
 

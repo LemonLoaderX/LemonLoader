@@ -18,11 +18,11 @@ file extraction. The crypto runtime exposes explicit host initialization with
 JavaVM and ClassLoader, and CoreCLR resolves P/Invoke through that exact module.
 Byte storage and retained JNI references have process lifetime.
 
-New Release, runtime identity and payload metadata declare embedded mode.
-Payload verification checks the bootstrap digest. Legacy Releases remain
-supported by Patcher's existing promotion path. Layout v8 remains valid because
-old Patchers reject the missing required helper input, rather than publishing
-a silently broken APK. Runtime packs still carry DEX as a verified build input;
+Release metadata declares embedded mode and file validation protects bootstrap
+bytes. The [minimal-producer decision](../simplification/2026-10-02-minimal-produced-payload.md)
+owns active layout-9 configuration and audit-field removal. Historical layout-8
+embedded inputs retain their identity/bootstrap digest checks, while external-DEX
+Releases remain supported by the promotion path. Runtime packs carry DEX as a verified build input;
 public Loader archives do not carry a standalone helper in embedded mode.
 
 ## Alternatives considered

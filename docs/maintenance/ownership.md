@@ -43,10 +43,12 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 
 ## Installation identity ownership
 
-- Loader staging creates release file inventories, runtime identity and initial
-  domain hashes. These are not Patcher-only computations.
-- Patcher validates the release, adds generated Interop/deployment files and
-  recomputes final domain identities and deployment revision/policies.
+- Loader staging creates Release file inventories and source/runtime audit
+  identity. Active layout-9 payload configuration contains only format/RID;
+  frozen layout-8 staging retains the historical recipe.
+- Patcher validates the Release and adds Interop DLLs/deployment files. Layout 9
+  emits non-seed policy overrides without generated digests, revision or copied
+  Interop manifest. Its layout-8 compatibility path retains the old computations.
 - The native host checks actual CoreCLR/crypto loading and reads deployment from
   actual assets and optional path policies, ignoring declared hashes/revision
   and identity digests. Package lastUpdateTime supplies all extraction freshness.

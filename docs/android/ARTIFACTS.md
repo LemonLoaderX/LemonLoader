@@ -25,7 +25,6 @@ assets/LemonLoader/
       Dependencies/
     interop/
       *.dll
-      interop-manifest.json
     dotnet/
       shared/Microsoft.NETCore.App/<version>/
         libSystem.Security.Cryptography.Native.Android.so
@@ -34,9 +33,6 @@ assets/LemonLoader/
     Plugins/
     UserLibs/
     UserData/
-
-tools/android/
-  lemonloader-coreclr-crypto.dex
 
 LICENSE.md
 NOTICE.txt
@@ -68,9 +64,8 @@ The package includes `lemonloader-release.json` with a SHA-256 entry for every
 payload file (the manifest excludes itself), the locked dotnet source revision,
 and the exact managed runtime library SHA-256. It does not publish the build
 command or full `runtime-provenance.json`; those remain in the dependency build
-output. The runtime domain contains only a minimal `runtime-identity.json` with
-the version, backend, hosting model, engine filename/hash, runtime RID and crypto
-backend. Supported output uses
+output. Active layout-9 runtime assets contain no `runtime-identity.json`; the
+Release manifest owns the audit identity. Supported output uses
 `bootstrapFlavor: Ndk`. It is deployable only
 and always records `gameAssembliesIncluded: false`. Game-specific Interop DLLs
 are generated and merged by LemonLoader.Patcher. The manifest also records the
@@ -91,10 +86,11 @@ assemblies, not unrelated NuGet cache files.
   linked statically so the game's public C++ runtime remains untouched.
 - Every shipped `.so`, including managed runtime dependencies, must support 16 KiB
   pages. Checking only `libmain.so` is insufficient.
-- Producers retain layout-v8 hashes/revisions for older Loader and tooling
-  compatibility. `lemonloader-release.json` validates individual Release files,
-  and existing APK tooling recomputes domain hashes. The current native host
-  ignores these digest fields: all extraction uses Android's package update time
+- Active producers emit layout 9 without domain hashes, deployment revision,
+  declared file digests or audit JSON. Frozen legacy staging and Patcher's older
+  Release path retain layout 8. Older Patchers must reject layout-9 Releases;
+  use a Patcher build supporting layout 9. `lemonloader-release.json` continues
+  validating individual Release files. All extraction uses Android's package update time
   and local markers. Cached startup checks marker/directory existence without
   hashing installed runtime files. Deployment reads actual assets and optional
   policies; see [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -102,21 +98,20 @@ assemblies, not unrelated NuGet cache files.
   Release-mode DAC/DBI diagnostics at the staging source. Patcher and runtime
   consumers do not maintain path blacklists or delete historical copies merely
   to enforce that packaging policy.
-- Release assembly does not emit build-only `runtime-provenance.json` or build
-  command metadata; Release tooling validates runtime identity fields and
-  tolerates additive metadata. The native host does not require identity JSON.
+- Release assembly does not emit build-only provenance or build commands;
+  Release tooling validates audit identity in its Release manifest and tolerates
+  additive metadata. The native host does not require identity JSON.
 - The deployment tree mirrors the runtime MelonLoader base directory. Files in
   `Mods`, `Plugins`, `UserLibs`, and `UserData` keep their relative paths. The
   default development profile preserves existing files; production profiles can
   upgrade, refresh, or enforce managed files. Unknown files are never removed.
 - Active Android Releases contain the Android crypto SO and embed the complete
   verified helper DEX in `libmain.so`; they contain no standalone helper DEX.
-  Release, runtime identity and payload agree on `coreClrCryptoDexMode: embedded`.
-  Release and payload declare `minimumAndroidApi` of at least 26. Payload
-  `coreClrCryptoBootstrapSha256` identifies the bootstrap containing the helper;
-  Release and APK verification check it against the actual `libmain.so` bytes.
-  Patcher adds no DEX entries for this mode. Layout remains v8: old Patchers
-  reject these Releases because their required external helper input is absent.
+  The Release manifest declares `coreClrCryptoDexMode: embedded` and
+  `minimumAndroidApi` of at least 26; its file inventory verifies `libmain.so`.
+  These build/validation fields are not copied into layout-9 APK configuration.
+  Patcher adds no DEX entries for this mode. Historical embedded layout-8 inputs
+  retain their bootstrap digest checks.
 - Older Android Releases without the embedded-mode declaration still require
   `tools/android/lemonloader-coreclr-crypto.dex`. Patcher promotes this verified
   input to the next free `classesN.dex` and carries its digest into final APK
@@ -148,10 +143,13 @@ recipe. Android accepts absent/empty `payload.json` or `{}`. Bionic selects:
 ```
 
 `deploymentFiles` is an optional path/policy list. If `formatVersion` is explicitly
-present it must be `8`; unknown fields are tolerated. A malformed JSON document or
+present it must be `8` or `9`; unknown fields are tolerated. A malformed JSON document or
 unsupported RID/layout is still an error. No `runtime-identity.json` or
 `interop-manifest.json` is required by native/managed loading. Game-specific
 Interop DLLs remain necessary for Mods using their generated surface.
+Active Release configuration contains `formatVersion: 9` and `runtimeRid`.
+Patcher adds only non-seed path/policy overrides; it reads deployment paths
+without reopening their bytes to compute hashes or revisions.
 
 The existing extraction marker filenames ending in `-hash` now store the APK
 update token. Historical digest values trigger one replacement extraction. Every

@@ -30,6 +30,7 @@ $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."
 $dependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
 $profile = Get-RuntimeProfile -Name $RuntimeProfile
+$assetLayoutVersion = if ($profile.name -eq 'legacy') { 8 } else { 9 }
 $useOpenSsl = $profile.cryptoBackend -eq 'openssl'
 if ([string]::IsNullOrWhiteSpace($DotnetRuntimeVersion)) {
     $DotnetRuntimeVersion = $profile.version
@@ -299,18 +300,20 @@ Copy-Item -LiteralPath $coreLibSource `
     -Destination $sharedRuntimeOutput -Force
 Copy-Item -LiteralPath $managedRuntimeEngine `
     -Destination (Join-Path $sharedRuntimeOutput "libcoreclr.so") -Force
-$runtimeIdentity = [ordered]@{
-    formatVersion = 1
-    runtimeVersion = $DotnetRuntimeVersion
-    backend = $managedRuntimeBackendId
-    hostingModel = "coreclr-host-api"
-    engineFile = "libcoreclr.so"
-    engineSha256 = $managedRuntimeEngineHash
-    runtimeRid = $profile.rid
-    cryptoBackend = $profile.cryptoBackend
+if ($assetLayoutVersion -eq 8) {
+    $runtimeIdentity = [ordered]@{
+        formatVersion = 1
+        runtimeVersion = $DotnetRuntimeVersion
+        backend = $managedRuntimeBackendId
+        hostingModel = "coreclr-host-api"
+        engineFile = "libcoreclr.so"
+        engineSha256 = $managedRuntimeEngineHash
+        runtimeRid = $profile.rid
+        cryptoBackend = $profile.cryptoBackend
+    }
+    if ($embeddedCrypto) { $runtimeIdentity.coreClrCryptoDexMode = 'embedded' }
+    $runtimeIdentity | ConvertTo-Json | Set-Content -LiteralPath $runtimeIdentityOutput -Encoding Utf8
 }
-if ($embeddedCrypto) { $runtimeIdentity.coreClrCryptoDexMode = 'embedded' }
-$runtimeIdentity | ConvertTo-Json | Set-Content -LiteralPath $runtimeIdentityOutput -Encoding Utf8
 
 $runtimeConfigs = Get-ChildItem -LiteralPath $melonOutput `
     -Filter "MelonLoader.runtimeconfig.json" -File -Recurse
@@ -446,26 +449,25 @@ if (Test-Path -LiteralPath (Join-Path $melonOutput "Documentation")) {
     throw "Android Release must not contain 'Documentation'."
 }
 
-$payloadDescriptor = [ordered]@{
-    formatVersion = 8
-    loaderSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/loader"
-    dotnetSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/dotnet"
-    interopSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/interop"
-    deploymentSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "deployment"
-    managedRuntimeBackend = $managedRuntimeBackendId
-    managedRuntimeIdentitySha256 = Get-StagedFileHash -Path $runtimeIdentityOutput
-    deploymentProfile = "development"
-    deploymentRevisionSha256 = [Convert]::ToHexString(
-        [System.Security.Cryptography.SHA256]::HashData(
-            [System.Text.Encoding]::UTF8.GetBytes("deployment-revision=1"))).ToLowerInvariant()
-    deploymentFiles = @()
-    privateNativeLibraries = @()
-}
-$payloadDescriptor.runtimeRid = $profile.rid
-$payloadDescriptor.minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
-if ($embeddedCrypto) {
-    $payloadDescriptor.coreClrCryptoDexMode = 'embedded'
-    $payloadDescriptor.coreClrCryptoBootstrapSha256 = Get-StagedFileHash -Path $stagedBootstrap
+$payloadDescriptor = [ordered]@{ formatVersion = $assetLayoutVersion; runtimeRid = $profile.rid }
+if ($assetLayoutVersion -eq 8) {
+    $payloadDescriptor = [ordered]@{
+        formatVersion = 8
+        loaderSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/loader"
+        dotnetSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/dotnet"
+        interopSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "runtime/interop"
+        deploymentSha256 = Get-PayloadTreeHash -PayloadRoot $payloadOutput -Scope "deployment"
+        managedRuntimeBackend = $managedRuntimeBackendId
+        managedRuntimeIdentitySha256 = Get-StagedFileHash -Path $runtimeIdentityOutput
+        deploymentProfile = "development"
+        deploymentRevisionSha256 = [Convert]::ToHexString(
+            [System.Security.Cryptography.SHA256]::HashData(
+                [System.Text.Encoding]::UTF8.GetBytes("deployment-revision=1"))).ToLowerInvariant()
+        deploymentFiles = @()
+        privateNativeLibraries = @()
+    }
+    $payloadDescriptor.runtimeRid = $profile.rid
+    $payloadDescriptor.minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
 }
 $payloadDescriptor | ConvertTo-Json -Depth 4 |
     Set-Content -LiteralPath (Join-Path $payloadOutput "payload.json") -Encoding Utf8
@@ -481,7 +483,7 @@ $manifestFiles = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
     }
 $manifest = [ordered]@{
     formatVersion = 2
-    assetLayoutVersion = 8
+    assetLayoutVersion = $assetLayoutVersion
     rid = "linux-bionic-arm64"
     abi = "arm64-v8a"
     configuration = $Configuration

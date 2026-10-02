@@ -133,7 +133,7 @@ the adapter falls back to the application's internal files directory.
 - Changed runtime directories are fully copied into a sibling staging directory
   before replacing the prior extraction, and obsolete files do not survive an
   update.
-- Deployment files are planned and applied according to their layout v8
+- Deployment files are planned and applied according to their explicit
   `seed`, `upgrade`, `refresh`, or `enforce` policy. Unknown files are preserved;
   changed managed files are backed up and the ownership-state tree is committed
   only after all file actions succeed.

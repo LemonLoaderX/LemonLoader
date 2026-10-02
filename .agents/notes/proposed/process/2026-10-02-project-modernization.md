@@ -14,7 +14,8 @@ owns the narrower runtime-reporter/system-trace alternatives. This proposal
 retains the overall modernization sequence.
 The [editable-deployment decision](../../implemented/simplification/2026-10-02-editable-deployment.md)
 owns deployment consumer semantics. The [runtime-extraction decision](../../implemented/simplification/2026-10-02-runtime-extraction-without-digests.md)
-owns runtime digest subtraction; producer cleanup and independent repository
+owns runtime digest subtraction. The [producer decision](../../implemented/simplification/2026-10-02-minimal-produced-payload.md)
+owns minimal layout-9 production and old-consumer compatibility; independent repository
 ownership remain within this broader proposal.
 
 ## Proposal

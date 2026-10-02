@@ -19,8 +19,9 @@ not make those assets required. Declared `size`, `sha256`, `deploymentSha256`,
 Unsafe/duplicate paths, file/directory conflicts and unknown policies are errors.
 Bootstrap-reserved paths and symbolic-link destinations remain prohibited.
 
-Patcher continues producing legacy metadata for compatibility with older Loader
-consumers. Its packaging profiles resolve concrete policies:
+For layout 9 Patcher emits only non-seed policy overrides. For older layout-8
+Release inputs it preserves the historical metadata recipe. Its packaging
+profiles resolve concrete policies:
 
 | Profile | Mods, Plugins, UserLibs | UserData | Other directories |
 | --- | --- | --- | --- |

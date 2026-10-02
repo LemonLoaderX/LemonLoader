@@ -384,7 +384,7 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     const jint format_version = env->CallIntMethod(json_object, get_int, version_name, 8);
     env->DeleteLocalRef(version_name);
     bool valid = !clear_exception(env, "Read payload manifest version") &&
-        format_version == 8 &&
+        (format_version == 8 || format_version == 9) &&
         (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64");
     if (valid) {
         if (env->PushLocalFrame(32) != JNI_OK) {

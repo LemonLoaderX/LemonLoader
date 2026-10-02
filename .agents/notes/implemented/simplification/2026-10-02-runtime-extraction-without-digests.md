@@ -30,8 +30,8 @@ exports and initializes the matching crypto library. Required extraction or
 loading failures retain ordinary error logs; no new file inventory or diagnosis
 mechanism is introduced.
 
-Producers continue emitting historical layout-v8 metadata so older consumers can
-interpret Releases. Download, Release, runtime-pack, APK structural and ABI checks
+The [producer decision](2026-10-02-minimal-produced-payload.md) owns layout-9
+production and layout-8 compatibility. Download, Release, runtime-pack, APK structural and ABI checks
 remain at their existing tooling boundaries. This consumer subtraction does not
 turn off release hash/signature validation.
 
@@ -66,5 +66,5 @@ real-device startup.
 
 The editable-deployment note partially overlaps in freshness and owns policy and
 Loader-disable behavior. The [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md)
-retains repository migration and producer cleanup. Embedded crypto and crash
+retains repository migration. Embedded crypto and crash
 evidence decisions remain unchanged.

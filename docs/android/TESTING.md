@@ -32,6 +32,10 @@ protection, no unchanged-package scan and pre-hook Loader disabling on failure.
 Runtime extraction cases cover absent/minimal configuration, no generated
 digest/identity/Interop manifest, APK update replacement/removal and retry when
 the platform update token is unavailable.
+Patcher regressions cover active layout-9 APK/directory injection with plain
+Interop DLLs, non-default policy overrides, manual asset add/delete, malformed
+policies and Release-file corruption. Historical layout-8 hash, external-DEX and
+embedded-bootstrap checks remain separate compatibility cases.
 Native build verification requires an ELF build ID and checks that stripping
 preserves the private symbol file's ID. Release staging rejects DWARF/static
 symbols while retaining this diagnostic identifier. When changing native build

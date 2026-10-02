@@ -34,9 +34,9 @@ seed/upgrade/refresh/enforce replacement and obsolete-file rules remain.
 Optional deployment parse, extraction or transaction failure disables Loader
 before symbol redirects/managed initialization while leaving Unity loaded. No
 Mod executes after an incomplete rollback. Required runtime extraction failures
-remain fatal in this step. Release/download validation is unchanged. Producers
-continue writing the old additive metadata for compatibility with old Loaders;
-producer cleanup remains separate. The [runtime-extraction decision](2026-10-02-runtime-extraction-without-digests.md)
+remain fatal in this step. Release/download validation is unchanged. The
+[producer decision](2026-10-02-minimal-produced-payload.md) owns layout-9 metadata
+subtraction and layout-8 compatibility. The [runtime-extraction decision](2026-10-02-runtime-extraction-without-digests.md)
 owns removal of runtime-domain digest requirements.
 
 ## Alternatives considered
