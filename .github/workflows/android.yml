@@ -29,9 +29,9 @@ jobs:
           tool: git-cliff@2.10.1
       - name: Test release-note generation
         run: bash scripts/test-release-notes.sh
-      - name: Test product cleanup safety
+      - name: Test product scripts and helpers
         shell: pwsh
-        run: pwsh -NoProfile -File scripts/test/test-cleanup.ps1
+        run: pwsh -NoProfile -File scripts/test/test-scripts.ps1
       - name: Generate tagged release body
         if: startsWith(github.ref, 'refs/tags/')
         env:
@@ -86,20 +86,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "git diff --check failed."
           }
-          $errors = @()
-          Get-ChildItem ./scripts -Filter *.ps1 -File -Recurse | ForEach-Object {
-            $tokens = $null
-            $parseErrors = $null
-            [void][System.Management.Automation.Language.Parser]::ParseFile(
-              $_.FullName,
-              [ref]$tokens,
-              [ref]$parseErrors)
-            $errors += $parseErrors
-          }
-          if ($errors.Count -ne 0) {
-            $errors | Format-List
-            throw "PowerShell syntax validation failed."
-          }
+          pwsh -NoProfile -File scripts/test/test-scripts.ps1 -SkipBash
 
       - name: Test game information stream lifetime
         shell: pwsh
@@ -113,7 +100,6 @@ jobs:
         shell: pwsh
         run: |
           pwsh -NoProfile -File scripts/test/test-source-dependencies.ps1
-          pwsh -NoProfile -File scripts/test/test-cleanup.ps1
           pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 
       - name: Build release

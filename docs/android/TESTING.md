@@ -8,17 +8,15 @@ Run before every commit that changes Android files or scripts:
 
 ```powershell
 git diff --check
-
-$errors = @()
-Get-ChildItem ./scripts -Filter *.ps1 -File -Recurse | ForEach-Object {
-    $tokens = $null
-    $parseErrors = $null
-    [void][System.Management.Automation.Language.Parser]::ParseFile(
-        $_.FullName, [ref]$tokens, [ref]$parseErrors)
-    $errors += $parseErrors
-}
-if ($errors.Count) { $errors; exit 1 }
+pwsh -NoProfile -File scripts/test/test-scripts.ps1
 ```
+
+This product-owned entry parses PowerShell scripts and tests profile selection,
+ADB argument/error handling, legacy metadata boundaries, cleanup, runtime pack
+fixtures and publication scanner orchestration. No parent checkout or device is
+required. Bash parsing defaults on Linux and off on Windows; on Windows use
+`-SkipBash:$false -Distribution <WSL-distribution>` to include WSL Bash parsing.
+The heavier runtime source build fixture is a separate WSL test entry.
 
 The Android build adds ELF architecture, Android API, required export, Bionic
 symbol, and 16 KiB segment-alignment checks automatically.

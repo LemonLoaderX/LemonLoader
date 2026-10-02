@@ -62,8 +62,9 @@ private OpenSSL libraries and attribution. Active products require API 26.
 Bootstrap compilation verifies the runtime pack and the explicit ClassLoader
 initialization export, embeds the DEX, and records local input identities.
 Staging checks those identities and the full embedded bytes before omitting the
-standalone helper. APK verification checks `coreClrCryptoBootstrapSha256`.
-Asset layout remains v8; Patcher still supports older external-DEX Releases.
+standalone helper. Active layout 9 keeps minimal payload configuration, not
+installed bootstrap/digest inventories. Patcher still supports historical
+layout 8 and external-DEX Releases; see [artifact contracts](ARTIFACTS.md).
 
 ## Native dependency checks
 
@@ -105,6 +106,51 @@ use a new version for binary changes and edit notes only for prose corrections.
 - distinguish automated startup evidence from manual application acceptance;
 - scan the selected publication histories and final release archives for secrets;
   private backup refs are not publication inputs.
+
+## Publication audit
+
+From the Loader repository root, with a reviewed Gitleaks executable:
+
+```powershell
+. ./scripts/common/AndroidDependencies.ps1
+$sources = @('Dobby', 'Il2CppInterop', 'HarmonyX', 'MonoMod') | ForEach-Object {
+    Get-AndroidDependencySourceRoot -Name $_
+}
+& ./scripts/scan-publication.ps1 -GitleaksPath "<gitleaks>" `
+    -SourceRepository $sources -ArchivePath "<final-loader-archive>"
+```
+
+Supply the actual producing checkouts if a build used explicit source overrides.
+The product HEAD is always scanned; explicit sources and initialized nested
+dependencies use their own HEAD histories, never --all or private backup refs.
+Missing/mismatched nested dependencies and tracked edits reject scanning.
+Untracked/ignored source files are not audited by Git history mode. Select every
+source and final archive; product-only scanning does not certify dependencies or
+binaries. Neither product depends on the parent's .gitleaksignore or gitlinks.
+Loader's ignore file retains only reviewed exact upstream fixture fingerprints;
+new findings require review, not broad suppression. All scanner failures are fatal.
+
+Runtime history requires the reviewed upstream base of its patch stack, not all
+canonical dotnet/runtime ancestry:
+
+```powershell
+& ./scripts/scan-publication.ps1 -GitleaksPath "<gitleaks>" `
+    -RuntimeRepository "<runtime-source>" -RuntimeUpstreamBase "<full-upstream-commit>" `
+    -ArchivePath @("<android-runtime-archive>", "<bionic-runtime-archive>")
+```
+
+Both runtime arguments are required together. The full base commit must exist and
+be an ancestor of HEAD; the scanner audits base..HEAD only. Runtime artifacts and
+lock files can remain untracked without changing that source history scope.
+The command does not fetch, modify sources or publish releases.
+
+Normal script tests use isolated Git fixtures and a recording scanner. For
+real Gitleaks tests of synthetic leaked histories, private refs, upstream ranges
+and compressed archives:
+
+```powershell
+pwsh -NoProfile -File scripts/test/test-publication-scan.ps1 -GitleaksPath "<gitleaks>"
+```
 
 Physical 16 KiB-page hardware, additional Unity revisions, complex hook layouts,
 and deployment fault injection remain continuing qualification work. Do not

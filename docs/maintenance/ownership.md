@@ -16,8 +16,8 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Runtime setup | Loader `setup-runtime.ps1` | Loader; non-mutating pinned source setup |
 | Product build entry | Loader `scripts/build.ps1`; parent wrapper retained during migration | Loader |
 | Source setup/audit/status | parent scripts | per-product manifest validation |
-| Syntax/helper verification | parent `test-scripts.ps1` | per-product tests |
-| Source/archive secret scan | parent `scan-publication.ps1` | owned release checks |
+| Syntax/helper verification | Loader `scripts/test/test-scripts.ps1`; Patcher `scripts/test-scripts.ps1` | product tests/CI; parent delegate retained temporarily |
+| Source/archive secret scan | each product `scripts/scan-publication.ps1` and .gitleaksignore | explicit product publication inputs; no parent gitlink discovery |
 | Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup; parent delegate retained temporarily |
 | Agent rules | each product `AGENTS.md` | per-product rules; Loader owns main rationale |
 | Runtime current docs | Loader `docs/android/RUNTIME-DEVELOPMENT.md` | Loader, retained |

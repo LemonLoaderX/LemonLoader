@@ -51,6 +51,17 @@ the old cross-repository Deep switch is not retained. Stop builds before cleanin
 All selected trees are validated before deletion; links at/above a target and
 nested links reject cleanup. Traversal skips nested Git repositories and links.
 Per-product AGENTS.md retains maintenance rules without requiring parent docs.
+Each product also owns script syntax/helper checks and publication scanning.
+Publication scanning always includes its own HEAD; additional source checkouts
+and final archives are explicit inputs rather than discovered through parent
+gitlinks. Initialized nested dependencies of those selected sources are scanned
+at their own HEAD; missing/mismatched nested checkouts reject the operation.
+The scanner checks clean tracked sources and validates Git roots. Untracked and
+ignored source files are outside HEAD history scanning, not certified clean.
+Runtime history scanning requires an explicit full upstream commit and ancestor
+validation, and scans only that base..HEAD patch range. Backup refs are excluded.
+Loader owns the reviewed upstream false-positive fingerprints; Patcher starts
+with no exceptions. These checks audit publication inputs, not installed files.
 Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
@@ -67,6 +78,9 @@ Physical dependency moves remain a separate step of the
 - Keeping umbrella cleanup provides one command but mutates other independently
   maintained sources and treats unknown outputs as disposable. Product-owned,
   named cleanup targets keep ownership and evidence retention explicit.
+- Discovering publication sources from parent gitlinks is convenient but can scan
+  unrelated forks or omit the exact source used by an external build. Explicit
+  source selection follows the actual release inputs without a new shared lock.
 
 ## Consequences
 
@@ -75,7 +89,9 @@ without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
 prepared. Existing runtime artifacts are not moved or deleted by script migration.
-Remaining root audit/test/publication workflows still require ownership migration.
+Remaining root setup/audit/build retirement and historical documentation still
+require migration. Release maintainers must supply every source input to scanning;
+scanning the product alone does not certify a dependency or a release archive.
 The temporary parent cleanup delegates to product commands without dependency
 cleanup. Product cleanup does not reclaim shared dependency build caches or
 runtime source build space; those need deliberate owner-specific maintenance.
@@ -90,6 +106,11 @@ Product build and publish entries verify the actual manifests/inputs.
 Cleanup fixtures operate only on synthetic standalone trees and exercise WhatIf,
 default/archive retention, unknown diagnostics, nested Git checkout preservation,
 containment and ancestor/nested-link rejection before any selected tree is removed.
+Script checks exercise helper behavior without devices or the parent checkout.
+Publication fixtures record exact redaction, input/deduplication and range options;
+real-scanner mode additionally checks synthetic leaked histories/ZIPs, patch-range
+exclusion and private-ref exclusion. Base identity is normalized before comparison
+so a trailing source separator cannot silently change a runtime range into HEAD.
 
 ## Prior-note Audit
 

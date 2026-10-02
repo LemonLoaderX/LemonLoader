@@ -13,6 +13,7 @@ without scanning one flat directory.
 | `build-runtime.ps1` | WSL runtime source entry; serialized Android/Bionic builds and read-only Plan |
 | `build/build-runtime.sh` | Internal WSL backend, per-RID artifacts and source lock |
 | `clean.ps1` | Remove known product build trees; packs/archives require AllOutputs, diagnostics and shared sources are retained |
+| `scan-publication.ps1` | Audit product HEAD plus explicitly selected source histories/final archives with Gitleaks |
 | `build/build-android.ps1` | Full CoreCLR Android orchestration |
 | `build/build-android-ndk-bootstrap.ps1` | Build NDK `libmain.so`; active Android requires a validated matching runtime pack for embedded crypto |
 | `build/build-android-managed.ps1` | Build the managed host, support module, and maintained managed dependencies |
@@ -49,6 +50,8 @@ without scanning one flat directory.
 | `test/test-source-dependencies.ps1` | Local Git fixtures for independent pins, sibling/cache selection and setup preservation |
 | `test/test-runtime-source-build.ps1` | WSL fixtures for runtime output isolation, source protection and failure propagation |
 | `test/test-cleanup.ps1` | Standalone cleanup fixtures for output retention, preview and linked-tree rejection |
+| `test/test-scripts.ps1` | Product script parsing and profile/ADB/cleanup/pack/publication helper regressions |
+| `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

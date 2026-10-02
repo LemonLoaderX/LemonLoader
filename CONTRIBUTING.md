@@ -20,6 +20,7 @@ a desktop build. Android bootstrap, runtime, or packaging changes require the
 corresponding ARM64 build and artifact verification.
 
 ```powershell
+pwsh -NoProfile -File scripts/test/test-scripts.ps1
 dotnet build MelonLoader.sln --configuration Release -p:Platform=x64
 pwsh -NoProfile -File scripts/build/build-android-ndk-bootstrap.ps1 `
     -Configuration Release `

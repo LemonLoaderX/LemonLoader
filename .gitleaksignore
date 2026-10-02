@@ -1,0 +1,16 @@
+# Reviewed already-public MelonLoader fixture fingerprints only: Mono config
+# token names and the RFC 6455 example key in easywsclient, not project secrets.
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x64/etc/mono/2.0/machine.config:generic-api-key:217
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x64/etc/mono/4.0/machine.config:generic-api-key:234
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x64/etc/mono/4.5/machine.config:generic-api-key:237
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x86/etc/mono/2.0/machine.config:generic-api-key:217
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x86/etc/mono/4.0/machine.config:generic-api-key:234
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:BaseLibs/MonoBleedingEdge.x86/etc/mono/4.5/machine.config:generic-api-key:237
+392cc5022e71647c9b1b8adda9b8bc14382b3edf:SrcLibs/bHaptics/src/easywsclient.cpp:generic-api-key:483
+76885939cbd9e04e2527b764037db4bb5088f1bf:SrcLibs/bHaptics/src/easywsclient.cpp:generic-api-key:483
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x64/etc/mono/2.0/machine.config:generic-api-key:217
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x64/etc/mono/4.0/machine.config:generic-api-key:234
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x64/etc/mono/4.5/machine.config:generic-api-key:237
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x86/etc/mono/2.0/machine.config:generic-api-key:217
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x86/etc/mono/4.0/machine.config:generic-api-key:234
+e89f84273d80a91a0d594a08ff80362666b5d807:BaseLibs/MonoBleedingEdge.x86/etc/mono/4.5/machine.config:generic-api-key:237
