@@ -42,13 +42,13 @@ runtime wrappers.
     -InteropInputPath ./Output/InteropInput
 ```
 
-The workspace defaults to the maintained source fork. A standalone checkout can
-pass its CLI project explicitly:
+The Loader selects its own pinned source fork through sibling/cache resolution.
+An explicit external checkout can provide its CLI project:
 
 ```powershell
 ./scripts/interop/generate-android-interop.ps1 `
     -InteropInputPath ./Output/InteropInput `
-    -Il2CppInteropCliProject ../dependencies/Il2CppInterop/Il2CppInterop.CLI/Il2CppInterop.CLI.csproj
+    -Il2CppInteropCliProject "<source-root>/Il2CppInterop.CLI/Il2CppInterop.CLI.csproj"
 ```
 
 The selected source project is recorded in `interop-manifest.json`.
@@ -143,7 +143,7 @@ the migration-only Il2CppDumper path are not restored.
 ## Android ARM64 runtime ABI
 
 Android releases build `Il2CppInterop.Runtime` and
-`Il2CppInterop.HarmonySupport` from `dependencies/Il2CppInterop`; they are not
+`Il2CppInterop.HarmonySupport` from the selected reviewed source checkout; they are not
 opaque prebuilt replacements. LemonLoader explicitly sets the runtime's Android
 platform flag from the Android build target instead of relying on runtime
 environment heuristics.

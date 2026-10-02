@@ -54,6 +54,7 @@ without scanning one flat directory.
 | `test/test-scripts.ps1` | Product script parsing and profile/ADB/cleanup/pack/publication helper regressions |
 | `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
 | `test/test-verification-entry.ps1` | Synthetic orchestration fixtures for selected sources, omitted builds, failure propagation and repacking |
+| `test/inspect-runtime-native.sh` | Explicit raw-nupkg native diagnostic: ARM64/alignment/glibc/host exports; not device qualification |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

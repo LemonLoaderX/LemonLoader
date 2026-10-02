@@ -22,9 +22,10 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup; parent delegate retained temporarily |
 | Agent rules | each product `AGENTS.md` | per-product rules; Loader owns main rationale |
 | Runtime current docs | Loader `docs/android/RUNTIME-DEVELOPMENT.md` | Loader, retained |
-| Runtime historical evidence prose | parent `RUNTIME-EXPERIMENT.md` | compact Loader history/notes |
+| Runtime investigation lessons | Loader `docs/android/RUNTIME-TROUBLESHOOTING.md` | stable root causes; local timelines/evidence kept privately |
 | Parent operations/status | parent docs | current facts merged into Loader docs |
-| Historical device/OpenSSL probes | parent diagnostic scripts | inventory callers before retaining/retiring |
+| Historical runtime scripts | retired raw-pack verifier, shell runner and fixed OpenSSL downloader | preserved privately; current product pack/build/probe validation retained |
+| Native nupkg inspection | Loader `scripts/test/inspect-runtime-native.sh` | retained explicit diagnostic; no parent tool cache |
 
 ## Existing path coupling
 

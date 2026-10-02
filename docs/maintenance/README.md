@@ -16,6 +16,8 @@ Read only the document needed for the current task:
   host suites, runtime compilation and device checks remain explicit workflows.
 - [Publication audit](../android/MAINTENANCE.md#publication-audit): explicit source
   histories and final archives, without parent gitlink discovery.
+- [Runtime troubleshooting](../android/RUNTIME-TROUBLESHOOTING.md): retained
+  build, Bionic feature, crypto and source-adaptation lessons, without local timelines.
 - [Payload contract](../android/ARTIFACTS.md) and
   [deployment](../android/DEPLOYMENT.md): current installation/update rules.
 - [Maintenance](../android/MAINTENANCE.md): current dependency/release practices.

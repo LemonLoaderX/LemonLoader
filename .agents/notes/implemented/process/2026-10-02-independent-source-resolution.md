@@ -75,6 +75,17 @@ requires already-cloned products and calls each product's non-mutating pinned
 setup; it never initializes or switches products from umbrella gitlinks.
 Parent status/audit and the shared environment-cache override are retired;
 ordinary git status and existing source/setup/build checks replace them.
+Stable historical runtime causes and recovery steps belong to Loader's
+RUNTIME-TROUBLESHOOTING.md. Chronological build/device/publication states stay in
+private retained evidence, not tracked history documents. The old dual-checkout
+raw-nupkg verifier, fixed-revision shell runner, unauthenticated fixed-version
+OpenSSL downloader are retired after caller inspection.
+Current pack preparation/staging own structural/native gates. CoreClrProbe source
+remains available for explicit investigations, and Java/application/device
+qualification remains separate from shell execution. No diagnostic assets are
+deleted as part of retirement.
+The all-SO raw-nupkg inspector retains a distinct glibc/native diagnostic boundary
+and lives under Loader scripts/test without the parent unzip cache assumption.
 Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
@@ -97,6 +108,10 @@ Physical dependency moves remain a separate step of the
 - A new per-product audit/status framework can duplicate source checks and provide
   a convenient summary, but adds another gate to maintain. Use native Git for
   worktree inspection and reuse pinned setup/build checks for compatibility.
+- Moving every historical experiment script preserves reproduction convenience
+  but retains obsolete paths, duplicate validation and an old OpenSSL download
+  recipe without authenticated inputs. Keep useful lessons/probe source and
+  privately preserve exact old scripts instead of presenting them as supported.
 
 ## Consequences
 
@@ -105,7 +120,8 @@ without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
 prepared. Existing runtime artifacts are not moved or deleted by script migration.
-Historical documentation and physical directory migration still remain.
+Physical directory migration and remaining documentation/script consolidation
+still remain.
 Release maintainers must supply every source input to scanning;
 scanning the product alone does not certify a dependency or a release archive.
 The temporary parent cleanup delegates to product commands without dependency

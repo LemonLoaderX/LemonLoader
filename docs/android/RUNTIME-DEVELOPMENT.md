@@ -3,6 +3,8 @@
 Run these commands from the LemonLoader repository root. Normal product builds
 consume validated runtime packs; rebuilding CoreCLR is an explicit maintainer
 workflow. Runtime hosting and crypto behavior are in [RUNTIME.md](RUNTIME.md).
+Build/packaging, Bionic startup and crypto investigation findings are in
+[runtime troubleshooting](RUNTIME-TROUBLESHOOTING.md).
 
 ## Source selection
 
