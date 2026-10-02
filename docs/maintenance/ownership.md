@@ -9,13 +9,14 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 | Loader fork pins | Loader `eng/AndroidDependencies.props` | Loader, retained |
 | Active runtime pins/profile | Loader `eng/runtime-profiles.json` | Loader, retained |
 | Patcher Interop pin | Patcher `Directory.Build.props` | Patcher, retained |
-| Parent checkout lock | parent `.gitmodules` and gitlinks | retired after standalone validation |
+| Historical parent lock | retained parent `.gitmodules` and gitlinks | no active setup/build authority; preserve for recovery |
 | Loader release CI | Loader `.github/workflows/android.yml` | Loader, retained |
 | Patcher release CI | Patcher workflows and scripts | Patcher, retained |
 | Runtime source build | Loader `build-runtime.ps1` and WSL backend | Loader; parent wrapper retained during migration |
 | Runtime setup | Loader `setup-runtime.ps1` | Loader; non-mutating pinned source setup |
 | Product build entry | Loader `scripts/build.ps1`; parent wrapper retained during migration | Loader |
-| Source setup/audit/status | parent scripts | per-product manifest validation |
+| Source setup/checks | product setup/build helpers | parent setup delegates; umbrella status/audit retired |
+| Loader verification | Loader `scripts/verify.ps1`; Patcher retains `scripts/test.ps1` | independent product boundaries; parent delegate temporary |
 | Syntax/helper verification | Loader `scripts/test/test-scripts.ps1`; Patcher `scripts/test-scripts.ps1` | product tests/CI; parent delegate retained temporarily |
 | Source/archive secret scan | each product `scripts/scan-publication.ps1` and .gitleaksignore | explicit product publication inputs; no parent gitlink discovery |
 | Cleanup | each product `scripts/clean.ps1` | per-product named output cleanup; parent delegate retained temporarily |
@@ -30,11 +31,12 @@ Status: migration inventory, not a completed move. Updated 2026-10-02.
 - Both products select a matching sibling HEAD or a private per-revision cache.
   Loader reads its props; Patcher independently reads generator URL/revision from
   its own props. Setup never switches shared or existing checkouts. Parent builds
-  still override Loader paths with `dependencies/*` during physical migration.
+  no longer override Loader paths with historical `dependencies/*` or inspect
+  umbrella gitlinks. Use explicit source paths for retained old checkouts.
 - Loader release CI operates from the Loader checkout and downloads reviewed
   runtime artifacts; it does not require the parent Git lock. Local runtime
-  source build/setup is also Loader-owned; remaining parent audit/test coordination
-  still needs migration.
+  source build/setup and verification are also Loader-owned. Parent wrappers only
+  invoke product entries; status/audit gitlink gates and cache overrides are retired.
 - Runtime builds use an artifacts symlink and per-RID outputs under Loader Output
   or an explicit output root; parent wrappers retain historical temp paths.
   Move only after builds stop; preserve the existing target and avoid a recursive

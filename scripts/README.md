@@ -9,6 +9,7 @@ without scanning one flat directory.
 | --- | --- |
 | `setup-android-dependencies.ps1` | Resolve maintained source forks at their manifest revisions |
 | `build.ps1` | Product build entry, profile selection and explicit development source roots; no parent workspace required |
+| `verify.ps1` | Loader script/host/Interop checks and optional desktop/Android build/repack; independent of Patcher |
 | `setup-runtime.ps1` | Resolve the active runtime fork at Loader's own pin without changing existing sources |
 | `build-runtime.ps1` | WSL runtime source entry; serialized Android/Bionic builds and read-only Plan |
 | `build/build-runtime.sh` | Internal WSL backend, per-RID artifacts and source lock |
@@ -52,6 +53,7 @@ without scanning one flat directory.
 | `test/test-cleanup.ps1` | Standalone cleanup fixtures for output retention, preview and linked-tree rejection |
 | `test/test-scripts.ps1` | Product script parsing and profile/ADB/cleanup/pack/publication helper regressions |
 | `test/test-publication-scan.ps1` | Publication preflight fixtures; optional real Gitleaks marker/history/archive tests |
+| `test/test-verification-entry.ps1` | Synthetic orchestration fixtures for selected sources, omitted builds, failure propagation and repacking |
 
 Use PowerShell 7. Internal paths resolve from the script location; caller-supplied
 relative paths resolve from the current directory. Build output and captured device logs

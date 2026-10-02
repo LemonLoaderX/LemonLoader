@@ -12,6 +12,8 @@ Read only the document needed for the current task:
 - [Android status](../android/STATUS.md): current implemented/qualified behavior.
 - [Build guide](../android/BUILDING.md): current supported product commands.
 - [Testing](../android/TESTING.md): automated and device validation ownership.
+  Loader scripts/verify.ps1 and Patcher scripts/test.ps1 are independent; native
+  host suites, runtime compilation and device checks remain explicit workflows.
 - [Publication audit](../android/MAINTENANCE.md#publication-audit): explicit source
   histories and final archives, without parent gitlink discovery.
 - [Payload contract](../android/ARTIFACTS.md) and

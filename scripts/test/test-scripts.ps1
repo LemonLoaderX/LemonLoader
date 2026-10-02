@@ -61,4 +61,5 @@ if (!$rejected) { throw 'Missing legacy metadata was accepted for legacy use.' }
 & (Join-Path $PSScriptRoot 'test-cleanup.ps1')
 & (Join-Path $PSScriptRoot 'test-runtime-profiles.ps1')
 & (Join-Path $PSScriptRoot 'test-publication-scan.ps1')
+& (Join-Path $PSScriptRoot 'test-verification-entry.ps1')
 Write-Host "Loader script syntax and helpers passed ($count scripts; SkipBash=$SkipBash)."

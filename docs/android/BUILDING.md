@@ -32,6 +32,10 @@ Setup/build selects a sibling `../Dobby`, `../Il2CppInterop`, `../HarmonyX` or
 creates an isolated `.dependencies/<name>/<revision>` checkout. Existing sources
 are verified without fetching or switching revisions; local changes are preserved.
 Different product pins never switch a shared checkout. Builds do not fetch.
+Use ordinary git status for worktree inspection; setup/build helpers own the
+source-pin checks. No parent status/audit gate or shared environment cache is
+required. Configure local NuGet/temp caches through standard environment variables
+when needed; product commands do not redirect them to a parent temp directory.
 
 Use the corresponding `-DobbySourceRoot`, `-Il2CppInteropSourceRoot`,
 `-HarmonyXSourceRoot` or `-MonoModSourceRoot` for explicit external checkouts.

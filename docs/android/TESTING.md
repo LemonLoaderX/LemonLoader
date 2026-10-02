@@ -103,6 +103,22 @@ RuntimeLocalBuilder paths before packaging.
 
 ### Build tests
 
+The independent Loader verification entry includes script/host fixtures, pinned
+Interop Runtime/Generator regressions, a Win64 build and one Android profile build
+followed by deterministic repacking:
+
+```powershell
+pwsh -NoProfile -File scripts/verify.ps1 -RuntimeProfile android `
+    -AndroidNdkRoot "<android-ndk-r27d>"
+```
+
+Use `-SkipAndroid -SkipDesktop` for host/script/Interop-only verification, not full
+build qualification. Explicit source roots, CoreClrRuntimePackRoot and Development
+follow the same rules as scripts/build.ps1. Interop tests use the selected source,
+not Patcher's pin. The entry never runs Patcher, source runtime compilation, native
+WSL host suites or device tests implicitly; run the relevant entries separately.
+Final output names report selected profile/development mode and skipped builds.
+
 For runtime or packaging changes, provide validated packs and build both profiles
 sequentially (the staging directory is shared):
 

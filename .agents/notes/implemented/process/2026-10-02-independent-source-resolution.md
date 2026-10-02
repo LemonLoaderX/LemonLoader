@@ -62,6 +62,19 @@ Runtime history scanning requires an explicit full upstream commit and ancestor
 validation, and scans only that base..HEAD patch range. Backup refs are excluded.
 Loader owns the reviewed upstream false-positive fingerprints; Patcher starts
 with no exceptions. These checks audit publication inputs, not installed files.
+Loader's scripts/verify.ps1 owns its host/script/runtime-resolver and Interop
+source regressions, optional desktop build, and selected Android build/repack
+check. It uses the same source-root/development selection as product builds,
+without requiring Patcher or mutating process-wide caches. Patcher retains its
+own scripts/test.ps1. SkipDesktop/SkipAndroid explicitly narrow verification;
+completion reports the omitted boundaries rather than claiming full coverage.
+The release reproducibility check selects profile/development output from the
+staged manifest and repacks that same tree, including frozen legacy selection.
+Parent setup/build/verify are temporary delegates, not a second policy. Setup
+requires already-cloned products and calls each product's non-mutating pinned
+setup; it never initializes or switches products from umbrella gitlinks.
+Parent status/audit and the shared environment-cache override are retired;
+ordinary git status and existing source/setup/build checks replace them.
 Physical dependency moves remain a separate step of the
 [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md).
 
@@ -81,6 +94,9 @@ Physical dependency moves remain a separate step of the
 - Discovering publication sources from parent gitlinks is convenient but can scan
   unrelated forks or omit the exact source used by an external build. Explicit
   source selection follows the actual release inputs without a new shared lock.
+- A new per-product audit/status framework can duplicate source checks and provide
+  a convenient summary, but adds another gate to maintain. Use native Git for
+  worktree inspection and reuse pinned setup/build checks for compatibility.
 
 ## Consequences
 
@@ -89,8 +105,8 @@ without sharing a version authority. Cache copies consume additional disk when
 pins differ. Old caches and dependency working trees are preserved. Setup requires
 network access only for a new source clone; builds remain offline once inputs are
 prepared. Existing runtime artifacts are not moved or deleted by script migration.
-Remaining root setup/audit/build retirement and historical documentation still
-require migration. Release maintainers must supply every source input to scanning;
+Historical documentation and physical directory migration still remain.
+Release maintainers must supply every source input to scanning;
 scanning the product alone does not certify a dependency or a release archive.
 The temporary parent cleanup delegates to product commands without dependency
 cleanup. Product cleanup does not reclaim shared dependency build caches or
@@ -111,6 +127,9 @@ Publication fixtures record exact redaction, input/deduplication and range optio
 real-scanner mode additionally checks synthetic leaked histories/ZIPs, patch-range
 exclusion and private-ref exclusion. Base identity is normalized before comparison
 so a trailing source separator cannot silently change a runtime range into HEAD.
+Verification-entry fixtures use a standalone product tree and recorded build
+commands to exercise pin mismatches, explicit edited source selection, skipped
+boundaries, legacy/Bionic development paths and failure/repack propagation.
 
 ## Prior-note Audit
 
