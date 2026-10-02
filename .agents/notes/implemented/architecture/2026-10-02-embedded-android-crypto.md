@@ -55,8 +55,10 @@ public Loader archives do not carry a standalone helper in embedded mode.
   packaging accepts an explicit development pack, validates it and preserves its
   development identity in isolated output. Regressions cover locked-mode rejection,
   archive round-trip and reproducibility.
-- The Android runtime pack and matching Loader development archive are rebuilt.
-  Bionic rebuilding and device crypto/TLS/namespace acceptance remain incomplete.
+- Android and Bionic runtime packs and matching Loader development archives are
+  rebuilt from the reviewed common source; both actual Releases pass Patcher's
+  regressions/validator. Active source pins select that commit. Device
+  crypto/TLS/namespace acceptance and runtime artifact publication remain pending.
 
 ## Consequences
 
@@ -64,8 +66,11 @@ The explicit host API requires rebuilding the runtime source fork. Source pins
 cannot be updated to uncommitted revisions; local validation uses development
 packs, and publication requires reviewed commits and rebuilt pinned artifacts.
 No claim of startup speedup or broad device qualification is made.
-The existing pinned Android pack now fails closed at the product build gate
-because it lacks the new export. Bionic remains independent of Java helpers.
+Old Android packs fail the product build gate because they lack the new export.
+Both active profile pins now select the reviewed runtime fork commit; its remote
+artifact tag is not published yet, so normal CI/download needs runtime publication
+first. Local acceptance uses explicit development pack paths, without removing
+their development identity. Bionic remains independent of Java helpers.
 Legacy package staging does not require the new local bootstrap identity file.
 The current rebuild/recovery workflow remains in the parent
 docs/RUNTIME-DEVELOPMENT.md until its scripts and documentation are migrated.

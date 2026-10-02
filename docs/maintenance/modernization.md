@@ -46,7 +46,7 @@ Requested: 2026-10-02. Status: active, incremental work.
 
 - Embedded-DEX source changes exist in Loader, Patcher and the runtime fork.
   Patcher regressions and host/NDK checks passed in the prior implementation;
-  full pack/product rebuilding and device acceptance are not complete.
+  both pack/product development rebuilds pass; device acceptance is not complete.
 - Crypto helpers are loaded from the bootstrap with InMemoryDexClassLoader and
   an explicit runtime initialization export. The old pinned pack lacks it.
 - Identity generation is not entirely in Patcher: Loader staging produces
@@ -98,17 +98,20 @@ history; runtime behavior has not been changed by planning.
   new-mode APK verification. Fix defects with focused regressions.
 - [x] Commit runtime changes in their source fork (`b85b9fbd264`); use that real source identity
   for rebuilds. Do not update pins to a fictitious/uncommitted revision.
-- [ ] Rebuild Android and Bionic from the reviewed common runtime source; preserve
+- [x] Rebuild Android and Bionic from the reviewed common runtime source; preserve
   separate outputs and old packs. Normalize/import/package validated packs.
-- [ ] Update consuming pins, build matching Loader/Patcher artifacts, check no new
+- [x] Update consuming pins, build matching Loader/Patcher development artifacts, check no new
   top-level DEX and retain hashes/symbols/logs privately.
 - [x] Commit Loader implementation after its automated gates (`a6c5e65d`); Patcher committed as `ccd329f`
   after 19 regressions and published locally for win-x64.
 - [x] Produce a [device-acceptance checklist](embedded-crypto-acceptance.md); maintainer performs installation and
   crypto/TLS/lifecycle/namespace tests later.
 
-Exit: matching, locally verified artifacts and exact commands are available.
+Exit: matching, locally verified development artifacts and exact commands are available.
 Do not label them device-qualified or publish them before device acceptance.
+The runtime fork/asset tag is still unpublished. Normal CI/downloads for the new
+pin require publishing reviewed runtime inputs first; explicit local development
+pack paths work now. Do not relabel existing development packs as formal packs.
 
 ### P2: Native crash evidence
 
@@ -257,15 +260,15 @@ ReleaseValidator, alongside all 19 regressions. Bootstrap contains the complete
 matching helper DEX; the Release contains no standalone helper DEX. Runtime pack
 packaging/round-trip/reproducibility tests pass, and an isolated development
 runtime archive is ready. Private unstripped bootstrap symbols and runtime symbol
-nupkgs are retained. Bionic is still building. Check the active background build
-before rerunning or moving any
-dependency directory. Outputs are under parent `temp/runtime-development/local/`
+nupkgs are retained. Bionic also completed with zero errors; its isolated pack,
+runtime archive and Loader development ZIP pass the same validation. Both active
+profile pins now select the real reviewed runtime commit. Builds have stopped;
+there is no active source build to resume. Outputs are under parent `temp/runtime-development/local/`
 by exact source revision and RID; failure logs and exit-code files remain there.
 
-Next P1 actions: finish Bionic, normalize/import its isolated pack,
-update both product runtime pins to the reviewed common revision, build/check
-matching Loader archives, and record artifact identities outside Git. Patcher
-win-x64 is ready locally. Maintainer device acceptance remains pending. NuGet
+Next actions: maintainer device acceptance from the checklist, then controlled
+runtime/product publication. P2 first verifies existing runtime crash reporting
+and fixes early-session log loss. Patcher win-x64 is ready locally. NuGet
 audit reported known high-severity advisories on the upstream DiaSymReader.Native
 build dependency; assess publication exposure separately rather than suppressing
 the warning or upgrading unrelated pins without review.

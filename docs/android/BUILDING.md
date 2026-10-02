@@ -78,6 +78,12 @@ This validates the pack and writes a reproducible archive plus checksum under
 Use one profile when specifying a pack path. Development identity is retained;
 packaging does not turn an unqualified build into a published runtime.
 
+The embedded-crypto source pin is rebuilt locally but its runtime release tag
+is not published yet. Until publication, use the matching explicit pack path
+and `-AllowDirtyDependencies` for local acceptance; normal CI/downloads require
+the reviewed runtime artifact to be published first. See the
+[maintenance status](../maintenance/modernization.md#p1-review-and-rebuild-embedded-crypto).
+
 Use `-CoreClrRuntimePackRoot <directory>` for a reviewed local/offline pack. A
 runtime pack contains:
 

@@ -5,7 +5,7 @@
     "android": {
       "rid": "android-arm64",
       "version": "11.0.0",
-      "revision": "12e2dc84c3fec81acb741410c787f23d8c65e32d",
+      "revision": "b85b9fbd264f0f25ab17f722162813ff7d0a1ea5",
       "tfm": "net11.0",
       "minimumApi": 26,
       "cryptoBackend": "android-jni",
@@ -14,7 +14,7 @@
     "bionic": {
       "rid": "linux-bionic-arm64",
       "version": "11.0.0",
-      "revision": "12e2dc84c3fec81acb741410c787f23d8c65e32d",
+      "revision": "b85b9fbd264f0f25ab17f722162813ff7d0a1ea5",
       "tfm": "net11.0",
       "minimumApi": 26,
       "cryptoBackend": "openssl",
