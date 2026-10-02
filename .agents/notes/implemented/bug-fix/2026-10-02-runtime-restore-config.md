@@ -31,8 +31,7 @@ used. The script remains in the parent until the
 
 The original runtime build fails during toolset restore with only nuget.org in
 the error. Replaying the restore entry point with explicit RestoreConfigFile
-restores the Arcade toolset and proceeds to the runtime project restore. This
-fix does not claim the later compiler/product-pack stages or device gates pass.
+restores the Arcade toolset and proceeds to the runtime project restore.
 
 ## Consequences
 

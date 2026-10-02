@@ -1,6 +1,8 @@
 # Project modernization
 
-Requested: 2026-10-02. Status: active, incremental work.
+This document defines goals and execution order, not local build status.
+Build jobs, artifact hashes, test-run results and acceptance progress belong in
+ignored local records; keep only stable decisions and commands in repository docs.
 
 ## Goals
 
@@ -44,11 +46,8 @@ Requested: 2026-10-02. Status: active, incremental work.
 
 ## Current facts
 
-- Embedded-DEX source changes exist in Loader, Patcher and the runtime fork.
-  Patcher regressions and host/NDK checks passed in the prior implementation;
-  both pack/product development rebuilds pass; device acceptance is not complete.
 - Crypto helpers are loaded from the bootstrap with InMemoryDexClassLoader and
-  an explicit runtime initialization export. The old pinned pack lacks it.
+  an explicit runtime initialization export; earlier runtime packs lack it.
 - Identity generation is not entirely in Patcher: Loader staging produces
   runtime/payload identities; Patcher finishes game-specific deployment and
   Interop identities; the native host verifies deployment revisions and files.
@@ -81,10 +80,10 @@ mandatory umbrella repo under another name.
 
 ### P0: Durable plan and baseline
 
-- [x] Persist goals, constraints, sequence and acceptance gates in Loader.
-- [x] Inspect ownership and existing decisions; preserve unrelated proposal.
-- [x] Commit the plan alone (`87e1c2c0` in Loader).
-- [x] Record initial [ownership inventory](ownership.md); exhaustive caller and
+- Persist goals, constraints, sequence and acceptance gates in Loader.
+- Inspect ownership and existing decisions; preserve unrelated proposal.
+- Commit the plan separately from implementation.
+- Record initial [ownership inventory](ownership.md); exhaustive caller and
   Git-metadata checks remain mandatory before P4 physical moves/deletions.
 
 Exit: a resumable plan exists in the primary product without requiring chat
@@ -92,48 +91,46 @@ history; runtime behavior has not been changed by planning.
 
 ### P1: Review and rebuild embedded crypto
 
-- [x] Review native initialization, JNI references, ClassLoader parent, buffer
+- Review native initialization, JNI references, ClassLoader parent, buffer
   lifetime, exception paths, P/Invoke handle reuse and compiler/linker exports.
-- [x] Review build/staging identity, API declarations, legacy compatibility and
+- Review build/staging identity, API declarations, legacy compatibility and
   new-mode APK verification. Fix defects with focused regressions.
-- [x] Commit runtime changes in their source fork (`b85b9fbd264`); use that real source identity
+- Commit runtime changes in their source fork; use that real source identity
   for rebuilds. Do not update pins to a fictitious/uncommitted revision.
-- [x] Rebuild Android and Bionic from the reviewed common runtime source; preserve
+- Rebuild Android and Bionic from the reviewed common runtime source; preserve
   separate outputs and old packs. Normalize/import/package validated packs.
-- [x] Update consuming pins, build matching Loader/Patcher development artifacts, check no new
+- Update consuming pins, build matching Loader/Patcher development artifacts, check no new
   top-level DEX and retain hashes/symbols/logs privately.
-- [x] Commit Loader implementation after its automated gates (`a6c5e65d`); Patcher committed as `ccd329f`
-  after 19 regressions and published locally for win-x64.
-- [x] Produce a [device-acceptance checklist](embedded-crypto-acceptance.md); maintainer performs installation and
+- Commit Loader and Patcher changes separately after their automated gates.
+- Produce a [device-acceptance checklist](embedded-crypto-acceptance.md); maintainer performs installation and
   crypto/TLS/lifecycle/namespace tests later.
 
 Exit: matching, locally verified development artifacts and exact commands are available.
 Do not label them device-qualified or publish them before device acceptance.
-The runtime fork/asset tag is still unpublished. Normal CI/downloads for the new
-pin require publishing reviewed runtime inputs first; explicit local development
-pack paths work now. Do not relabel existing development packs as formal packs.
+Publish reviewed runtime inputs before consuming product releases.
+Do not relabel existing development packs as formal packs.
 
 ### P2: Native crash evidence
 
-- [ ] Inventory CoreCLR/Unity handlers, existing logs, Android exit information
+- Inventory CoreCLR/Unity handlers, existing logs, Android exit information
   and storage accessibility; distinguish faults from SIGKILL/OOM/ANR.
-- [ ] Evaluate a maintained Android crash library against a minimal recorder;
+- Evaluate a maintained Android crash library against a minimal recorder;
   select based on handler coexistence, APK/bootstrap integration, reliability
   and maintenance cost, not the attractiveness of a full dump alone.
   Existing .NET 11 in-process reporting is a third candidate; see the
   [scoped investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md).
-- [ ] Preserve last-session logs before truncation, including early-startup
+- Preserve last-session logs before truncation, including early-startup
   failures. Prepare bounded report storage before a fault can occur.
-- [ ] Persist crash/session identity, signal/code/fault address, register context,
+- Persist crash/session identity, signal/code/fault address, register context,
   module identity/load bias and available trace. Preserve unstripped symbols
   outside public releases for offline symbolization.
-- [ ] Do not allocate, lock normal log mutexes, call JNI/.NET or perform complex
+- Do not allocate, lock normal log mutexes, call JNI/.NET or perform complex
   unwinding in a fatal signal handler. Do not treat CoreCLR's internally handled
   signals as fatal crashes, swallow original faults or suppress Android reports.
-- [ ] Recover/export evidence on the next launch through app-accessible storage;
+- Recover/export evidence on the next launch through app-accessible storage;
   evaluate API 30+ ApplicationExitInfo as supplemental evidence, not API 26
   coverage. Bound retention and redact sensitive data by default.
-- [ ] Test faults in subprocesses, handler chaining, early crashes, recursive
+- Test faults in subprocesses, handler chaining, early crashes, recursive
   faults, low storage, truncated reports, report rotation and symbol matching.
 
 Exit: another-device user can provide retained evidence without live logcat;
@@ -141,38 +138,38 @@ coverage limits (pre-init faults, SIGKILL, OOM, corrupted process state) are exp
 
 ### P3: Installation/deployment contract owned by Loader
 
-- [ ] Reassess all manifests, identity digests, mixed domain hashes, extraction
+- Reassess all manifests, identity digests, mixed domain hashes, extraction
   markers and deployment policy state from actual installation/update needs.
   Prefer deleting unnecessary requirements, not rebuilding the same machinery.
-- [ ] Compare with upstream MelonLoader's directory installation/loading. Keep
+- Compare with upstream MelonLoader's directory installation/loading. Keep
   demonstrated Android requirements: APK asset extraction, private runtime files
   and process-safe publication. Do not add per-file corruption diagnostics,
   expected-file inventories or routine startup scans; reuse existing error logs.
-- [ ] Remove deployment revision self-consistency as a startup prerequisite. Treat
+- Remove deployment revision self-consistency as a startup prerequisite. Treat
   legacy revision as an optional rollout hint or retire it when equivalent update
   decisions are derived locally. Missing/stale declared revision must not prevent
   the game from starting or require a manual installer to recalculate it.
-- [ ] Evaluate whether a global deployment revision is needed at all. Preserve
+- Evaluate whether a global deployment revision is needed at all. Preserve
   only the state needed for refresh-once, user-edit preservation, safe obsolete
   file handling and transactional recovery. Per-file previous hashes can support
   those decisions without pretending to authenticate the APK's editable content.
-- [ ] Specify a minimal Loader-owned file layout and extraction/update behavior.
+- Specify a minimal Loader-owned file layout and extraction/update behavior.
   Patcher is an optional adapter, not an admission authority. Do not build a
   metadata-generation framework unless necessary metadata remains after deletion.
-- [ ] Make ordinary deployment explicitly editable; do not introduce a mandatory
+- Make ordinary deployment explicitly editable; do not introduce a mandatory
   locked/verified path merely to keep the current manifest design. Evaluate
   optional managed/locked policies for a demonstrated distribution need.
   Filename/content edits should not require manually recomputing revision fields.
   Existing locked/enforce policies require an explicit migration decision; they
   are deployment behavior, not anti-tamper protection against an APK editor.
-- [ ] Isolate optional deployment failures from base game startup. Determine safe
+- Isolate optional deployment failures from base game startup. Determine safe
   Loader-disable/fallback points before installing hooks or changing startup;
   do not continue from partially initialized runtime state.
-- [ ] Support a minimal third-party/manual injection workflow: documented native
+- Support a minimal third-party/manual injection workflow: documented native
   replacement, release extraction, explicit game Interop input, private runtime
   installation and local Mods path. APK signing/Android permissions still apply;
   do not promise that PC-style extraction removes these platform requirements.
-- [ ] Test MT Manager-like add/edit/delete, stale metadata, unsafe paths, protected
+- Test MT Manager-like add/edit/delete, stale metadata, unsafe paths, protected
   tampering, locked behavior, interrupted updates, rollback and old consumer
   compatibility. Change schema versions only if old consumers cannot interpret
   the new semantics safely.
@@ -185,18 +182,18 @@ and its trust source; do not label colocated hashes as proof of authenticity.
 
 ### P4: Independent repositories and sibling layout
 
-- [ ] Assign every root script/doc/config to Loader, Patcher, a dependency owner,
+- Assign every root script/doc/config to Loader, Patcher, a dependency owner,
   or obsolete/local-only status before moving it.
-- [ ] Move build/setup/audit/runtime/release workflows into their owners and update
+- Move build/setup/audit/runtime/release workflows into their owners and update
   CI, explicit source paths, source pin validation and output roots.
-- [ ] Move primary maintenance docs/agent rules to Loader; Patcher links to public
+- Move primary maintenance docs/agent rules to Loader; Patcher links to public
   contract docs but retains its own commands and operational responsibilities.
-- [ ] Migrate dependency checkouts with verified absolute targets and repository
+- Migrate dependency checkouts with verified absolute targets and repository
   identity/status checks; preserve .git metadata, dirty work and output links.
   Do not let parent submodule metadata become a hidden build dependency.
-- [ ] Verify clean standalone Loader/Patcher clones with matching dependencies,
+- Verify clean standalone Loader/Patcher clones with matching dependencies,
   conflicting sibling revisions, explicit overrides and local development edits.
-- [ ] Retire the parent lock/build scripts only after independent workflows pass.
+- Retire the parent lock/build scripts only after independent workflows pass.
   Preserve the old local root/history for recovery instead of destructive reset.
 
 Exit: neither product needs files, Git metadata or commands from the parent repo;
@@ -204,15 +201,15 @@ both independently control their dependency revisions.
 
 ### P5: Documentation/script simplification and final audit
 
-- [ ] Provide a short primary index by task: use/install, build, troubleshoot,
+- Provide a short primary index by task: use/install, build, troubleshoot,
   contribute/release, public contracts and active decisions.
-- [ ] Keep current commands in one authoritative location; keep current status
+- Keep current commands in one authoritative location; keep current status
   separate from rationale and historical/private evidence.
-- [ ] Put decisions in proposed/implemented/rejected notes by topic; do not flatten
+- Put decisions in proposed/implemented/rejected notes by topic; do not flatten
   everything into one long file or build redundant note/index hierarchies.
-- [ ] Consolidate duplicate helpers, remove unreferenced obsolete scripts/docs and
+- Consolidate duplicate helpers, remove unreferenced obsolete scripts/docs and
   repair links. Keep stable narrow entry points and explicit output locations.
-- [ ] Run complete repository-specific regression/CI-equivalent checks and a
+- Run complete repository-specific regression/CI-equivalent checks and a
   clean-clone onboarding walkthrough; document remaining device gates.
 
 Exit: a newcomer can build/diagnose through the index without knowing the old
@@ -236,50 +233,5 @@ generated packs, private traces, APKs, symbols, keys or build evidence.
 2. Inspect all affected worktrees and active build jobs; preserve edits.
 3. Select the earliest unfinished stage and its narrowest exit condition.
 4. Run the documented narrow test, inspect diff and actual artifacts.
-5. Update stage status, blockers and next command, then make a scoped commit.
-
-## Progress
-
-2026-10-02: Plan committed as `87e1c2c0` in Loader. Runtime crypto host extension
-committed as `b85b9fbd264` after explicit/legacy host JNI regressions. Self-review
-fixed constructor-lookup JNI cleanup and a stale API table; bootstrap host tests
-pass. Both-profile runtime rebuild is in progress with isolated development
-outputs. P2-P5 are not implemented; no new crash capture or editable-deployment
-behavior is claimed. Loader implementation is committed as `a6c5e65d`, Patcher
-as `ccd329f`; win-x64 Patcher outputs built locally. Rebuild preflight exposed a
-DrvFS/Linux-Git stat bottleneck; native Windows Git preserves source checks and
-lets compilation begin. The required SDK downloads from the official CI feed
-when the primary SDK feed has no copy. Original packs remain untouched.
-
-Rebuild recovery: official SDK installation and full Android restore pass.
-The external-artifacts feed-discovery fix is committed in the temporary parent
-as `f0fec60` (native Git preflight fix: `14b14ab`). The both-profile build
-uses `b85b9fbd264`. Android has completed with zero errors; its isolated pack and
-matching Loader development archive are built and validated by Patcher's actual
-ReleaseValidator, alongside all 19 regressions. Bootstrap contains the complete
-matching helper DEX; the Release contains no standalone helper DEX. Runtime pack
-packaging/round-trip/reproducibility tests pass, and an isolated development
-runtime archive is ready. Private unstripped bootstrap symbols and runtime symbol
-nupkgs are retained. Bionic also completed with zero errors; its isolated pack,
-runtime archive and Loader development ZIP pass the same validation. Both active
-profile pins now select the real reviewed runtime commit. Builds have stopped;
-there is no active source build to resume. Outputs are under parent `temp/runtime-development/local/`
-by exact source revision and RID; failure logs and exit-code files remain there.
-
-Next actions: maintainer device acceptance from the checklist, then controlled
-runtime/product publication. P2 first verifies existing runtime crash reporting
-and fixes early-session log loss. Patcher win-x64 is ready locally. NuGet
-audit reported known high-severity advisories on the upstream DiaSymReader.Native
-build dependency; assess publication exposure separately rather than suppressing
-the warning or upgrading unrelated pins without review.
-
-2026-10-02 clarification: deployment revision has practical update semantics but
-is not a security identity. P3 prioritizes removing revision/hash metadata as an
-admission requirement for ordinary editable deployment, and evaluates eliminating
-the global revision rather than simply adding a second complex deployment mode.
-Current runtime behavior remains unchanged until that stage's migration/tests.
-
-Further clarification: P3 covers the entire installed-payload contract. No
-per-file diagnostic system is requested. Favor deleting derived metadata and
-unnecessary gates; use upstream-style loading/logging. Normal runtime domain
-hashes are extraction freshness markers, not continuous installed-file checks.
+5. Record progress, blockers and the next command in ignored local records;
+   make a scoped commit for source or stable documentation changes.

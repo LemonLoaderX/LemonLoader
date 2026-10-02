@@ -36,9 +36,9 @@ public Loader archives do not carry a standalone helper in embedded mode.
 - Bionic/OpenSSL avoids Java helpers entirely but changes trust semantics and
   adds private OpenSSL maintenance; Android retains platform crypto.
 
-## Verification
+## Test Coverage
 
-- Patcher's 19 regressions pass, including new Android APKs adding no DEX entries,
+- Patcher regressions cover new Android APKs adding no DEX entries,
   decoded directory mode, independent APK verification and old DEX promotion.
 - Missing/mixed modes, wrong bootstrap hashes and insufficient API declarations
   are rejected. Existing ZIP, ABI and runtime integrity checks remain.
@@ -46,31 +46,23 @@ public Loader archives do not carry a standalone helper in embedded mode.
   retained in-memory ClassLoader, without System.load or ART private APIs.
 - Build-time embedding uses a validated matching runtime pack and rejects old
   crypto shims without the explicit initialization export.
-- Bootstrap and runtime host regressions pass. ARM64 API 26 NDK compilation
-  passes for the bootstrap and the complete Android crypto shim, including the
-  explicit export. The compiled bootstrap contains the exact verified DEX bytes.
-  Runtime profile tests and workspace PowerShell/Bash script checks pass.
+- Bootstrap and runtime host regressions cover explicit/legacy initialization,
+  JNI failure cleanup, process lifetime and exact crypto module reuse. Build
+  checks require the explicit export and complete matching DEX bytes in the ELF.
 - Patcher's test entry can additionally validate actual Release ZIPs using its
   production ReleaseValidator, without game inputs or APK installation. Runtime
   packaging accepts an explicit development pack, validates it and preserves its
   development identity in isolated output. Regressions cover locked-mode rejection,
   archive round-trip and reproducibility.
-- Android and Bionic runtime packs and matching Loader development archives are
-  rebuilt from the reviewed common source; both actual Releases pass Patcher's
-  regressions/validator. Active source pins select that commit. Device
-  crypto/TLS/namespace acceptance and runtime artifact publication remain pending.
 
 ## Consequences
 
 The explicit host API requires rebuilding the runtime source fork. Source pins
 cannot be updated to uncommitted revisions; local validation uses development
 packs, and publication requires reviewed commits and rebuilt pinned artifacts.
-No claim of startup speedup or broad device qualification is made.
 Old Android packs fail the product build gate because they lack the new export.
-Both active profile pins now select the reviewed runtime fork commit; its remote
-artifact tag is not published yet, so normal CI/download needs runtime publication
-first. Local acceptance uses explicit development pack paths, without removing
-their development identity. Bionic remains independent of Java helpers.
+Publish runtime artifacts before consuming product releases. Local development
+pack paths retain their development identity. Bionic remains independent of Java helpers.
 Legacy package staging does not require the new local bootstrap identity file.
 The current rebuild/recovery workflow remains in the parent
 docs/RUNTIME-DEVELOPMENT.md until its scripts and documentation are migrated.
@@ -92,8 +84,8 @@ by the old staging extension filter. Embedded staging now publishes only native
 SO inputs from that directory, rather than maintaining a historical filename
 denylist; all helper DEX bytes stay build inputs, not runtime release files.
 
-Remaining limitations: ART loading and real TLS are unqualified; native runtime
-initialization still inherits upstream fatal checks for incompatible Java method
+Host mocks do not prove ART loading or TLS behavior. Native runtime
+initialization inherits upstream fatal checks for incompatible Java method
 signatures; the host serializes initialization rather than providing a general
 concurrent initialization interface. Private symbol retention/crash recording
 belongs to a separate stage, not a promise of this change.

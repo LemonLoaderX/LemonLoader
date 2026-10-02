@@ -1,6 +1,6 @@
 # Embedded crypto device acceptance
 
-Status: pending maintainer acceptance. Host/NDK checks do not satisfy this gate.
+Host/NDK checks do not replace this device-acceptance procedure.
 
 ## Inputs and identity
 
@@ -56,8 +56,7 @@ Keep build identities, APK layout verification, known-answer results, startup
 and TLS errors, selected native module evidence and rollback notes together in
 ignored local output. Include the whole session context, not only a success line.
 
-API 26 ART in-memory DEX compatibility, native TLS/provider behavior and actual
-game acceptance remain unqualified until this matrix runs. Android profile's
-upstream synchronous HTTP restriction remains unchanged. The planned crash
-collector is not yet implemented; capture existing logs/logcat during maintainer
-acceptance where possible and do not mistake their absence for a clean run.
+Use this matrix to qualify API 26 ART in-memory DEX, native TLS/provider behavior
+and game compatibility. Android profile's upstream synchronous HTTP restriction
+is a separate runtime limitation. Capture available logs/logcat alongside the
+checks; their absence does not establish a clean run.

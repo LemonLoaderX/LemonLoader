@@ -32,8 +32,6 @@ explicit native-trace coverage decision after the runtime reporter is tested.
   DOTNET_EnableCrashReport / DOTNET_EnableCrashReportOnly and uses
   DOTNET_CrashReportRootPath / DOTNET_CrashReportMaxFileCount. These are existing
   upstream controls, not a new Loader report format.
-  The rebuilt Android libcoreclr.so contains the report-root/retention controls
-  and crashreport.json writer messages; this is artifact evidence, not a crash test.
 - Reporter lifecycle requires an existing writable root and creates
   .dotnet/crash-reports beneath it. Startup prunes completed reports and deletes
   leftover temporary reports. Recover useful partial/previous evidence before
