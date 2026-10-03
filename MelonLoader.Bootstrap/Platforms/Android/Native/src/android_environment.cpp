@@ -1296,6 +1296,10 @@ bool extract_runtime_assets() {
     }
     runtime_paths.runtime_rid = payload.runtime_rid;
     payload.deployment_stamp = deployment_update_stamp();
+    if (setenv("MELONLOADER_APK_UPDATE_TOKEN", payload.deployment_stamp.c_str(), 1) != 0) {
+        unsetenv("MELONLOADER_APK_UPDATE_TOKEN");
+        log_line("[WARNING] Could not supply APK update time for game-information caching");
+    }
 
     const std::filesystem::path base(runtime_paths.base_directory);
     const std::filesystem::path internal(runtime_paths.internal_data_directory);

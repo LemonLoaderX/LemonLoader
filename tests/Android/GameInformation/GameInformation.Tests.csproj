@@ -10,6 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../../MelonLoader/InternalUtils/UnityInformationHandler.cs" Link="UnityInformationHandler.cs" />
+    <Compile Include="../../../MelonLoader/InternalUtils/AndroidGameInformationCache.cs" Link="AndroidGameInformationCache.cs" />
     <EmbeddedResource Include="../../../MelonLoader/Resources/classdata.tpk" LogicalName="classdata.tpk" />
     <PackageReference Include="AssetsTools.NET" Version="$(AssetToolsVersion)" />
     <PackageReference Include="AssetRipper.Primitives" Version="$(AssetRipperVersion)" />

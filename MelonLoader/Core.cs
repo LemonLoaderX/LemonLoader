@@ -150,7 +150,9 @@ namespace MelonLoader
 
 #endif
 
+#if !ANDROID
             Fixes.MonoMod.DetourContextDisposeFix.Install();
+#endif
 
 #if NET6_0_OR_GREATER
             // if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))

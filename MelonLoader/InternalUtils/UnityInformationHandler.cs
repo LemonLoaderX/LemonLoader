@@ -40,6 +40,22 @@ namespace MelonLoader.InternalUtils
         internal static void Setup()
         {
             string gameDataPath = MelonEnvironment.UnityGameDataDirectory;
+#if ANDROID
+            var cached = AndroidGameInformationCache.Read(LoaderConfig.Current.UnityEngine.VersionOverride);
+            if (cached != null)
+            {
+                var version = TryParse(cached[4]);
+                if (version != UnityVersion.MinVersion)
+                {
+                    GameName = cached[1];
+                    GameDeveloper = cached[2];
+                    GameVersion = cached[3];
+                    EngineVersion = version;
+                    LogGameInformation();
+                    return;
+                }
+            }
+#endif
 
             if (!string.IsNullOrEmpty(LoaderConfig.Current.UnityEngine.VersionOverride))
                 EngineVersion = TryParse(LoaderConfig.Current.UnityEngine.VersionOverride);
@@ -69,6 +85,17 @@ namespace MelonLoader.InternalUtils
             if (string.IsNullOrEmpty(GameVersion))
                 GameVersion = DefaultInfo;
 
+#if ANDROID
+            if (GameName != DefaultInfo && GameDeveloper != DefaultInfo &&
+                GameVersion != DefaultInfo && EngineVersion != UnityVersion.MinVersion)
+                AndroidGameInformationCache.Write(LoaderConfig.Current.UnityEngine.VersionOverride,
+                    GameName, GameDeveloper, GameVersion, EngineVersion.ToString());
+#endif
+            LogGameInformation();
+        }
+
+        private static void LogGameInformation()
+        {
             MelonLogger.WriteLine(ColorARGB.Magenta);
             MelonLogger.Msg($"Game Name: {GameName}");
             MelonLogger.Msg($"Game Developer: {GameDeveloper}");
@@ -117,9 +144,11 @@ namespace MelonLoader.InternalUtils
                 if (instance == null)
                     return;
 
-                assetsManager.LoadIncludedClassPackage();
                 if (!instance.file.Metadata.TypeTreeEnabled)
+                {
+                    assetsManager.LoadIncludedClassPackage();
                     assetsManager.LoadClassDatabaseFromPackage(instance.file.Metadata.UnityVersion);
+                }
 
                 if (EngineVersion == UnityVersion.MinVersion)
                     EngineVersion = TryParse(instance.file.Metadata.UnityVersion);

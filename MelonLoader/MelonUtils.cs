@@ -24,13 +24,14 @@ namespace MelonLoader
         private static NativeLibrary.StringDelegate WineGetVersion;
         //private static readonly Random RandomNumGen = new();
         private static readonly MethodInfo StackFrameGetMethod = typeof(StackFrame).GetMethod("GetMethod", BindingFlags.Instance | BindingFlags.Public);
+#if !ANDROID
         private static readonly LemonSHA256 sha256 = new();
         private static readonly LemonSHA512 sha512 = new();
+#endif
 
         internal static void Setup(AppDomain domain)
         {
-            using (var sha = SHA256.Create()) 
-                HashCode = ComputeSimpleSHA256Hash(Assembly.GetExecutingAssembly().Location);
+            HashCode = ComputeSimpleSHA256Hash(Assembly.GetExecutingAssembly().Location);
 
             Core.WelcomeMessage();
 
@@ -217,11 +218,17 @@ namespace MelonLoader
             if (!File.Exists(filePath))
                 return null;
 
+#if ANDROID
+            using var input = File.OpenRead(filePath);
+            using var hasher = SHA256.Create();
+            return Convert.ToHexString(hasher.ComputeHash(input));
+#else
             byte[] byteHash = File.ReadAllBytes(filePath);
             if (byteHash == null)
                 return null;
 
             return sha256.ComputeHash(byteHash).ToString("X2");
+#endif
         }
 
         public static string ComputeSimpleSHA512Hash(string filePath)
@@ -229,11 +236,17 @@ namespace MelonLoader
             if (!File.Exists(filePath))
                 return null;
 
+#if ANDROID
+            using var input = File.OpenRead(filePath);
+            using var hasher = SHA512.Create();
+            return Convert.ToHexString(hasher.ComputeHash(input));
+#else
             byte[] byteHash = File.ReadAllBytes(filePath);
             if (byteHash == null)
                 return null;
 
             return sha512.ComputeHash(byteHash).ToString("X2");
+#endif
         }
 
         public static string ToString(this byte[] data)

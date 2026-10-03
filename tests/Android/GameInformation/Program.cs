@@ -24,6 +24,7 @@ var scenarios = new (string Name, string Path, byte[] Data, bool Success)[]
     ("invalid bundle", "data.unity3d", new byte[64], false)
 };
 int failures = 0;
+Environment.SetEnvironmentVariable("MELONLOADER_APK_UPDATE_TOKEN", null);
 foreach (var scenario in scenarios)
 {
     foreach (var property in typeof(UnityInformationHandler).GetProperties())
@@ -48,5 +49,43 @@ foreach (var scenario in scenarios)
         failures++;
         foreach (string error in MelonDebug.Errors) Console.WriteLine(error);
     }
+}
+var cacheRoot = Path.Combine(Path.GetTempPath(), "lemon-gameinfo-" + Guid.NewGuid().ToString("N"));
+Environment.SetEnvironmentVariable("MELONLOADER_BASE_DIR", cacheRoot);
+Environment.SetEnvironmentVariable("MELONLOADER_APK_UPDATE_TOKEN", "apk-first");
+try
+{
+    APKAssetManager.Files.Clear();
+    APKAssetManager.Files.Add("bin/Data/globalgamemanagers", managers);
+    UnityInformationHandler.Setup();
+    var cacheFile = Path.Combine(cacheRoot, "MelonLoader", "GameInformation.json");
+    if (!File.Exists(cacheFile)) throw new Exception("Parsed information was not cached.");
+    APKAssetManager.Files.Clear();
+    APKAssetManager.Opened.Clear();
+    foreach (var property in typeof(UnityInformationHandler).GetProperties())
+        property.SetValue(null, property.PropertyType.IsValueType ? Activator.CreateInstance(property.PropertyType) : null);
+    UnityInformationHandler.Setup();
+    if (UnityInformationHandler.GameName != "Fixture Game" || APKAssetManager.Opened.Count != 0)
+        throw new Exception("Cached startup still read game assets.");
+    if (AndroidGameInformationCache.Read("2022.1.0f1") != null)
+        throw new Exception("Version override did not invalidate cache.");
+    Environment.SetEnvironmentVariable("MELONLOADER_APK_UPDATE_TOKEN", "apk-next");
+    if (AndroidGameInformationCache.Read(LoaderConfig.Current.UnityEngine.VersionOverride) != null)
+        throw new Exception("APK update did not invalidate cache.");
+    Environment.SetEnvironmentVariable("MELONLOADER_APK_UPDATE_TOKEN", "apk-first");
+    File.WriteAllText(cacheFile, "invalid-json");
+    if (AndroidGameInformationCache.Read(LoaderConfig.Current.UnityEngine.VersionOverride) != null)
+        throw new Exception("Malformed cache accepted.");
+    APKAssetManager.Files.Add("bin/Data/globalgamemanagers", managers);
+    UnityInformationHandler.Setup();
+    if (AndroidGameInformationCache.Read(LoaderConfig.Current.UnityEngine.VersionOverride) == null)
+        throw new Exception("Malformed cache did not recover from real game data.");
+    Console.WriteLine("PASS cache hit avoids assets; APK/override invalidation and malformed-cache recovery");
+}
+finally
+{
+    Environment.SetEnvironmentVariable("MELONLOADER_BASE_DIR", null);
+    Environment.SetEnvironmentVariable("MELONLOADER_APK_UPDATE_TOKEN", null);
+    if (Directory.Exists(cacheRoot)) Directory.Delete(cacheRoot, true);
 }
 return failures == 0 ? 0 : 1;

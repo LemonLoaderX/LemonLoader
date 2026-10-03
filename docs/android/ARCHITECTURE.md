@@ -147,6 +147,10 @@ the adapter falls back to the application's internal files directory.
   the game process when the bootstrap cannot start.
 - Android consumes pre-generated Il2CppInterop assemblies. It does not execute
   the legacy desktop Cpp2IL binary inside the application process.
+- Parsed game information is cached after successful parsing, keyed by APK update
+  time, Loader module and Unity version override. Cache errors fall back to asset
+  parsing. Delete MelonLoader/GameInformation.json after manually replacing game
+  metadata without updating the APK.
 - The bootstrap retains the process-scoped IL2CPP handle observed in Unity's
   symbol lookups. Managed P/Invoke, injection helpers and the ARM64 resolver use
   that same instance. They must not reopen `libil2cpp.so` by name: another linker
