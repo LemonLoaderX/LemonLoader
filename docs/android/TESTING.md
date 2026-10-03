@@ -89,6 +89,9 @@ The smoke run requires a fresh Latest.log, managed/backend startup, a live proce
 and the Smoke Mod's initialization, scene, Update/FixedUpdate/LateUpdate, JNI
 worker and loaded CoreCLR markers. Same-process maps/exports provide evidence
 when Android denies external procfs access. No runtime-identity.json is required.
+Resolve the identity probe's CoreCLR handle from its exact private path in
+`/proc/self/maps`; loading only `libcoreclr.so` can fail across linker namespaces
+even while the private runtime is running.
 
 Smoke may force-stop/relaunch, clear logcat and temporarily push a Mod/HTTPS probe.
 It restores existing files and removes test-created files in finally. Captured

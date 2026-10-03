@@ -97,10 +97,15 @@ public sealed class AndroidSmokeMod : MelonMod
         nint runtime = 0;
         try
         {
-            runtime = RuntimeNativeLibrary.Load("libcoreclr.so");
+            string maps = File.ReadAllText("/proc/self/maps");
+            string runtimePath = maps.Split('\n')
+                .Select(line => line.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault())
+                .Where(path => path is not null && path.Contains("/dotnet/shared/Microsoft.NETCore.App/", StringComparison.Ordinal)
+                    && path.EndsWith("/libcoreclr.so", StringComparison.Ordinal))
+                .Distinct(StringComparer.Ordinal).Single()!;
+            runtime = RuntimeNativeLibrary.Load(runtimePath);
             bool coreClr = RuntimeNativeLibrary.TryGetExport(runtime, "coreclr_initialize", out _);
             bool monoVm = RuntimeNativeLibrary.TryGetExport(runtime, "monovm_initialize", out _);
-            string maps = File.ReadAllText("/proc/self/maps");
             bool privateMap = maps.Contains(
                 "/dotnet/shared/Microsoft.NETCore.App/",
                 StringComparison.Ordinal) &&
