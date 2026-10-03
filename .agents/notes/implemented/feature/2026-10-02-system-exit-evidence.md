@@ -67,6 +67,6 @@ surface and linking, not OEM trace availability or real-device permission.
 
 ## Prior-note Audit
 
-The [evidence proposal](../../proposed/feature/2026-10-02-native-crash-evidence.md)
-partially overlaps and retains API 26-30 coverage investigation. Runtime report
+The [CoreCLR report decision](2026-10-02-runtime-crash-reports.md)
+retains reporting alternatives and API coverage limitations. Runtime report
 configuration and previous-session rotation remain independent decisions.

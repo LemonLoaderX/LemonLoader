@@ -1,6 +1,6 @@
 # Repository agent rules
 
-Read [maintenance](docs/maintenance/README.md) and the relevant build, test or
+Read the [task index](docs/README.md) and the relevant build, test or
 contract guide before changing code. Commands run from this repository root;
 the parent folder and Patcher checkout are not required build inputs.
 

@@ -10,9 +10,10 @@ Host/NDK checks do not replace this device-acceptance procedure.
 - Retain the original/private test APK, existing signer and successful rollback
   artifact privately. Device installation and signing are maintainer operations;
   this checklist does not authorize uninstalling or clearing application data.
-- Verify the final APK with Patcher's `scripts/verify-apk-layout.ps1`. Confirm
-  `coreClrCryptoDexMode: embedded`, API declaration at least 26, and matching
-  `coreClrCryptoBootstrapSha256`. Original game DEX entries should be unchanged
+- Verify the final APK with the [Patcher verifier](https://github.com/LemonLoaderX/LemonLoader.Patcher/blob/main/scripts/verify-apk-layout.ps1). Confirm
+  embedded mode and API 26+ in the Release manifest, and validate its bootstrap
+  through the Release file hashes. Layout-9 APK configuration has no bootstrap
+  digest or crypto-mode fields. Original game DEX entries should be unchanged
   and no additional helper `classesN.dex` should appear.
 - Keep exact-build native symbols and local build logs outside release archives.
   Record device API, ABI and page size privately with the test evidence.
@@ -49,6 +50,10 @@ smoke coverage and must remain without Android helpers.
    the saved baseline; record pre-existing warnings separately from regressions.
 10. Negative package tests reject missing/wrong crypto SO, wrong bootstrap digest,
     mixed modes and damaged embedded bytes without accepting a broken pack.
+11. Crash evidence: distinguish a CLR-handled fault from managed/native fatal paths.
+    Check reporter coexistence with Unity/Android, completed/partial reports,
+    Previous.log and next-launch system-exit recovery with matching symbols.
+    Do not add an outer signal logger as a substitute for these checks.
 
 ## Evidence and limitations
 

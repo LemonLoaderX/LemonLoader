@@ -162,13 +162,7 @@ bootstrap and retain both the detailed error and any rollback error. Inspect the
 reported paths and free space according to the actual error; do not clear app
 data or remove deployment state as a diagnostic shortcut.
 
-The Linux/WSL regression is:
-
-```bash
-bash scripts/test/test-android-deployment.sh
-# With Clang and libc++ development libraries installed:
-CXX=clang++ bash scripts/test/test-android-deployment.sh --libcxx
-```
+Run the deployment publication regression from [Testing](TESTING.md#host-boundaries).
 
 It exercises successful initial publication and replacement with and without
 `sendfile` rejection, plus filesystem and read/write/close failures. It checks

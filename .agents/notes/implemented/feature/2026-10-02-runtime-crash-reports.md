@@ -38,10 +38,16 @@ manifest. No automatic upload, full-memory dump or installed-payload scan is add
 - Leaving reporting opt-in avoids initialization overhead, but preserves the
   silent-crash experience. Respect explicit settings while enabling local reports
   by default.
-- A new crash library can supply richer native unwinding, but adds dependencies
-  and handler-coexistence obligations. Reuse the existing reporter first; the
-  [broader evidence proposal](../../proposed/feature/2026-10-02-native-crash-evidence.md)
-  owns supplemental system tombstones and remaining coverage.
+- Crashpad supplies richer process/thread snapshots but adds handler-process IPC,
+  ptrace/broker behavior and mini_chromium. xCrash supplies Android tombstones but
+  needs Java/AAR initialization and current API/16 KiB/CoreCLR qualification.
+  Reuse the existing reporter first; consider those only for demonstrated gaps.
+- A custom preopened-descriptor handler can record minimal bytes on older APIs,
+  but adds fatality classification, chaining, recursion and alternate-stack work.
+  It must not allocate, call JNI/CLR or use the ordinary logger while faulting.
+- System exit traces avoid another signal handler, but native traces start at
+  API31 and may disappear from Android's global circular buffer. They supplement
+  reporting through the [system-exit decision](2026-10-02-system-exit-evidence.md).
 
 ## Consequences
 
@@ -74,7 +80,11 @@ recovery only when partial bytes exist. It is not a successful-trace assertion.
 
 ## Prior-note Audit
 
-The broader evidence proposal partially overlaps; system exit information and
-native tombstones remain its scope. The [previous-log decision](../../implemented/bug-fix/2026-10-02-preserve-previous-log.md)
-is complementary and independent of runtime initialization. Embedded crypto is
-unrelated to signal reporting.
+The broad crash investigation is fully absorbed here: alternatives and native
+trace limitations remain above; [system exit recovery](2026-10-02-system-exit-evidence.md)
+owns supplemental traces, [previous logs](../bug-fix/2026-10-02-preserve-previous-log.md)
+protect early sessions, and [build IDs](../bug-fix/2026-10-02-preserve-native-build-id.md)
+own private symbol matching. [Device acceptance](../../../../docs/maintenance/embedded-crypto-acceptance.md)
+retains signal-coexistence and API coverage gates. Android lacks desktop-style
+out-of-process createdump; DbgEnableMiniDump alone is not a solution. Embedded
+crypto is unrelated to signal ownership.

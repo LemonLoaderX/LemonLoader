@@ -70,7 +70,6 @@ or Android linker namespaces on a device.
 - [Editable deployment](2026-10-02-editable-deployment.md) and
   [runtime extraction](2026-10-02-runtime-extraction-without-digests.md): related,
   preserve policy transactions/freshness and no regular startup scans.
-- [Independent sources](../process/2026-10-02-independent-source-resolution.md) and
-  [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md):
+- [Independent sources](../process/2026-10-02-independent-source-resolution.md):
   related maintenance scope; source ownership and development rules are unchanged.
   Crash decisions and the separate Interop proposal are unrelated.

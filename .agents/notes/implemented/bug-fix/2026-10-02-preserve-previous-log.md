@@ -49,7 +49,7 @@ against temporary output directories.
 
 ## Prior-note Audit
 
-The [crash-evidence proposal](../../proposed/feature/2026-10-02-native-crash-evidence.md)
+The [CoreCLR report decision](../feature/2026-10-02-runtime-crash-reports.md)
 partially overlaps and owns reporter/trace integration. This decision implements
-only its previous-session logging concern. The modernization proposal retains
+only its previous-session logging concern. The source-ownership decision retains
 the broader execution order; embedded crypto is unrelated to log rotation.

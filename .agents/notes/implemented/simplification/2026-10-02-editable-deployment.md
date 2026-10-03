@@ -75,7 +75,7 @@ their safety boundary.
 
 ## Prior-note Audit
 
-The [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md)
+The [source-ownership decision](../process/2026-10-02-independent-source-resolution.md)
 partially overlaps and governs the remaining runtime/layout simplification.
 Crash evidence notes are unrelated. Existing DEPLOYMENT.md defines policy and
 transaction mechanics, updated here for editable input semantics.

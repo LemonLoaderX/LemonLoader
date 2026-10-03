@@ -53,7 +53,7 @@ symbols and checking ABI, alignment and cryptography inputs.
 
 ## Prior-note Audit
 
-The [crash investigation](../../proposed/feature/2026-10-02-native-crash-evidence.md)
+The [CoreCLR report decision](../feature/2026-10-02-runtime-crash-reports.md)
 and system-exit note partially overlap in offline-symbol inputs and retain their
 reporting/trace decisions. Runtime extraction notes concern local cache tokens,
 not ELF symbol identities. The historical build-ID removal has no separate active

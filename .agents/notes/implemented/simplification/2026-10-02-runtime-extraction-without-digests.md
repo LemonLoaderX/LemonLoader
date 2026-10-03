@@ -65,6 +65,6 @@ real-device startup.
 ## Prior-note Audit
 
 The editable-deployment note partially overlaps in freshness and owns policy and
-Loader-disable behavior. The [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md)
+Loader-disable behavior. The [source-ownership decision](../process/2026-10-02-independent-source-resolution.md)
 retains repository migration. Embedded crypto and crash
 evidence decisions remain unchanged.

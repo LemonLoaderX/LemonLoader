@@ -51,8 +51,9 @@ by responsibility:
 - `logging.cpp`: logcat and managed logging ABI;
 - `arm64_il2cpp_resolver.cpp`: stripped Unity 6 injection-target resolution.
 
-The obsolete NativeAOT adapter and its ILCompiler-specific build configuration
-have been removed. The NDK module is the only Android bootstrap.
+The NDK module replaces the retired Android NativeAOT adapter: it matches Unity's
+Java/native startup directly without ILCompiler or glibc dependencies. Desktop
+NativeAOT remains the upstream implementation.
 
 ## Managed seam
 

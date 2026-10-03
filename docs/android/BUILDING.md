@@ -99,18 +99,9 @@ Use a new destination, not `-Force`, when retrying an incomplete extraction.
 Existing valid packs can be reused. The archive checksum detects corruption; it
 is not an independent source signature.
 
-Package an imported pack with `scripts/build/package-runtime.ps1`. For an explicit
-local development pack:
-
-```powershell
-pwsh -NoProfile -File scripts/build/package-runtime.ps1 -RuntimeProfile android `
-    -RuntimePackRoot "<development-pack>" -Development
-```
-
-This validates the pack and writes a reproducible archive plus checksum under
-`Output/DevelopmentRuntimeArtifacts`, without replacing formal runtime archives.
-Use one profile when specifying a pack path. Development identity is retained;
-packaging does not turn an unqualified build into a published runtime.
+Runtime preparation, import, development packaging and source compilation belong
+to [Runtime development](RUNTIME-DEVELOPMENT.md). They are separate from product
+builds and retain development identity; packaging never qualifies a runtime.
 
 Use `-CoreClrRuntimePackRoot <directory>` for a reviewed local/offline pack. A
 runtime pack contains:
@@ -125,17 +116,6 @@ THIRD-PARTY-NOTICES.TXT
 licenses/OpenSSL/LICENSE.txt  # Bionic only
 ```
 
-Rebuilding CoreCLR is a separate maintainer action:
-
-```powershell
-pwsh -NoProfile -File scripts/setup-runtime.ps1
-pwsh -NoProfile -File scripts/build-runtime.ps1 -RuntimeProfile all
-```
-
-The active builder uses WSL, one source checkout and separate per-RID outputs on
-the source drive. Prepare/import each resulting pack before building Loader.
-See [runtime source development](RUNTIME-DEVELOPMENT.md) for source iteration.
-
 ## Release build
 
 ```powershell
@@ -145,14 +125,8 @@ pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 pwsh -NoProfile -File scripts/build.ps1 -Configuration Release
 ```
 
-Partial entries:
-
-| Script | Output |
-| --- | --- |
-| `build-android-ndk-bootstrap.ps1` | verified `libmain.so` |
-| `build-android-managed.ps1` | managed host and Il2Cpp support assemblies |
-| `stage-android-package.ps1` | verified unpacked payload |
-| `publish-android-release.ps1` | deterministic release ZIP |
+The [script catalog](../../scripts/README.md#narrow-backends) lists native,
+managed, staging and archive entries for a targeted rebuild.
 
 The final files are:
 

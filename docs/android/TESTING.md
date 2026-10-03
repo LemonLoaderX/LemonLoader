@@ -1,232 +1,110 @@
-# Android testing
+# Testing
 
-## Test levels
+Run the smallest boundary affected by a change. Output stays below Output/Tests
+or an explicit ignored path; synthetic fixtures do not qualify Android devices.
 
-### Static checks
-
-Run before every commit that changes Android files or scripts:
+## Script and source checks
 
 ```powershell
 git diff --check
 pwsh -NoProfile -File scripts/test/test-scripts.ps1
+pwsh -NoProfile -File scripts/test/test-source-dependencies.ps1
 ```
 
-This product-owned entry parses PowerShell scripts and tests profile selection,
-ADB argument/error handling, retired-profile rejection, cleanup, runtime pack
-fixtures and publication scanner orchestration. No parent checkout or device is
-required. Bash parsing defaults on Linux and off on Windows; on Windows use
-`-SkipBash:$false -Distribution <WSL-distribution>` to include WSL Bash parsing.
-The heavier runtime source build fixture is a separate WSL test entry.
+Script tests cover profile selection, ADB errors, cleanup, publication preflight,
+pack contracts and verification orchestration. On Windows, include Bash syntax
+with `-SkipBash:$false -Distribution <WSL-distribution>`.
+`test-runtime-source-build.ps1` separately checks the WSL launcher with fixture
+sources; it does not compile CoreCLR. Actual-pack tests are documented in
+[Runtime development](RUNTIME-DEVELOPMENT.md#validation-and-publication).
 
-The Android build adds ELF architecture, Android API, required export, Bionic
-symbol, and 16 KiB segment-alignment checks automatically.
-Product cleanup safety has a standalone synthetic-tree regression:
-
-```powershell
-pwsh -NoProfile -File scripts/test/test-cleanup.ps1
-```
-
-It checks previews, retained packs/archives/evidence, source/cache boundaries and
-link rejection without cleaning actual builds or dependency checkouts.
-The native bootstrap host suite includes system-exit recovery tests against
-the NDK JNI interface: API gating, current-process selection, exact trace bytes,
-stream errors/closure, retry, capacity limits and safe retention. These fake-JNI
-tests do not establish OEM tombstone availability or Android permission behavior.
-The same suite exercises editable deployment through real extraction/transaction
-code with fake APK/JNI inputs: stale/absent metadata, add/edit/delete, user-edit
-protection, no unchanged-package scan and pre-hook Loader disabling on failure.
-Runtime extraction cases cover absent/minimal configuration, no generated
-digest/identity/Interop manifest, APK update replacement/removal and retry when
-the platform update token is unavailable.
-Patcher regressions cover active layout-9 APK/directory injection with plain
-Interop DLLs, non-default policy overrides, manual asset add/delete, malformed
-policies, mixed/incomplete runtime inputs and Release-file corruption. Layout-8
-and MonoVM inputs are rejected; DEX/smali preservation is checked without helper
-promotion or any dependency on a primary DEX.
-Native build verification requires an ELF build ID and checks that stripping
-preserves the private symbol file's ID. Release staging rejects DWARF/static
-symbols while retaining this diagnostic identifier. When changing native build
-flags/toolchains, compare builds from different source/build roots using the same
-inputs to check that local paths do not change the output.
-
-For native-hook changes, run the maintained Dobby far-target regression on both
-a native ARM64 device and any supported native-bridge emulator:
-
-```powershell
-pwsh -NoProfile -File "<Dobby-source-root>/scripts/test-android-near-hook.ps1" `
-    -DeviceSerial "<serial>"
-```
-
-### Managed compatibility tests
-
-Preference persistence and Android logging have focused host regressions:
-
-```powershell
-dotnet run --project tests/Preferences/Preferences.csproj
-```
+## Host boundaries
 
 ```bash
-# Linux/WSL; CXX may select a C++17 compiler.
+ANDROID_NDK_ROOT=<ndk> bash scripts/test/test-android-bootstrap.sh
 bash scripts/test/test-android-logging.sh
-```
-
-See `tests/README.md` for their boundaries. Preference save success messages are
-emitted only after a write; an I/O failure keeps the existing fallback behavior
-and error diagnostics. Fix the path/permissions and restart to leave fallback
-mode. Android logs use stripped text for file/logcat output and preserve WARN
-and ERROR priorities; native errors produce one logcat record.
-The native logging regression also exercises previous-session retention before
-managed history setup, empty-session handling, history limits and append fallback
-when rotation fails.
-
-Runtime report defaults and overrides are covered by that native logging test.
-To exercise the upstream reporter in isolated Linux host subprocesses:
-
-```bash
+bash scripts/test/test-android-deployment.sh
+CXX=clang++ bash scripts/test/test-android-deployment.sh --libcxx
 DOTNET11="<dotnet-11-sdk>/dotnet" bash scripts/test/test-crash-reporting.sh
 ```
 
-The probe checks handled faults, FailFast/native faults, report JSON, retention
-and explicit opt-out. It disables host core dumps and writes evidence below
-Output/Tests. It does not qualify Android signal coexistence or ARM64 crash traces.
+Set CXX to an installed C++17 compiler. The libc++ variant also needs its host
+headers/libraries. Bootstrap tests compile production code with NDK JNI and fake
+Java/linker/OS inputs: bounded scans, IL2CPP handle ownership, failure rollback,
+embedded crypto, process locking, editable extraction and system-exit recovery.
+Logging covers severity, previous-session retention and report settings.
+Publication tests cover short/interrupted I/O, failures and sendfile rejection.
+The crash probe uses isolated Linux processes, disables core dumps and checks
+handled faults, FailFast/native faults, report attempts, retention and opt-out.
+An empty report is a coverage gap, not a successful trace.
 
 ```powershell
-../LemonLoader.Patcher/scripts/test.ps1 -Configuration Release
+dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
+dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj -c Release -p:Platform=x64
+dotnet run --project tests/Preferences/Preferences.csproj
 ```
 
-Patcher tests cover release validation, runtime selection, APK and directory
-assembly, deployment policies, native collisions, and CLI/signing contracts.
-They use synthetic inputs and do not rewrite dependency binaries.
+Managed JNI tests cover reference/finalizer ownership, asset buffer/seek/close,
+configuration preservation, scene fallback and hook-root retention.
+GameInformation uses real AssetsTools parsing with generated files/bundles and
+tracked source streams. Preferences checks actual save outcomes, fallback and
+events without real Unity logging/watchers. See [failure contracts](HARDENING.md)
+for the invariants these fixtures protect.
 
-Android managed builds also run `MonoModCoreClrProbe` and
-`HarmonyCoreClrProbe`. They exercise the source-built CoreCLR DynamicMethod and
-RuntimeLocalBuilder paths before packaging.
-
-### Build tests
-
-The independent Loader verification entry includes script/host fixtures, pinned
-Interop Runtime/Generator regressions, a Win64 build and one Android profile build
-followed by deterministic repacking:
+## Product builds
 
 ```powershell
-pwsh -NoProfile -File scripts/verify.ps1 -RuntimeProfile android `
-    -AndroidNdkRoot "<android-ndk-r27d>"
+pwsh -NoProfile -File scripts/verify.ps1 -RuntimeProfile android -AndroidNdkRoot "<ndk>"
 ```
 
-Use `-SkipAndroid -SkipDesktop` for host/script/Interop-only verification, not full
-build qualification. Explicit source roots, CoreClrRuntimePackRoot and Development
-follow the same rules as scripts/build.ps1. Interop tests use the selected source,
-not Patcher's pin. The entry never runs Patcher, source runtime compilation, native
-WSL host suites or device tests implicitly; run the relevant entries separately.
-Final output names report selected profile/development mode and skipped builds.
+This selects pinned Interop regressions, a Win64 build and one Android
+build/repack. `-SkipAndroid -SkipDesktop` narrows it to script/source/Interop tests.
+Explicit source/pack paths and Development follow [Building](BUILDING.md).
+It does not implicitly run Patcher, native WSL suites, devices or a CoreCLR source
+build. Shared managed changes need desktop validation; runtime/packaging changes
+need both Android and Bionic builds sequentially because staging is shared.
+Managed builds also run MonoModCoreClrProbe and HarmonyCoreClrProbe.
 
-For runtime or packaging changes, provide validated packs and build both profiles
-sequentially (the staging directory is shared):
+Patcher owns `scripts/test.ps1`, including APK/directory injection, all deployment
+policies, duplicate/path/native-collision safety, runtime completeness and legacy
+input rejection. Its optional ReleaseArchive input checks actual Loader ZIPs.
+Native builds require AArch64/Bionic exports, 16 KiB alignment and matching
+stripped/unstripped ELF build IDs. Retain exact symbols before cleaning; compare
+different build roots when changing path mapping or link flags.
+
+## Device checks
+
+Devices must already contain the selected application. Use the same signer and
+replacement updates; never uninstall, clear app data or change package identity
+as a test setup shortcut. Device scripts are explicit maintainer actions.
 
 ```powershell
-./scripts/build/build-android.ps1 -Configuration Release -RuntimeProfile android
-./scripts/build/build-android.ps1 -Configuration Release -RuntimeProfile bionic
+pwsh -NoProfile -File scripts/test/check-android-device.ps1 -PackageName com.example.game
+pwsh -NoProfile -File scripts/test/build-android-smoke-mod.ps1 -Configuration Release
+pwsh -NoProfile -File scripts/test/smoke-test-android.ps1 -PackageName com.example.game `
+    -SmokeModPath ./Output/AndroidSmokeMod/Release/AndroidSmokeMod.dll -WaitSeconds 30
 ```
 
-For shared managed code, also run the Win64 Il2Cpp support-module build from
-`BUILDING.md`. A successful Android build alone does not prove desktop behavior
-was preserved.
+The smoke run requires a fresh Latest.log, managed/backend startup, a live process
+and the Smoke Mod's initialization, scene, Update/FixedUpdate/LateUpdate, JNI
+worker and loaded CoreCLR markers. Same-process maps/exports provide evidence
+when Android denies external procfs access. No runtime-identity.json is required.
 
-### Device preflight
+Smoke may force-stop/relaunch, clear logcat and temporarily push a Mod/HTTPS probe.
+It restores existing files and removes test-created files in finally. Captured
+logs, screenshots and metadata stay in Output/DeviceSmoke. Use HttpsProbeUrl with
+SmokeModPath for a controlled endpoint; a positive request alone does not
+establish certificate rejection or client-auth coverage.
 
-```powershell
-./scripts/test/check-android-device.ps1 `
-    -PackageName com.example.game
-```
+For logging/preferences, collect the same session's Latest/Previous/historical
+logs, Loader.cfg and relevant preference file. Check retained warnings and real
+save outcomes rather than matching historical instrumentation strings.
+[Device acceptance](../maintenance/embedded-crypto-acceptance.md) owns API26 ART,
+TLS, crash coexistence, Activity recreation and physical 16 KiB coverage.
+Dobby hook allocator changes also need its test-android-near-hook.ps1 on native
+ARM64 and supported native-bridge devices.
 
-The device must advertise ARM64, use API 26+, use a 4 KiB or
-16 KiB page size, and already contain the selected package.
-
-### Device smoke test
-
-```powershell
-./scripts/test/build-android-smoke-mod.ps1 -Configuration Release
-./scripts/test/smoke-test-android.ps1 `
-    -PackageName com.example.game `
-    -SmokeModPath ./Output/AndroidSmokeMod/Release/AndroidSmokeMod.dll `
-    -ExpectedBootstrapFlavor Ndk `
-    -WaitSeconds 30
-```
-
-The test requires the managed startup banner and these exact marker classes:
-
-```text
-[Android_Smoke_Mod] Initialize
-[Android_Smoke_Mod] SceneLoaded
-[Android_Smoke_Mod] FirstUpdate
-[Android_Smoke_Mod] FirstFixedUpdate
-[Android_Smoke_Mod] FirstLateUpdate
-[Android_Smoke_Mod] JniWorker 10006 True
-[Android_Smoke_Mod] RuntimeIdentity CoreClr True MonoVm False Maps True
-[Android_Smoke_Mod] RuntimeIdentityFile coreclr <version> coreclr-host-api Hash True
-```
-
-It also asserts that the game process stays alive, rejects a stale `Latest.log`,
-checks the pure NDK/backend markers, and archives `Latest.log` and logcat under
-`Output/DeviceSmoke`. When Android blocks external `/proc/<pid>/maps` or
-`run-as`, the Smoke Mod supplies same-process map, symbol, engine-hash, and
-runtime-identity evidence instead of weakening the assertion. Known framework
-startup failures in Harmony's local-builder initialization also fail the smoke
-test even when later lifecycle markers are present.
-
-After a logging or preference change, pull the app's MelonLoader base directory
-and run the parity contract against the same launch:
-
-```powershell
-./scripts/test/verify-android-runtime-parity.ps1 `
-    -LatestLog "<pulled-MelonLoader-base>/MelonLoader/Latest.log" `
-    -RuntimeRoot "<pulled-MelonLoader-base>" `
-    -RequiredPreferenceFile "<mod-preferences>.cfg" `
-    -RequireUnityLogs
-```
-
-This rejects temporary `[DEBUG-*]` instrumentation, the obsolete component-
-sibling warning, missing Unity capture, a missing `Loader.cfg`, a missing Mod
-preference file, and an empty historical log directory. A synthetic log can
-validate the script itself but is not device evidence.
-
-Game-specific reproduction matrices and their logs belong in the workspace
-`temp/` evidence tree, not in the reusable runtime script set. Promote only a
-generic regression that can run against more than one game.
-
-Do not use large restart counts as a default reliability test. Run no more than
-three consecutive cold starts for one build, then prefer one longer session that
-covers scene changes, repeated managed and IL2CPP GC activity, HTTPS, and real Mod
-workflows. More restarts require a specific unresolved startup hypothesis.
-
-## Device safety
-
-- The smoke script may force-stop and relaunch the app.
-- It may temporarily push `AndroidSmokeMod.dll` and an HTTPS probe into the
-  app-scoped files directory. It restores pre-existing files and removes files
-  created by the test in `finally`, including after a failed assertion.
-- It must not uninstall the package or clear application data.
-- Installing a newly packaged test APK is an external step. When replacement is
-  required, use a non-incremental replacement install and verify the package's
-  `firstInstallTime` did not change.
-- Never use an uninstall/reinstall sequence as a test setup shortcut.
-
-## Coverage claims
-
-The generic device probe covers managed initialization, scene-loaded callbacks,
-normal Update, FixedUpdate, and LateUpdate phases, plus JNI attachment from a
-managed worker thread. The current game regression also covers coroutine hosting,
-but does not prove IMGUI, scene unload, or quit behavior across games. Add a
-deterministic marker before broadening a claim.
-
-## Release evidence
-
-Record the following in ignored workspace evidence for a release candidate;
-keep `STATUS.md` limited to stable capabilities and qualification gaps:
-
-- commit, SDK, NDK, bootstrap flavor, and private runtime versions;
-- device Android API, ABI, page size, package version, and Unity version;
-- full build result and known warnings;
-- smoke-test output directory and observed markers;
-- APK signature/alignment verification performed by external packaging;
-- whether app data and `firstInstallTime` were preserved.
+Prefer up to three cold starts followed by a longer scene/GC/network/Mod session;
+additional restart loops need an unresolved startup hypothesis. Keep exact source,
+toolchain, archive and device identities privately. Host success, a living process
+and one device run never establish broad compatibility.

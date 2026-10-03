@@ -77,6 +77,13 @@ does not inject Java crypto helpers. Never mix the two profiles' crypto inputs.
 
 ## Runtime fork
 
+CoreCLR is a versioned pack rather than a binary Git submodule. Full source builds
+are expensive and need a separate Linux/WSL toolchain; normal Loader builds verify
+prepared packs instead. Pack hashes, source revision, engine identity, RID and
+crypto checks establish input consistency, not source authenticity. Reviewed
+source/tool availability and published checksums remain release requirements.
+
+
 The source repository is maintained at `LemonLoaderX/runtime`. Both active
 profiles use one pinned official-main revision on `main`. The old
 CPU discovery, affinity and NULL-handle fixes are already upstream and are not

@@ -69,6 +69,6 @@ Source compilation and host tests cannot qualify ART, TLS or device behavior.
 - [Editable deployment](2026-10-02-editable-deployment.md) and
   [runtime extraction](2026-10-02-runtime-extraction-without-digests.md): related,
   but their update/ownership policies are unchanged.
-- [Modernization proposal](../../proposed/process/2026-10-02-project-modernization.md):
+- [source-ownership decision](../process/2026-10-02-independent-source-resolution.md):
   partially overlapping maintenance scope; retains independent products and later
   device qualification. Crash notes and the separate Interop proposal are unrelated.

@@ -1,65 +1,47 @@
 # Contributing
 
-LemonLoader is maintained as an Android platform layer over MelonLoader. Keep
-changes small enough to review and place each fix in the repository that owns
-the failing behavior.
+Read the [task index](docs/README.md) and the relevant contract before changing
+code. LemonLoader keeps an Android adapter over the desktop upstream baseline.
 
-## Before changing code
+## Changes
 
-1. Confirm the issue against the current default branch.
-2. Identify whether ownership belongs to LemonLoader, the Patcher, or a retained
-   dependency fork.
-3. Add a regression that reaches the original failure boundary.
-4. Avoid game-specific branches in framework code. Private test games are
-   integration inputs, not project dependencies.
+Preserve existing worktree edits. Fix dependency behavior in its source fork,
+with a focused regression and PATCHES.md entry describing upstream base, root
+cause and removal condition; consumers then update their own pins. Never repair
+compatibility through post-build binary rewriting or game-specific framework
+branches. Do not switch shared source checkouts.
 
-Inspect each affected worktree with Git and preserve existing edits. Dependency
-fixes come first, then each consumer updates its own pin; there is no workspace
-gitlink update. Keep fork PATCHES.md entries scoped to the upstream base, root
-cause, regression and removal condition. Nontrivial decisions belong in
-.agents/notes, updating the existing topic before adding a new one.
+[Testing](docs/android/TESTING.md) owns commands and coverage. Select the smallest
+test that reaches the original boundary, inspect the diff, then broaden checks
+for shared managed code, native hosting or public contracts. Host checks do not
+qualify devices.
 
-## Validation
+Record nontrivial choices in .agents/notes by topic: why, alternatives and
+consequences. Update an existing note for facts; a reversed decision gets a new
+note with supersession links. Fully absorbed duplicate notes may be deleted after
+preserving unique rationale and fixing callers. Do not archive worthless drafts.
 
-Run the narrowest relevant test first. Cross-platform managed changes also need
-a desktop build. Android bootstrap, runtime, or packaging changes require the
-corresponding ARM64 build and artifact verification.
+## Commits and releases
 
-```powershell
-pwsh -NoProfile -File scripts/test/test-scripts.ps1
-dotnet build MelonLoader.sln --configuration Release -p:Platform=x64
-pwsh -NoProfile -File scripts/build/build-android-ndk-bootstrap.ps1 `
-    -Configuration Release `
-    -AndroidNdkRoot "<android-ndk-r27d>"
-```
-
-Do not commit APKs, generated Interop assemblies, runtime packs, logs, signing
-material, local paths, or device identifiers.
-
-## Commits
-
-Use an imperative subject with a meaningful scope, for example
-`fix(android): preserve CoreCLR startup on restricted kernels`. Explain the
-problem, root cause, chosen behavior, and verification in the body when they are
-not obvious from the diff. Do not mix dependency updates, generated output, and
-unrelated refactoring in one commit.
+Use scoped imperative subjects; include root cause, behavior and verification
+when the diff does not explain them. Keep dependency fixes, consumers and unrelated
+work separate. [Maintenance](docs/android/MAINTENANCE.md) and
+[release notes](docs/releases/README.md) own publication procedures.
+Applications, generated Interop, packs, symbols, logs, private paths, signing
+material and build/device progress stay outside Git and public archives.
 
 ## Cleanup
 
-Stop builds first and preview from this repository root:
+Stop builds and retain matching symbols before cleaning:
 
 ```powershell
 pwsh -NoProfile -File scripts/clean.ps1 -WhatIf
 pwsh -NoProfile -File scripts/clean.ps1
-# Also remove known pack/download/archive directories:
 pwsh -NoProfile -File scripts/clean.ps1 -AllOutputs -WhatIf
 ```
 
-Routine cleanup removes Output/Debug, Release and Dependencies, project bin/obj
-and known per-project outputs. Save exact-build symbols outside those build trees
-before cleaning. Packs and formal/development archives require AllOutputs.
-RuntimeDevelopment, diagnostic/test evidence, private/unknown Output directories,
-source caches and sibling repositories remain untouched in both modes. Runtime
-source outputs need deliberate maintenance at their real output root, not through
-the source artifacts symlink. Links within a selected tree or on its path reject
-cleanup before deletion. There is no cross-repository Deep mode.
+Default cleanup owns known build trees and project bin/obj. Packs and archives
+require AllOutputs. Runtime source outputs, diagnostics, unknown directories,
+source caches and siblings remain untouched. Selected links reject deletion;
+never clean through the runtime artifacts symlink. Each repository owns its
+outputs; there is no cross-repository Deep mode.
