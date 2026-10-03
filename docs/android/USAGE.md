@@ -9,8 +9,11 @@ It does not modify or install an APK itself. A complete payload is under:
 Output/Release/linux-bionic-arm64/package
 ```
 
-Use a layout-9-capable LemonLoader.Patcher for an original ARM64 Unity IL2CPP APK.
-It edits ZIP entries directly and generates Interop assemblies. Android Releases
+LemonLoader.Patcher is optional for an original ARM64 Unity IL2CPP APK. It exposes
+generate-interop, inject with existing DLLs, and process-apk, or combines them with
+patch. Its [workflow guide](https://github.com/LemonLoaderX/LemonLoader.Patcher/blob/main/docs/WORKFLOW.md)
+includes equivalent script commands; manual injection is described below. It edits
+ZIP entries directly. Android Releases
 embed crypto helpers in libmain.so, so injection adds no DEX. Alignment and
 signing are explicit options.
 Do not extract/repack a complete APK on a case-insensitive filesystem.

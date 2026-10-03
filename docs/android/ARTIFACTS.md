@@ -7,7 +7,7 @@ updates APK ZIP entries without a case-insensitive unpack/repack cycle.
 ## Release inputs and APK layout
 
 The tree below combines Release inputs and the final APK layout. The Release
-has no game Interop assemblies: Patcher creates `runtime/interop` content.
+has no game Interop assemblies: a matching generated DLL set supplies `runtime/interop` content.
 `tools` and root license files are Release-side inputs, not copied APK assets.
 The Android profile is shown; Bionic differences follow below.
 
@@ -68,7 +68,7 @@ output. Active layout-9 runtime assets contain no `runtime-identity.json`; the
 Release manifest owns the audit identity. Supported output uses
 `bootstrapFlavor: Ndk`. It is deployable only
 and always records `gameAssembliesIncluded: false`. Game-specific Interop DLLs
-are generated and merged by LemonLoader.Patcher. The manifest also records the
+are generated off device and merged by Patcher or another installer. The manifest also records the
 CoreCLR backend and engine provenance.
 Desktop Mono/NetStandard patch directories are excluded, and Release staging
 removes managed PDBs and CoreCLR diagnostic DAC/DBI libraries to avoid paying APK

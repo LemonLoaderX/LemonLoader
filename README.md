@@ -11,9 +11,11 @@ native libraries. Android uses platform JNI crypto with helpers embedded in
 and 32-bit ABIs are unsupported.
 
 This repository builds game-independent Loader archives.
-[LemonLoader.Patcher](https://github.com/LemonLoaderX/LemonLoader.Patcher) generates
-game Interop and modifies APKs or unpacked directories. Manual installation is
-also supported through the documented file layout.
+[LemonLoader.Patcher](https://github.com/LemonLoaderX/LemonLoader.Patcher) is an
+optional convenience tool. It exposes independent Interop generation, injection
+using existing DLLs and APK alignment/signing, plus a combined one-step workflow.
+Scripts and ZIP editors can install the same Loader through the documented
+[file layout](docs/android/ARTIFACTS.md) and [manual steps](docs/android/USAGE.md#manual-injection).
 
 ## Start here
 
