@@ -38,7 +38,7 @@ cryptography library initialized through `JNI_OnLoad`. Loading that library from
 an isolated class loader created two native-library identities, leaving the copy
 used by CoreCLR without its Java VM state.
 
-Legacy packages address this by promoting the helper DEX into the application
+Historical packages addressed this by promoting the helper DEX into the application
 ClassLoader. Active Android products instead embed the DEX in `libmain.so` and
 use `InMemoryDexClassLoader`, requiring API 26+. The runtime fork accepts the
 helper loader explicitly, initializes the host's `dlopen` module, and resolves

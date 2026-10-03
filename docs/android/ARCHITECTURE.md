@@ -141,7 +141,7 @@ the adapter falls back to the application's internal files directory.
 - The active Android profile embeds the validated runtime helper DEX in
   `libmain.so` and uses `InMemoryDexClassLoader` (API 26+). The crypto shim receives
   that loader explicitly; all crypto P/Invokes resolve to the same initialized
-  `dlopen` module. Legacy packages retain application-ClassLoader promotion.
+  `dlopen` module. Application-ClassLoader promotion is retired.
 - Android initialization must return failure to Java rather than terminating
   the game process when the bootstrap cannot start.
 - Android consumes pre-generated Il2CppInterop assemblies. It does not execute

@@ -63,7 +63,7 @@ Bootstrap compilation verifies the runtime pack and the explicit ClassLoader
 initialization export, embeds the DEX, and records local input identities.
 Staging checks those identities and the full embedded bytes before omitting the
 standalone helper. Active layout 9 keeps minimal payload configuration, not
-installed bootstrap/digest inventories. Patcher still supports historical
+installed bootstrap/digest inventories. Current Loader/Patcher reject historical
 layout 8 and external-DEX Releases; see [artifact contracts](ARTIFACTS.md).
 
 ## Native dependency checks

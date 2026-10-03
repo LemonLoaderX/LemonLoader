@@ -244,8 +244,8 @@ int main(int argc, char** argv) {
     std::filesystem::create_directory(crypto_root);
     std::ofstream(crypto_root / "libSystem.Security.Cryptography.Native.Android.so").put('x');
     assert(!initialize_android_crypto(crypto_root.string()));
-    assert(!pending && last_error.find("APK helper DEX") != std::string::npos);
-    std::cout << "PASS missing crypto bridge clears Java exception and reports recovery context\n";
+    assert(!pending && last_error.find("embedded helpers") != std::string::npos);
+    std::cout << "PASS bootstrap without embedded helpers rejects Android JNI crypto with recovery context\n";
 
     // Unity's handle belongs to another linker namespace. A by-name load in
     // the bootstrap's namespace finds a different, uninitialized instance.

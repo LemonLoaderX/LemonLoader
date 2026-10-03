@@ -87,8 +87,8 @@ assemblies, not unrelated NuGet cache files.
 - Every shipped `.so`, including managed runtime dependencies, must support 16 KiB
   pages. Checking only `libmain.so` is insufficient.
 - Active producers emit layout 9 without domain hashes, deployment revision,
-  declared file digests or audit JSON. Patcher's older Release input path is
-  separate; Loader no longer stages layout 8. Older Patchers must reject layout-9 Releases;
+  declared file digests or audit JSON. Only layout 9 is supported by current
+  Loader/Patcher. Older Patchers must reject layout-9 Releases;
   use a Patcher build supporting layout 9. `lemonloader-release.json` continues
   validating individual Release files. All extraction uses Android's package update time
   and local markers. Cached startup checks marker/directory existence without
@@ -110,12 +110,8 @@ assemblies, not unrelated NuGet cache files.
   The Release manifest declares `coreClrCryptoDexMode: embedded` and
   `minimumAndroidApi` of at least 26; its file inventory verifies `libmain.so`.
   These build/validation fields are not copied into layout-9 APK configuration.
-  Patcher adds no DEX entries for this mode. Historical embedded layout-8 inputs
-  retain their bootstrap digest checks.
-- Older Android Releases without the embedded-mode declaration still require
-  `tools/android/lemonloader-coreclr-crypto.dex`. Patcher promotes this verified
-  input to the next free `classesN.dex` and carries its digest into final APK
-  `coreClrCryptoDexSha256`. Historical Release payload digests remain checked.
+  Patcher adds no DEX entries. Layout 8, external-DEX and MonoVM Releases are
+  unsupported; use the corresponding historical tool checkout for old inputs.
 - A Bionic-profile Release has no JNI crypto library or helper DEX. Its shared
   runtime contains `libSystem.Security.Cryptography.Native.OpenSsl.so`,
   `libssl.so` and `libcrypto.so`; the archive includes OpenSSL attribution under

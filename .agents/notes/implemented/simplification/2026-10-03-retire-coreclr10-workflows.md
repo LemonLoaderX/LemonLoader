@@ -11,6 +11,9 @@ The optional parent also accumulates old reference checkouts and device work.
 
 ## Decision
 
+The [reader retirement](2026-10-03-retire-layout8-readers.md) owns the separate
+historical-input boundary described below; those readers are now retired too.
+
 Loader maintains only the .NET 11 Android and Bionic profiles, both API 26+.
 CoreCLR 10 profile/pins, recovery builder/publisher/downloader and the old
 staged-layout shell CoreClrProbe are removed. Staging produces only layout 9;

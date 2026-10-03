@@ -11,6 +11,9 @@ without JNI state. See [porting notes](../../../../docs/android/PORTING.md).
 
 ## Decision
 
+The [reader retirement](../simplification/2026-10-03-retire-layout8-readers.md)
+supersedes historical DEX promotion and application-ClassLoader fallback below.
+
 The [CoreCLR 10 retirement](../simplification/2026-10-03-retire-coreclr10-workflows.md)
 supersedes the frozen pre-26 recovery described below. Embedded crypto remains
 the maintained Android mechanism.

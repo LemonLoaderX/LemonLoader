@@ -9,10 +9,10 @@ It does not modify or install an APK itself. A complete payload is under:
 Output/Release/linux-bionic-arm64/package
 ```
 
-LemonLoader.Patcher 1.1.0 or later is the automated adapter for an original ARM64 Unity IL2CPP APK.
-It edits ZIP entries directly, generates Interop assemblies, and inserts a helper
-DEX only for historical external-DEX Releases. Active Android Releases already
-embed it in libmain.so. Alignment and signing are explicit options.
+Use a layout-9-capable LemonLoader.Patcher for an original ARM64 Unity IL2CPP APK.
+It edits ZIP entries directly and generates Interop assemblies. Android Releases
+embed crypto helpers in libmain.so, so injection adds no DEX. Alignment and
+signing are explicit options.
 Do not extract/repack a complete APK on a case-insensitive filesystem.
 See [ARTIFACTS.md](ARTIFACTS.md) for the payload interface.
 
@@ -48,8 +48,8 @@ generated ARM64 Interop DLLs for the exact game's IL2CPP library/metadata.
 
 Root release manifests, licenses and `tools` are Release-side material, not APK
 asset destinations. Loader extracts dotnet into private storage on launch; the
-editor does not need access to that private directory. Older external-DEX
-Releases still use their historical adapter contract.
+editor does not need access to that private directory. Current tooling rejects
+old layout-8 and external-DEX Releases.
 
 ## Before packaging
 

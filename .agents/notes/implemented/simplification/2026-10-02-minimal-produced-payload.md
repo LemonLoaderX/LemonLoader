@@ -11,6 +11,9 @@ consumer requirements have been removed.
 
 ## Decision
 
+The [reader retirement](2026-10-03-retire-layout8-readers.md) supersedes this note's
+layout-8/external-DEX/MonoVM compatibility decision below; current readers use 9.
+
 The [CoreCLR 10 retirement](2026-10-03-retire-coreclr10-workflows.md) supersedes
 frozen layout-8 staging below; Loader now produces only layout 9.
 

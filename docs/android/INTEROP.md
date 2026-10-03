@@ -124,8 +124,8 @@ The patcher copies only top-level `.dll` files into the independent
 this directory contains assemblies, publishes it as runtime
 `MelonLoader/Il2CppAssemblies`, and skips the desktop generator module.
 For active layout 9, interop-manifest.json remains a host-side generation record;
-it is not copied into the APK or required for startup. Historical layout-8
-Patcher inputs retain the old manifest-copying recipe. Keep generation evidence
+it is not copied into the APK or required for startup. Layout-8 input handling is
+retired. Keep generation evidence
 with the developer outputs when investigating input or tool mismatches.
 
 Unstripping restores the managed API surface used to compile and run ordinary

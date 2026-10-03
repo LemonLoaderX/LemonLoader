@@ -109,7 +109,7 @@ validation, and formal staging rejects development packs.
 Runtime archives contain runtime inputs, provenance, licenses and pack inventory.
 Loader active Release/APK layout 9 uses minimal payload configuration and embeds
 Android crypto DEX in libmain.so; it does not ship installed identity/digest
-inventories. Historical layout 8 and external DEX compatibility are separate.
+inventories. Historical layout 8 and external DEX inputs are unsupported.
 See [ARTIFACTS.md](ARTIFACTS.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ```powershell

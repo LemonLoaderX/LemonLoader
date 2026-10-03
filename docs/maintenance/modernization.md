@@ -89,9 +89,9 @@ mandatory umbrella repo under another name.
 
 The [CoreCLR 10 retirement decision](../../.agents/notes/implemented/simplification/2026-10-03-retire-coreclr10-workflows.md)
 supersedes the former frozen recovery rule. Current builds support only .NET 11
-Android/Bionic and API 26+. Legacy input readers (layout 8, external DEX and
-historical MonoVM) are a separate removal boundary: retain active safety/policy
-tests and explicit unsupported-input errors when removing them. Desktop upstream
+Android/Bionic and API 26+. The [reader retirement](../../.agents/notes/implemented/simplification/2026-10-03-retire-layout8-readers.md)
+removes layout 8, external DEX and historical MonoVM inputs while retaining active
+safety/policy tests and explicit unsupported-input errors. Desktop upstream
 code, Unity file-format support and required fork adaptations are not blanket
 cleanup targets. Local cleanup inventories/results belong outside Git.
 

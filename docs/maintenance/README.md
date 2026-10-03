@@ -7,6 +7,8 @@ Read only the document needed for the current task:
 - [Ownership inventory](ownership.md): current producers, paths and planned owners.
 - [Retired CoreCLR 10 workflows](../../.agents/notes/implemented/simplification/2026-10-03-retire-coreclr10-workflows.md):
   maintained runtime boundary and private-history cleanup rules.
+- [Retired payload readers](../../.agents/notes/implemented/simplification/2026-10-03-retire-layout8-readers.md):
+  layout-9-only input handling and removal of DEX promotion and mixed hashes.
 - [Embedded crypto acceptance](embedded-crypto-acceptance.md): maintainer's later
   device matrix and evidence, without installation/signing changes.
 - [Crash evidence investigation](../../.agents/notes/proposed/feature/2026-10-02-native-crash-evidence.md):

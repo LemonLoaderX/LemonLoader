@@ -49,8 +49,8 @@ generic Linux OpenSSL shim.
 
 If `AndroidCryptoNative_InitWithClassLoader` is missing, rebuild the runtime fork
 and prepare a new matching pack; an old pack cannot initialize embedded helpers.
-Do not transplant a crypto SO from a different runtime. For older external-DEX
-Releases only, verify the next unused `classesN.dex` entry. If JNI state is missing, check that the bootstrap
+Do not transplant a crypto SO from a different runtime. External-DEX packages are
+unsupported. If JNI state is missing, check that the bootstrap
 and CoreCLR resolve the same native cryptography module rather than loading a
 second namespace-local copy.
 

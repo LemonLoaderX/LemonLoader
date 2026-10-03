@@ -67,7 +67,7 @@ This avoids a second namespace-local copy with missing JNI state. This path
 applies to the Android profile only.
 
 Historical Android Releases used the application ClassLoader and
-top-level helper DEX. The older Patcher input path is separate from current builds. Old
+top-level helper DEX. That input path is retired. Old
 runtime packs without the explicit host export cannot build embedded Android
 products: rebuild the runtime fork rather than substituting a legacy shim.
 
@@ -114,8 +114,8 @@ that identity but does not copy the provenance file into the APK.
 
 Active layout-9 Releases record engine/source/profile audit identity in
 `lemonloader-release.json`, whose file inventory verifies runtime bytes before
-injection. They do not copy identity JSON into the APK. Older layout-8 Releases
-retain their historical `runtime-identity.json` checks. Native startup checks
+injection. They do not copy identity JSON into the APK. Layout-8 input support is
+retired. Native startup checks
 actual CoreCLR exports and crypto initialization rather than colocated digests.
 
 ## Failure handling

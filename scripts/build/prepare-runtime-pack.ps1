@@ -46,7 +46,6 @@ if ($profile.cryptoBackend -eq 'openssl') {
     $linuxWork = ConvertTo-WslPath -Path $work -Distribution $Distribution
     $linuxRepo = ConvertTo-WslPath -Path $repository -Distribution $Distribution
     & wsl.exe -d $Distribution -- bash "$linuxRepo/scripts/build/build-android-coreclr-crypto-loader.sh" `
-        "$linuxRepo/MelonLoader.Bootstrap/Platforms/Android/Native/java/net/dot/android/crypto/LemonLoaderCryptoBootstrap.java" `
         "$linuxWork/native/libSystem.Security.Cryptography.Native.Android.jar" `
         "$linuxWork/native/lemonloader-coreclr-crypto.dex" "$linuxWork/cache" $LinuxAndroidSdkRoot $LinuxJavaHome
     if($LASTEXITCODE){throw 'Crypto helper build failed'}

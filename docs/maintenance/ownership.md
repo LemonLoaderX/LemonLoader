@@ -55,7 +55,7 @@ This inventory identifies authorities and retirement boundaries, not local progr
   CoreCLR 10 and layout-8 staging are retired.
 - Patcher validates the Release and adds Interop DLLs/deployment files. Layout 9
   emits non-seed policy overrides without generated digests, revision or copied
-  Interop manifest. Its layout-8 compatibility path retains the old computations.
+  Interop manifest. Layout-8 computations and external-DEX promotion are retired.
 - The native host checks actual CoreCLR/crypto loading and reads deployment from
   actual assets and optional path policies, ignoring declared hashes/revision
   and identity digests. Package lastUpdateTime supplies all extraction freshness.

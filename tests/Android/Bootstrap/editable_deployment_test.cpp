@@ -160,7 +160,7 @@ int main(int argc, char** argv) {
     JNIEnv env{&table}; current_env = &env;
     JNIInvokeInterface vm_table{}; vm_table.GetEnv = get_env; JavaVM vm{&vm_table}; java_vm = &vm;
     root = make(); asset_manager_object = object(root);
-    root->fields = {{"formatVersion", "8"}, {"loaderSha256", std::string(64,'a')}, {"dotnetSha256", std::string(64,'b')},
+    root->fields = {{"formatVersion", "9"}, {"loaderSha256", std::string(64,'a')}, {"dotnetSha256", std::string(64,'b')},
         {"interopSha256", std::string(64,'c')}, {"managedRuntimeIdentitySha256", std::string(64,'d')}, {"managedRuntimeBackend", "coreclr"},
         {"deploymentRevisionSha256", "stale"}, {"deploymentSha256", "stale"}, {"deploymentProfile", "unknown"}};
     assets["LemonLoader/payload.json"] = "fixture JSON supplied through fake JSONObject";
@@ -252,6 +252,7 @@ int main(int argc, char** argv) {
     assert(read_payload_descriptor(payload) && payload.runtime_rid == "linux-bionic-arm64");
     root->fields["runtimeRid"] = "unsafe-rid"; assert(!read_payload_descriptor(payload));
     root->fields = {{"formatVersion", "7"}}; assert(!read_payload_descriptor(payload));
+    root->fields = {{"formatVersion", "8"}}; assert(!read_payload_descriptor(payload));
     root->fields.clear();
     assert(read_payload_descriptor(payload) && payload.runtime_rid == "android-arm64");
     root->fields["formatVersion"] = "9";

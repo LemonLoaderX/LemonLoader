@@ -13,15 +13,15 @@ namespace lemon::bootstrap {
 namespace {
 
 void* android_crypto_module = nullptr;
-jobject android_crypto_loader = nullptr;
 #ifdef LEMON_EMBEDDED_CRYPTO_DEX
+jobject android_crypto_loader = nullptr;
 extern "C" const unsigned char lemon_crypto_dex_start[];
 extern "C" const unsigned char lemon_crypto_dex_end[];
-#endif
 
 bool clear_jni_exception(JNIEnv* env, const std::string& context) {
     return clear_java_exception(env, context.c_str());
 }
+#endif
 
 bool is_android_crypto_library(const char* library_name) {
     if (library_name == nullptr) {
@@ -142,44 +142,8 @@ bool initialize_android_crypto(const std::string& runtime_directory) {
     android_crypto_module = module;
     return true;
 #else
-    jclass loader_class = env->FindClass(
-        "net/dot/android/crypto/LemonLoaderCryptoBootstrap");
-    if (clear_jni_exception(env, "finding the APK crypto bridge") || loader_class == nullptr) {
-        log_error("Android CoreCLR crypto bridge is unavailable; verify the APK helper DEX and class loader");
-        return false;
-    }
-    jmethodID load_library = required_static_method(env,
-        loader_class,
-        "load",
-        "(Ljava/lang/String;)V");
-    jstring library_path = new_java_string(env, crypto_library.string());
-    env->CallStaticVoidMethod(loader_class, load_library, library_path);
-    const bool load_failed = clear_jni_exception(env, "loading the Android crypto native library") ||
-        library_path == nullptr;
-    if (!load_failed) {
-        android_crypto_module = dlopen(
-            crypto_library.c_str(),
-            RTLD_NOW | RTLD_NOLOAD | RTLD_LOCAL);
-        if (!android_crypto_module) {
-            const char* detail = dlerror();
-            log_error("Could not retain Android crypto module '" + crypto_library.string() +
-                      "': " + (detail ? detail : "unknown linker error"));
-        }
-        android_crypto_loader = env->NewGlobalRef(loader_class);
-    }
-
-    if (library_path != nullptr) {
-        env->DeleteLocalRef(library_path);
-    }
-    env->DeleteLocalRef(loader_class);
-
-    if (clear_jni_exception(env, "retaining the Android crypto bridge") ||
-        load_failed || android_crypto_module == nullptr ||
-        android_crypto_loader == nullptr) {
-        log_error("Android CoreCLR crypto native library initialization did not complete");
-        return false;
-    }
-    return true;
+    log_error("Android JNI crypto requires a bootstrap with embedded helpers; rebuild for the Android profile");
+    return false;
 #endif
 }
 

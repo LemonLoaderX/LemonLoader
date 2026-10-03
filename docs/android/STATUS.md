@@ -9,8 +9,8 @@ supported Android managed backend.
 
 The active profiles are android (default) and bionic, selected in
 `eng/runtime-profiles.json`. They share one source revision. CoreCLR 10 recovery
-is retired. Preview 5 distributes both profiles and requires Patcher
-1.1.0 or later; it does not imply broad game or device qualification.
+is retired. Current layout-9 Releases require a Patcher supporting layout 9;
+preview distributions do not imply broad game or device qualification.
 
 The game-independent LemonLoader Release is consumed by LemonLoader.Patcher,
 which owns game input extraction, Interop generation, APK mutation, alignment,
@@ -27,7 +27,7 @@ and CoreCLR sources remain independent, reviewable forks.
 - IL2CPP calls and injection scans reuse Unity's initialized library handle;
   host regressions cover duplicate-loading failures and JNI ownership.
 - Android crypto helpers are embedded in libmain.so and loaded in memory;
-  historical external-DEX inputs retain a separate compatibility path.
+  layout 8, external-DEX and MonoVM inputs are retired.
 - Previous-session logs, bounded CoreCLR reports and API-gated Android exit traces
   are retained; exact-build native symbols stay private for offline diagnostics.
 - Il2CppInterop covers Android ARM64 aggregate ABI and multiple generic-method

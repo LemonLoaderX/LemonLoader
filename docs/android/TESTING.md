@@ -40,8 +40,9 @@ digest/identity/Interop manifest, APK update replacement/removal and retry when
 the platform update token is unavailable.
 Patcher regressions cover active layout-9 APK/directory injection with plain
 Interop DLLs, non-default policy overrides, manual asset add/delete, malformed
-policies and Release-file corruption. Historical layout-8 hash, external-DEX and
-embedded-bootstrap checks remain separate compatibility cases.
+policies, mixed/incomplete runtime inputs and Release-file corruption. Layout-8
+and MonoVM inputs are rejected; DEX/smali preservation is checked without helper
+promotion or any dependency on a primary DEX.
 Native build verification requires an ELF build ID and checks that stripping
 preserves the private symbol file's ID. Release staging rejects DWARF/static
 symbols while retaining this diagnostic identifier. When changing native build
