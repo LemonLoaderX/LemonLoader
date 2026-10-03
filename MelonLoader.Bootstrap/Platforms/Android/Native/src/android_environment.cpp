@@ -808,6 +808,17 @@ bool deploy_assets_if_changed(
     size_t preserved_count = 0;
     for (const DeploymentFileDescriptor& file : deployment_files) {
         const std::filesystem::path relative(file.path);
+        if (!revision_changed && !deployment::requires_continuous_content_check(file.policy)) {
+            const auto prior = previous_states.find(file.path);
+            if (prior != previous_states.end() && !write_text_file(
+                    next_state_root / relative,
+                    prior->second.hash + "\n" + deployment::name(prior->second.policy) + "\n")) {
+                log_error("Failed to retain deployment state for '" + file.path + "'");
+                std::filesystem::remove_all(staging, error);
+                return false;
+            }
+            continue;
+        }
         const std::filesystem::path staged = staging / relative;
         const std::filesystem::path destination = base / relative;
         bool exists = false;
