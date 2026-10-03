@@ -49,12 +49,7 @@ internal static class MelonLogger
                 foreach (var file in logs)
                     queue.Add((file, File.GetLastWriteTime(file)));
 
-                queue.Sort((x, y) =>
-                {
-                    if (x.Item2 >= y.Item2)
-                        return 0;
-                    return 1;
-                });
+                queue.Sort((x, y) => x.Item2.CompareTo(y.Item2));
 
                 var toDelete = logs.Length - LoaderConfig.Current.Logs.MaxLogs + 1;
                 for (var i = 0; i < toDelete; i++)
@@ -74,7 +69,7 @@ internal static class MelonLogger
         }
 
         var latestPath = Path.Combine(LoaderConfig.Current.Loader.BaseDirectory, "MelonLoader", "Latest.log");
-        var cachedPath = Path.Combine(logsDir, $"{DateTime.Now:%y-%M-%d_%H-%m-%s}.log");
+        var cachedPath = Path.Combine(logsDir, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.log");
 
         MelonDebug.Log("Opening stream to latest log");
         try
@@ -110,6 +105,8 @@ internal static class MelonLogger
         {
             Core.Logger.Error("Failed to create any log files. Logging to console only");
         }
+
+        ConsoleHandler.InstallHooks();
 
         if (LoaderConfig.Current.Loader.CapturePlayerLogs)
         {
@@ -206,7 +203,7 @@ internal static class MelonLogger
 
             return;
         }
-        
+
         if (!sectionName.IsEmpty)
             Console.WriteLine($"[{time.Pastel(timeColor)}] [{sectionName.Pastel(sectionColor)}] {msg.Pastel(msgColor)}");
         else
@@ -217,14 +214,14 @@ internal static class MelonLogger
         => LogInternal("WARNING", msg, null, ColorARGB.Yellow, ConsoleColor.Yellow);
     public static void LogWarning(ReadOnlySpan<char> msg, ReadOnlySpan<char> sectionName)
         => LogInternal("WARNING", msg, sectionName, ColorARGB.Yellow, ConsoleColor.Yellow);
-    
+
     public static void LogError(ReadOnlySpan<char> msg)
         => LogInternal("ERROR", msg, null, ColorARGB.IndianRed, ConsoleColor.Red);
     public static void LogError(ReadOnlySpan<char> msg, ReadOnlySpan<char> sectionName)
         => LogInternal("ERROR", msg, sectionName, ColorARGB.IndianRed, ConsoleColor.Red);
 
-    private static void LogInternal(ReadOnlySpan<char> special, 
-        ReadOnlySpan<char> msg, 
+    private static void LogInternal(ReadOnlySpan<char> special,
+        ReadOnlySpan<char> msg,
         ReadOnlySpan<char> sectionName,
         ColorARGB color,
         ConsoleColor backupColor)
@@ -233,7 +230,7 @@ internal static class MelonLogger
         var sectionPart = string.IsNullOrEmpty(sectionName.ToString()) ? "" : $"[{sectionName}] ";
         var time = DateTime.Now.ToString(timeFormat);
         string logStr = $"[{time}] {specialPart}{sectionPart}{msg}";
-        
+
         LogToFiles(logStr);
 
         if (!ConsoleHandler.IsOpen)

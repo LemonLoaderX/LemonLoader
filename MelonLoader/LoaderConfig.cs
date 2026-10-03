@@ -32,6 +32,15 @@ public class LoaderConfig
     [RequiresDynamicCode("Dynamically accesses LoaderConfig properties")]
     internal static void Initialize()
     {
+        var env = Environment.GetEnvironmentVariable("MELONLOADER_LOADED");
+        if (!string.IsNullOrEmpty(env)
+            || ArgParser.IsDefined("no-mods"))
+        {
+            Current.Loader.Disable = true;
+            return;
+        }
+        Environment.SetEnvironmentVariable("MELONLOADER_LOADED", "1");
+
         var customBaseDir = ArgParser.GetValue("melonloader.basedir");
         var baseDir = Environment.GetEnvironmentVariable("MELONLOADER_BASE_DIR");
         if (string.IsNullOrWhiteSpace(baseDir))
@@ -98,6 +107,8 @@ public class LoaderConfig
         }
         else
             TrySaveFile(path);
+        if (Current.Loader.Disable)
+            return;
 
     }
 
@@ -114,13 +125,13 @@ public class LoaderConfig
 #endif
         }
     }
-    
+
     private static void SaveFile(string path)
     {
         var doc2 = TomletMain.TomlStringFrom(Current);
         File.WriteAllText(path, doc2);
     }
-    
+
 #endif
 
     public static LoaderConfig Current { get; internal set; } = new();
@@ -168,9 +179,6 @@ public class LoaderConfig
             if (int.TryParse(ArgParser.GetValue("melonloader.harmonyloglevel"), out var harmonyLogLevel))
                 Current.Loader.HarmonyLogLevel = (HarmonyLogVerbosity)Math.Clamp(harmonyLogLevel, (int)HarmonyLogVerbosity.None, (int)HarmonyLogVerbosity.IL);
 
-            if (ArgParser.IsDefined("no-mods"))
-                Current.Loader.Disable = true;
-
             if (ArgParser.IsDefined("quitfix"))
                 Current.Loader.ForceQuit = true;
 
@@ -195,7 +203,7 @@ public class LoaderConfig
         }
 #endif
 
-            [TomlNonSerialized]
+        [TomlNonSerialized]
         public string BaseDirectory { get; internal set; } = null!;
 
         // Technically, this will always return false, but it's still a config ¯\_(ツ)_/¯
@@ -408,7 +416,7 @@ public class LoaderConfig
 #elif LINUX || OSX || ANDROID
             "colon (:)";
 #endif
-        
+
         [TomlProperty("version_override")]
         [TomlPrecedingComment("Overrides the detected UnityEngine version. Equivalent to the '--melonloader.unityversion' launch option")]
         public string VersionOverride { get; internal set; } = "";
@@ -480,5 +488,9 @@ public class LoaderConfig
 #endif
         [TomlPrecedingComment("Enables the NativeMethodDetector processor for Cpp2IL. Equivalent to the '--cpp2il.nativemethoddetector' launch option")]
         public bool EnableCpp2ILNativeMethodDetector { get; internal set; }
+
+        [TomlProperty("keep_cpp2il_output")]
+        [TomlPrecedingComment("Keeps the output assemblies from Cpp2IL. Equivalent to the '--cpp2il.keepoutput' launch option")]
+        public bool KeepCpp2ILOutput { get; internal set; }
     }
 }

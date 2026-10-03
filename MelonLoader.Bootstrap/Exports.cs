@@ -103,15 +103,13 @@ internal static class Exports
         Environment.SetEnvironmentVariable(LdPreloadEnvName, newLdPreload);
     }
 #endif
-    
-#if WINDOWS
-    [UnmanagedCallersOnly(EntryPoint = "DllMain")]
-    [RequiresDynamicCode("Calls InitConfig")]
-    public static bool DllMain(nint hModule, uint ulReasonForCall, nint lpReserved)
-    {
-        if (ulReasonForCall != 1)
-            return true;
 
+#if WINDOWS
+    // https://github.com/Xpl0itR/NativeDllMain
+    [UnmanagedCallersOnly(EntryPoint = "DllProcessAttach")]
+    [RequiresDynamicCode("Calls InitConfig")]
+    public static bool WindowsEntryPoint(nint hModule)
+    {
         if (!Initialize(hModule))
             return true;
 
@@ -130,8 +128,8 @@ internal static class Exports
             return;
 
         string libraryPath = $"{CurrentAssemblyName}.dylib";
-        nint handle = NativeLibrary.Load(libraryPath);
-        if (!Initialize(handle))
+        if (!NativeLibrary.TryLoad(libraryPath, out nint handle)
+            || !Initialize(handle))
             return;
 
         _hookPlayerMainEntered = true;
@@ -167,9 +165,10 @@ internal static class Exports
         if (_hookPlayerMainEntered)
             return LibcNative.LibCStartMain(main, argc, argv, init, fini, rtLdFini, stackEnd);
         
-        string libraryPath = $"{CurrentAssemblyName}.so";
-        nint handle = NativeLibrary.Load(libraryPath);
-        if (!Initialize(handle))
+        string libraryPath = Path.Join(Path.GetDirectoryName(Environment.ProcessPath), $"{CurrentAssemblyName}.so");
+        if (!File.Exists(libraryPath)
+            || !NativeLibrary.TryLoad(libraryPath, out nint handle)
+            || !Initialize(handle))
             return LibcNative.LibCStartMain(main, argc, argv, init, fini, rtLdFini, stackEnd);
 
         RemoveLibraryPreloadEnv();
@@ -188,8 +187,10 @@ internal static class Exports
     {
         if (_originalMain is null)
             return 0;
+
         if (_hookPlayerMainEntered)
             return _originalMain(argc, argv, envp);
+
         _hookPlayerMainEntered = true;
 
         Core.Init();

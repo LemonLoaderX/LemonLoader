@@ -1,5 +1,6 @@
 ﻿#if X64 && (WINDOWS || OSX || LINUX)
 using System.Diagnostics;
+using System.Formats.Tar;
 using System.IO.Compression;
 
 namespace MelonLoader.Bootstrap.RuntimeHandlers.Dotnet;
@@ -8,19 +9,35 @@ internal static class DotnetPortable
 {
     private const string dotnetRuntimeDownload =
 #if LINUX
-        "https://github.com/LavaGang/PortableDotnet/raw/refs/heads/6.0.25/dotnet6.linux.x86_64.zip";
-#elif OSX
-        "https://github.com/LavaGang/PortableDotnet/raw/refs/heads/6.0.25/dotnet6.macos.x86_64.zip";
-#elif WINDOWS
-        "https://github.com/LavaGang/PortableDotnet/raw/refs/heads/6.0.25/dotnet6.windows.x86_64.zip";
+#if X64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-linux-x64.tar.gz";
+#elif ARM64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-linux-arm64.tar.gz";
+#elif ARM32
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-linux-arm.tar.gz";
 #endif
-    
+#elif OSX
+#if X64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-osx-x64.tar.gz";
+#elif ARM64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-osx-arm64.tar.gz";
+#endif
+#elif WINDOWS
+#if X64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-win-x64.zip";
+#elif X86
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-win-x86.zip";
+#elif ARM64
+        "https://builds.dotnet.microsoft.com/dotnet/Runtime/6.0.36/dotnet-runtime-6.0.36-win-arm64.zip";
+#endif
+#endif
+
     private static readonly FileDownload downloadRequest = new(dotnetRuntimeDownload);
 
     public static bool AttemptInstall()
     {
         Core.Logger.Msg($"Downloading the Portable .NET Runtime from: {dotnetRuntimeDownload}");
-        var tempPath = Path.GetTempFileName() + ".zip";
+        var tempPath = Path.GetTempFileName() + ".tmp";
         (bool, HttpResponseMessage?)? resp = null;
         try
         {
@@ -28,10 +45,10 @@ internal static class DotnetPortable
             if (!resp.Value.Item1)
             {
                 Core.Logger.Error("Failed to download the Portable .NET Runtime. Check your internet connection.");
-                
+
                 if (resp.Value.Item2 != null)
                     Core.Logger.Error(resp.Value.Item2.ReasonPhrase!);
-                
+
                 if (File.Exists(tempPath))
                     File.Delete(tempPath);
                 return false;
@@ -40,13 +57,13 @@ internal static class DotnetPortable
         catch (Exception ex)
         {
             Core.Logger.Error("Failed to download the Portable .NET Runtime. Check your internet connection.");
-            
+
             if (resp.HasValue
                 && (resp.Value.Item2 != null))
                 Core.Logger.Error(resp.Value.Item2.ReasonPhrase!);
-            
+
             Core.Logger.Error(ex.ToString());
-            
+
             if (File.Exists(tempPath))
                 File.Delete(tempPath);
             return false;
@@ -61,7 +78,20 @@ internal static class DotnetPortable
         {
             if (Directory.Exists(dotnetDir))
                 Directory.Delete(dotnetDir, true);
-            ZipFile.ExtractToDirectory(tempPath, dependenciesDir);
+            Directory.CreateDirectory(dotnetDir);
+
+#if WINDOWS
+            ZipFile.ExtractToDirectory(tempPath, dotnetDir);
+#else
+            var fileStream = File.OpenRead(tempPath);
+            var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+            TarFile.ExtractToDirectory(
+                gzipStream,
+                dotnetDir,
+                true);
+            gzipStream.Close();
+            fileStream.Close();
+#endif
         }
         catch (Exception ex)
         {

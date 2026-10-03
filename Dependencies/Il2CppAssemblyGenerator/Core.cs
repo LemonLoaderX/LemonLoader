@@ -36,19 +36,7 @@ namespace MelonLoader.Il2CppAssemblyGenerator
 
             AssemblyGenerationNeeded = LoaderConfig.Current.UnityEngine.ForceRegeneration;
 
-            string gameAssemblyName = "GameAssembly";
-            if (MelonUtils.IsUnix)
-                gameAssemblyName += ".so"; 
-            if (MelonUtils.IsWindows)
-                gameAssemblyName += ".dll";
-            if (MelonUtils.IsMac)
-                gameAssemblyName += ".dylib";
-
-#if OSX
-            GameAssemblyPath = Path.Combine(MelonEnvironment.GameExecutablePath, "Contents", "Frameworks", gameAssemblyName);
-#else
-            GameAssemblyPath = Path.Combine(MelonEnvironment.GameRootDirectory, gameAssemblyName);
-#endif
+            GameAssemblyPath = MelonEnvironment.Il2CppGameAssemblyPath;
             ManagedPath = MelonEnvironment.MelonManagedDirectory;
             BasePath = MelonEnvironment.Il2CppAssemblyGeneratorDirectory;
         }
@@ -73,6 +61,7 @@ namespace MelonLoader.Il2CppAssemblyGenerator
             deobfuscationMap = new DeobfuscationMap();
             deobfuscationRegex = new DeobfuscationRegex();
 
+            Logger.Msg($"Using GameAssembly: {(string.IsNullOrEmpty(GameAssemblyPath) ? "null" : GameAssemblyPath)}");
             Logger.Msg($"Using Cpp2IL Version: {(string.IsNullOrEmpty(cpp2il.Version) ? "null" : cpp2il.Version)}");
             Logger.Msg($"Using Il2CppInterop Version = {(string.IsNullOrEmpty(il2cppinterop.Version) ? "null" : il2cppinterop.Version)}");
             Logger.Msg($"Using Unity Dependencies Version = {(string.IsNullOrEmpty(unitydependencies.Version) ? "null" : unitydependencies.Version)}");
@@ -108,13 +97,15 @@ namespace MelonLoader.Il2CppAssemblyGenerator
 
             if (!cpp2il.Execute())
             {
-                cpp2il.Cleanup();
+                if (!LoaderConfig.Current.UnityEngine.KeepCpp2ILOutput)
+                    cpp2il.Cleanup();
                 return 1;
             }
 
             if (!il2cppinterop.Execute())
             {
-                cpp2il.Cleanup();
+                if (!LoaderConfig.Current.UnityEngine.KeepCpp2ILOutput)
+                    cpp2il.Cleanup();
                 il2cppinterop.Cleanup();
                 return 1;
             }
@@ -122,7 +113,8 @@ namespace MelonLoader.Il2CppAssemblyGenerator
             OldFiles_Cleanup();
             OldFiles_LAM();
 
-            cpp2il.Cleanup();
+            if (!LoaderConfig.Current.UnityEngine.KeepCpp2ILOutput)
+                cpp2il.Cleanup();
             il2cppinterop.Cleanup();
 
             Logger.Msg("Assembly Generation Successful!");

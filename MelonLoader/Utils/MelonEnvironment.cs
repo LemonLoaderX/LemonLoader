@@ -22,7 +22,7 @@ namespace MelonLoader.Utils
 #if ANDROID
             string.Empty;
 #elif OSX
-            MelonUtils.GetPathAncestor(Process.GetCurrentProcess()!.MainModule!.FileName, 3);
+            GetOSXGameExecutablePath();
 #else
             Process.GetCurrentProcess().MainModule.FileName;
 #endif
@@ -52,7 +52,7 @@ namespace MelonLoader.Utils
         public static string OurRuntimeDirectory { get; } = Path.Combine(MelonLoaderDirectory, OurRuntimeName);
 
         public static string GameExecutableName { get; } = Path.GetFileNameWithoutExtension(GameExecutablePath);
-        public static string UnityGameDataDirectory { get; } = 
+        public static string UnityGameDataDirectory { get; } =
 #if ANDROID
             "bin/Data";
 #elif OSX
@@ -66,7 +66,13 @@ namespace MelonLoader.Utils
 #if ANDROID
             "libunity.so";
 #else
-            Path.Combine(GameRootDirectory, "UnityPlayer.dll");
+            FindLibrary("UnityPlayer");
+#endif
+        public static string Il2CppGameAssemblyPath { get; } =
+#if ANDROID
+            "libil2cpp.so";
+#else
+            FindLibrary("GameAssembly");
 #endif
 
         public static string MelonManagedDirectory { get; } = Path.Combine(DependenciesDirectory, "Mono");
@@ -82,5 +88,87 @@ namespace MelonLoader.Utils
 
             MelonLogger.MsgDirect($"Runtime Type: {OurRuntimeName}");
         }
+
+        private static string FindLibrary(string libraryName)
+        {
+	        string modFilePath = string.Empty;
+	        string modFileName = string.Empty;
+
+	        var loadedModules = Process.GetCurrentProcess().Modules;
+	        foreach (var mod in loadedModules)
+	        {
+		        if (mod.GetType() != typeof(ProcessModule))
+			        continue;
+
+		        modFilePath = ((ProcessModule)mod).FileName;
+		        modFileName = Path.GetFileName(modFilePath);
+		        if (modFileName.Contains(libraryName))
+			        return modFilePath;
+	        }
+
+	        string processModulePath = Process.GetCurrentProcess().MainModule!.FileName;
+	        string parentPlayerPath = Path.GetDirectoryName(processModulePath)!;
+
+#if OSX
+	        modFileName = $"{libraryName}.dylib";
+	        parentPlayerPath = Path.Combine(Path.GetDirectoryName(parentPlayerPath)!, "Frameworks");
+	        modFilePath = Path.Combine(parentPlayerPath, modFileName);
+#elif LINUX
+	        modFileName = $"{libraryName}.so";
+	        modFilePath = Path.Combine(parentPlayerPath, modFileName);
+#elif WINDOWS
+	        modFileName = $"{libraryName}.dll";
+	        modFilePath = Path.Combine(parentPlayerPath, modFileName);
+#endif
+
+#if !WINDOWS
+	        if (!File.Exists(modFilePath))
+	        {
+		        modFileName = $"lib{libraryName}.so";
+		        modFilePath = Path.Combine(parentPlayerPath, modFileName);
+	        }
+	        if (!File.Exists(modFilePath))
+	        {
+		        modFileName = $"Lib{libraryName}.so";
+		        modFilePath = Path.Combine(parentPlayerPath, modFileName);
+	        }
+#endif
+
+	        if (!File.Exists(modFilePath))
+		        return null;
+
+	        return modFilePath;
+        }
+
+#if OSX
+		[System.Runtime.InteropServices.DllImport("/usr/lib/libSystem.B.dylib")]
+		private static extern int _NSGetExecutablePath([System.Runtime.InteropServices.Out] byte[] buffer, ref uint size);
+
+		private static string GetOSXGameExecutablePath() {
+			// MainModule can refer to the embedding Mono runtime instead of the
+			// game's executable. dyld knows the actual process executable path.
+			uint size = 1024;
+			var buffer = new byte[size];
+			if (_NSGetExecutablePath(buffer, ref size) != 0) {
+				buffer = new byte[size];
+				if (_NSGetExecutablePath(buffer, ref size) != 0) {
+					throw new IOException("Could not determine the game executable path.");
+				}
+			}
+			var length = System.Array.IndexOf(buffer, (byte)0);
+			if (length < 0) {
+				throw new IOException("The game executable path was not null-terminated.");
+			}
+			var path = Path.GetDirectoryName(Path.GetFullPath(System.Text.Encoding.UTF8.GetString(buffer, 0, length)));
+			while (!string.IsNullOrEmpty(path)) {
+				if (path.EndsWith(".app", System.StringComparison.OrdinalIgnoreCase) &&
+					Directory.Exists(Path.Combine(path, "Contents/Resources/Data"))) {
+					return path;
+				}
+				path = Path.GetDirectoryName(path);
+			}
+			throw new DirectoryNotFoundException("Could not locate the Unity app bundle containing the game executable.");
+		}
+#endif
     }
 }

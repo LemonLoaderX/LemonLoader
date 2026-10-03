@@ -15,6 +15,22 @@ namespace MelonLoader
         public RegisterTypeInIl2Cpp() { }
         public RegisterTypeInIl2Cpp(bool logSuccess) { LogSuccess = logSuccess; }
 
+        public static bool TryRegisterAssembly(Assembly asm,
+            out string errorMsg)
+        {
+            errorMsg = string.Empty;
+            try
+            {
+                RegisterAssembly(asm);
+                return true;
+            }
+            catch (Exception e)
+            {
+                errorMsg = e.ToString();
+            }
+            return false;
+        }
+
         public static void RegisterAssembly(Assembly asm)
         {
             if (!MelonUtils.IsGameIl2Cpp())
@@ -26,24 +42,7 @@ namespace MelonLoader
                 return;
             }
 
-            IEnumerable<Type> typeTbl = asm.GetValidTypes();
-            if ((typeTbl == null) || (typeTbl.Count() <= 0))
-                return;
-            foreach (Type type in typeTbl)
-            {
-                object[] attTbl = type.GetCustomAttributes(typeof(RegisterTypeInIl2Cpp), false);
-                if ((attTbl == null) || (attTbl.Length <= 0))
-                    continue;
-                RegisterTypeInIl2Cpp att = (RegisterTypeInIl2Cpp)attTbl[0];
-                if (att == null)
-                    continue;
-
-                bool shouldLogSuccess = MelonDebug.IsEnabled() 
-                    || att.LogSuccess;
-
-                InteropSupport.RegisterTypeInIl2CppDomain(type, 
-                    shouldLogSuccess);
-            }
+            ProcessAssembly(asm);
         }
 
         internal static void SetReady()
@@ -54,9 +53,34 @@ namespace MelonLoader
                 return;
 
             foreach (var asm in registrationQueue)
-                RegisterAssembly(asm);
+                if (!TryRegisterAssembly(asm, out string errorMsg))
+                    MelonLogger.Error($"{errorMsg}");
 
             registrationQueue = null;
+        }
+
+        private static void ProcessAssembly(Assembly asm)
+        {
+            IEnumerable<Type> typeTbl = asm.GetValidTypes();
+            if ((typeTbl == null) || (typeTbl.Count() <= 0))
+                return;
+
+            foreach (Type type in typeTbl)
+            {
+                object[] attTbl = type.GetCustomAttributes(typeof(RegisterTypeInIl2Cpp), false);
+                if ((attTbl == null) || (attTbl.Length <= 0))
+                    continue;
+
+                RegisterTypeInIl2Cpp att = (RegisterTypeInIl2Cpp)attTbl[0];
+                if (att == null)
+                    continue;
+
+                bool shouldLogSuccess = MelonDebug.IsEnabled()
+                    || att.LogSuccess;
+
+                InteropSupport.RegisterTypeInIl2CppDomain(type,
+                    shouldLogSuccess);
+            }
         }
     }
 }

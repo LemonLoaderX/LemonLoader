@@ -37,6 +37,22 @@ namespace MelonLoader
             Interfaces = interfaces;
         }
 
+        public static bool TryRegisterAssembly(Assembly asm,
+            out string errorMsg)
+        {
+            errorMsg = string.Empty;
+            try
+            {
+                RegisterAssembly(asm);
+                return true;
+            }
+            catch (Exception e)
+            {
+                errorMsg = e.ToString();
+            }
+            return false;
+        }
+
         public static void RegisterAssembly(Assembly asm)
         {
             if (!MelonUtils.IsGameIl2Cpp())
@@ -48,6 +64,25 @@ namespace MelonLoader
                 return;
             }
 
+            ProcessAssembly(asm);
+        }
+
+        internal static void SetReady()
+        {
+            ready = true;
+
+            if (registrationQueue == null)
+                return;
+
+            foreach (var asm in registrationQueue)
+                if (!TryRegisterAssembly(asm, out string errorMsg))
+                    MelonLogger.Error($"{errorMsg}");
+
+            registrationQueue = null;
+        }
+
+        private static void ProcessAssembly(Assembly asm)
+        {
             IEnumerable<Type> typeTbl = asm.GetValidTypes();
             if ((typeTbl == null) || (typeTbl.Count() <= 0))
                 return;
@@ -67,25 +102,12 @@ namespace MelonLoader
                     : att.Interfaces;
 
                 bool shouldLogSuccess = MelonDebug.IsEnabled()
-                    || att.LogSuccess;
+                                        || att.LogSuccess;
 
                 InteropSupport.RegisterTypeInIl2CppDomainWithInterfaces(type,
                     interfaceArr,
                     shouldLogSuccess);
             }
-        }
-
-        internal static void SetReady()
-        {
-            ready = true;
-
-            if (registrationQueue == null)
-                return;
-
-            foreach (var asm in registrationQueue)
-                RegisterAssembly(asm);
-
-            registrationQueue = null;
         }
     }
 }

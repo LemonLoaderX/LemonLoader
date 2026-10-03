@@ -25,9 +25,9 @@ namespace MelonLoader.InternalUtils
         private static UnityVersion TryParse(string version)
         {
             UnityVersion returnval = UnityVersion.MinVersion;
-            try 
+            try
             {
-                returnval = UnityVersion.Parse(version); 
+                returnval = UnityVersion.Parse(version);
             }
             catch (Exception ex)
             {
@@ -195,12 +195,14 @@ namespace MelonLoader.InternalUtils
         private static UnityVersion ReadVersionFallback(string gameDataPath)
         {
 #if !ANDROID
-            string unityPlayerPath = MelonEnvironment.UnityPlayerPath;
-            if (!GameDataFileExists(unityPlayerPath))
-                unityPlayerPath = MelonEnvironment.GameExecutablePath;
-
             if (Environment.OSVersion.Platform == PlatformID.Win32NT)
             {
+                string unityPlayerPath = MelonEnvironment.UnityPlayerPath;
+
+                if (string.IsNullOrEmpty(unityPlayerPath)
+                    || !File.Exists(unityPlayerPath))
+                    unityPlayerPath = MelonEnvironment.GameExecutablePath;
+
                 var unityVer = FileVersionInfo.GetVersionInfo(unityPlayerPath);
                 return TryParse(unityVer.FileVersion);
             }
