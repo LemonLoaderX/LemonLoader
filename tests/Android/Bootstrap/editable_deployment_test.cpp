@@ -189,7 +189,15 @@ int main(int argc, char** argv) {
     assert(deploy_assets_if_changed(base, payload));
     assert(asset_lists == lists && asset_reads == opens && hashes == hash_count + 1); // Explicit enforce only.
     write(base / "Mods/enforce.dll", "user enforce");
+    std::filesystem::remove(base / "Mods/new.dll");
+    std::filesystem::remove(base / "Mods/refresh.dll");
+    std::filesystem::remove(base / "UserData/config");
     assert(deploy_assets_if_changed(base, payload) && read(base / "Mods/enforce.dll") == "enforce-v1");
+    assert(!std::filesystem::exists(base / "Mods/new.dll"));
+    assert(!std::filesystem::exists(base / "Mods/refresh.dll"));
+    assert(!std::filesystem::exists(base / "UserData/config"));
+    write(base / "Mods/new.dll", "user seed"); write(base / "Mods/refresh.dll", "user refresh");
+    write(base / "UserData/config", "user config");
     std::cout << "PASS unchanged package preserves user edits without APK scans; enforce remains explicit\n";
     failed_list = true;
     payload.deployment_stamp = "apk-list-failure";

@@ -139,7 +139,7 @@ recipe. Android accepts absent/empty `payload.json` or `{}`. Bionic selects:
 ```
 
 `deploymentFiles` is an optional path/policy list. If `formatVersion` is explicitly
-present it must be `8` or `9`; unknown fields are tolerated. A malformed JSON document or
+present it must be `9`; unknown fields are tolerated. A malformed JSON document or
 unsupported RID/layout is still an error. No `runtime-identity.json` or
 `interop-manifest.json` is required by native/managed loading. Game-specific
 Interop DLLs remain necessary for Mods using their generated surface.

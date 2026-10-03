@@ -25,6 +25,9 @@ constexpr Action decide_current(
     bool matches_packaged,
     bool has_previous_state,
     bool matches_previous_packaged) {
+    if (!revision_changed && policy != Policy::enforce) {
+        return Action::preserve;
+    }
     if (!exists) {
         return Action::install;
     }
@@ -101,6 +104,8 @@ inline bool parse(const std::string& value, Policy& policy) {
 
 static_assert(decide_current(Policy::seed, true, true, false, true, true) ==
               Action::preserve);
+static_assert(decide_current(Policy::seed, false, false, false, true, false) == Action::preserve);
+static_assert(decide_current(Policy::refresh, false, false, false, true, false) == Action::preserve);
 static_assert(decide_current(Policy::upgrade, true, true, false, true, true) ==
               Action::replace);
 static_assert(decide_current(Policy::upgrade, true, true, false, true, false) ==

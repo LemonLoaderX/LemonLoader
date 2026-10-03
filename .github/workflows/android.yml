@@ -46,8 +46,31 @@ jobs:
           path: ${{ runner.temp }}/release-notes.md
           if-no-files-found: error
 
+  host-tests:
+    name: Native and managed Android contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: android-actions/setup-android@v4
+      - name: Prepare JNI headers
+        run: sdkmanager "ndk;27.3.13750724"
+      - name: Run native fixtures
+        env:
+          CXX: clang++
+        run: |
+          export ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/27.3.13750724"
+          bash scripts/test/test-android-bootstrap.sh
+          bash scripts/test/test-android-logging.sh
+          bash scripts/test/test-android-deployment.sh
+      - name: Run managed fixtures
+        run: dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
+
   build:
-    needs: release-notes
+    needs: [release-notes, host-tests]
     name: Build Android and Bionic ARM64
     runs-on: windows-latest
     timeout-minutes: 90

@@ -5,14 +5,14 @@
 
     <AndroidDobbyRevision>be22f55a2adab028bb2d3264589df1cb3f1aea9f</AndroidDobbyRevision>
     <AndroidDobbyRepositoryUrl>https://github.com/LemonLoaderX/Dobby.git</AndroidDobbyRepositoryUrl>
-    <AndroidIl2CppInteropVersion>1.5.1-ci.845</AndroidIl2CppInteropVersion>
-    <AndroidIl2CppInteropRevision>309eb922d9933fbbc4f833e4b176e406f01f13a4</AndroidIl2CppInteropRevision>
+    <AndroidIl2CppInteropVersion>1.5.3</AndroidIl2CppInteropVersion>
+    <AndroidIl2CppInteropRevision>99c364ac3b351699983bc3dd20d84119c47fc74d</AndroidIl2CppInteropRevision>
     <AndroidIl2CppInteropRepositoryUrl>https://github.com/LemonLoaderX/Il2CppInterop.git</AndroidIl2CppInteropRepositoryUrl>
     <AndroidHarmonyXVersion>2.10.2</AndroidHarmonyXVersion>
     <AndroidHarmonyXRevision>e840099c922b9b4c81facd653b1daf84c978ae6a</AndroidHarmonyXRevision>
     <AndroidHarmonyXRepositoryUrl>https://github.com/LemonLoaderX/HarmonyX.git</AndroidHarmonyXRepositoryUrl>
     <AndroidMonoModVersion>22.7.31.1</AndroidMonoModVersion>
-    <AndroidMonoModRevision>d9bdeb4c918bb77ebfbda42bd0fa5bcf6cbd8d91</AndroidMonoModRevision>
+    <AndroidMonoModRevision>e36d088fb94ef851cb10d1fbb4c05a232e7f322f</AndroidMonoModRevision>
     <AndroidMonoModRepositoryUrl>https://github.com/LemonLoaderX/MonoMod.git</AndroidMonoModRepositoryUrl>
   </PropertyGroup>
 </Project>

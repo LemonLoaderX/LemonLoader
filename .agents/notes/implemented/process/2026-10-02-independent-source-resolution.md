@@ -2,6 +2,13 @@
 
 Status: implemented
 
+Source synchronization and product adoption are separate operations. A maintained
+fork may track a newer upstream API/runtime family while a product still pins its
+compatible revision in a private source cache. MonoMod master remains the legacy
+22-series maintenance line; reorganize is a separate API migration. Current
+runtime main branding and latest Harmony source do not implicitly change the
+product's .NET 11 / Harmony 2.10 / MonoMod 22 support contract.
+
 ## Problem
 
 An unpublished parent lock and command wrappers duplicate product ownership.

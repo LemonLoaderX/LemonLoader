@@ -26,6 +26,10 @@ Explicit enforce overrides retain their continuous checks against prior local
 state. If the update token is unavailable, retry the transaction rather than
 pretend the package is current.
 
+Enforcement repair on an unchanged APK preserves all seed/upgrade/refresh
+destinations, including missing files. Repairing one enforced Mod must not
+reseed a different Mod deleted by the user. Full rollout remains APK-update work.
+
 The existing transaction calculates hashes from staged bytes only when processing
 an APK update or enforcement repair. These hashes preserve user edits under
 upgrade and support ownership/rollback, not corruption diagnostics. Existing
