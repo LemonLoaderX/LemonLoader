@@ -28,9 +28,9 @@ records runtime source, engine identity, profile and cryptography information.
 Release file sizes/hashes, download verification, runtime-pack checks, ABI/path/
 duplicate/native-collision checks and crypto completeness remain. New layout 9
 requires active CoreCLR/API26 inputs: embedded JNI helpers on Android or private
-OpenSSL on Bionic. Native consumers accept layouts 8 and 9; Patcher preserves
-layout-8 generation/validation for older Release inputs, including external DEX
-and historical MonoVM. Frozen legacy staging stays on layout 8.
+OpenSSL on Bionic. The initial transition retained layout-8 generation/readers,
+external DEX and historical MonoVM to recover existing Releases. Those choices
+are historical and superseded by the retirement decisions above.
 
 The version change is required because old native/Patcher consumers require the
 deleted fields. They must reject the new format clearly rather than interpret a
@@ -40,23 +40,27 @@ still omit its format and retain the existing file-layout defaults.
 ## Alternatives considered
 
 - Removing fields under layout 8 minimizes version changes, but old consumers
-  cannot safely interpret the result. Declare 9 and retain the old reader path.
+  cannot safely interpret the result. Declare 9; the transition initially retained
+  the old reader path before its separate retirement.
 - Adding a capability flag while keeping every old digest preserves compatibility
   but does not remove producer coupling or the expensive APK tree rereads.
 - A shared manifest generator centralizes the old recipe but preserves metadata
   that loading does not use. Remove that recipe from active production instead.
 - Removing all legacy handling simplifies the implementation further but breaks
-  existing external-DEX Release inputs. Keep that behavior isolated to layout 8.
+  existing external-DEX Release inputs. The original transition isolated it to
+  layout 8; the later reader retirement accepts that compatibility cost.
 
 ## Test Coverage
 
 - Active Releases/APKs contain no removed digest/revision fields or audit JSON.
 - APK and directory injection work with plain Interop DLL inputs and preserve
   all four policy behaviors through non-default overrides.
-- Old layout-8 hashes, external DEX, collision and malformed-input regressions
-  remain effective. New Release file corruption is still rejected.
-- Actual Release archive validation exercises both profiles; native layout-8/9
-  host regressions cover the same extraction behavior without startup scans.
+- Historical layout-8 acceptance tests are replaced by rejection under the reader
+  retirement. Release corruption, collisions and malformed input remain covered.
+- Actual archive validation exercises both profiles; native tests cover minimal
+  layout-9 extraction without startup scans.
+- Device smoke consumes loaded maps/exports and lifecycle/JNI markers; it no longer
+  reads or hashes runtime-identity.json, which current producers do not install.
 
 ## Consequences
 
@@ -68,7 +72,7 @@ injection. Host tests do not replace device acceptance.
 ## Prior-note Audit
 
 The [runtime-extraction decision](2026-10-02-runtime-extraction-without-digests.md)
-and [editable-deployment decision](2026-10-02-editable-deployment.md)
-partially overlap and own native cache/policy behavior. This note owns production
-and old-consumer migration. The [modernization proposal](../../proposed/process/2026-10-02-project-modernization.md)
-retains independent-repository migration. Crypto/crash decisions remain unchanged.
+and [editable deployment](2026-10-02-editable-deployment.md) own cache/policies.
+This note owns producer subtraction and the original transition rationale.
+[Source ownership](../process/2026-10-02-independent-source-resolution.md) retains
+independent products; crypto/crash choices remain separate.

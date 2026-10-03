@@ -195,26 +195,6 @@ if ($managedRuntimeMaps.Count -eq 0 -and -not $smokeMod) {
     throw "The loaded private managed runtime engine was not found in '$mapsPath'."
 }
 
-$remoteRuntimeIdentity = "/data/user/0/$PackageName/dotnet/runtime-identity.json"
-$runtimeIdentityOutput = & $adb -s $Serial shell run-as $PackageName `
-    cat $remoteRuntimeIdentity 2>&1
-$runtimeIdentityCaptured = $LASTEXITCODE -eq 0
-if (-not $runtimeIdentityCaptured -and -not $smokeMod) {
-    throw "Could not read the extracted managed runtime identity from '$remoteRuntimeIdentity'."
-}
-$runtimeIdentityPath = Join-Path $outputDirectory "runtime-identity.json"
-$runtimeIdentityOutput | Set-Content -LiteralPath $runtimeIdentityPath -Encoding Utf8
-$runtimeIdentity = if ($runtimeIdentityCaptured) {
-    Get-Content -LiteralPath $runtimeIdentityPath -Raw | ConvertFrom-Json
-}
-else {
-    $null
-}
-if ($runtimeIdentityCaptured -and
-    $runtimeIdentity.backend -cne $expectedManagedRuntimeBackend) {
-    throw "Managed runtime identity backend '$($runtimeIdentity.backend)' does not match expected '$expectedManagedRuntimeBackend'."
-}
-
 $latestExists = & $adb -s $Serial shell test -f $remoteLatestLog
 if ($LASTEXITCODE -ne 0) {
     throw "MelonLoader did not create '$remoteLatestLog'. See '$logcatPath'."
@@ -270,11 +250,7 @@ if (-not [string]::IsNullOrWhiteSpace($SmokeModPath)) {
             throw "The lifecycle marker '$marker' was not found in '$latestLogPath'."
         }
     }
-    $runtimeIdentityPattern =
-        '(?m)^.*\[Android_Smoke_Mod\] RuntimeIdentityFile coreclr \S+ coreclr-host-api Hash True\s*$'
-    if ($latestLog -notmatch $runtimeIdentityPattern) {
-        throw "The same-process runtime identity marker was not found in '$latestLogPath'."
-    }
+
 }
 if (-not [string]::IsNullOrWhiteSpace($HttpsProbeUrl) -and
     -not $latestLog.Contains("[Android_Smoke_Mod] HttpsRequest 200", [StringComparison]::Ordinal)) {
@@ -289,8 +265,6 @@ if (-not [string]::IsNullOrWhiteSpace($HttpsProbeUrl) -and
     bootstrapFlavor = $ExpectedBootstrapFlavor
     managedRuntimeBackend = $expectedManagedRuntimeBackend
     externalProcessMapsCaptured = $externalProcessMapsCaptured
-    runtimeIdentityCaptured = $runtimeIdentityCaptured
-    runtimeIdentity = $runtimeIdentity
 } | ConvertTo-Json -Depth 5 |
     Set-Content -LiteralPath (Join-Path $outputDirectory "smoke-metadata.json") -Encoding Utf8
 

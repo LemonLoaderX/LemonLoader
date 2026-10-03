@@ -1,7 +1,5 @@
 using MelonLoader;
 using MelonLoader.Utils;
-using System.Security.Cryptography;
-using System.Text.Json;
 using RuntimeNativeLibrary = System.Runtime.InteropServices.NativeLibrary;
 
 [assembly: MelonInfo(
@@ -23,7 +21,6 @@ public sealed class AndroidSmokeMod : MelonMod
     {
         LoggerInstance.Msg("Initialize");
         ProbeManagedRuntimeIdentity();
-        ProbeRuntimeIdentityFile();
         _ = ProbeJniWorkerAsync();
 
         string probePath = Path.Combine(
@@ -93,37 +90,6 @@ public sealed class AndroidSmokeMod : MelonMod
 
         _firstLateUpdateLogged = true;
         LoggerInstance.Msg("FirstLateUpdate");
-    }
-
-    private void ProbeRuntimeIdentityFile()
-    {
-        try
-        {
-            string dotnetRoot = Environment.GetEnvironmentVariable("MELONLOADER_DOTNET_ROOT")
-                ?? throw new InvalidOperationException("MELONLOADER_DOTNET_ROOT is unset");
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(
-                Path.Combine(dotnetRoot, "runtime-identity.json")));
-            JsonElement identity = document.RootElement;
-            string backend = identity.GetProperty("backend").GetString() ?? "<null>";
-            string version = identity.GetProperty("runtimeVersion").GetString() ?? "<null>";
-            string hostingModel = identity.GetProperty("hostingModel").GetString() ?? "<null>";
-            string expectedHash = identity.GetProperty("engineSha256").GetString() ?? "";
-            string engine = Path.Combine(
-                dotnetRoot,
-                "shared",
-                "Microsoft.NETCore.App",
-                version,
-                "libcoreclr.so");
-            using FileStream input = File.OpenRead(engine);
-            using SHA256 sha256 = SHA256.Create();
-            string actualHash = Convert.ToHexString(sha256.ComputeHash(input)).ToLowerInvariant();
-            LoggerInstance.Msg(
-                $"RuntimeIdentityFile {backend} {version} {hostingModel} Hash {actualHash == expectedHash}");
-        }
-        catch (Exception exception)
-        {
-            LoggerInstance.Error($"RuntimeIdentityFileFailed {exception.Message}");
-        }
     }
 
     private void ProbeManagedRuntimeIdentity()
