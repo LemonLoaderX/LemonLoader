@@ -176,55 +176,61 @@ void recover(JNIEnv* env) {
     auto pid_method = required_method(env, exit_class, "getPid", "()I");
     auto status_method = required_method(env, exit_class, "getStatus", "()I");
     auto trace_method = required_method(env, exit_class, "getTraceInputStream", "()Ljava/io/InputStream;");
+    const auto root = std::filesystem::path(runtime_paths.base_directory) / "MelonLoader" / "SystemExit";
     for (jint index = 0; index < std::min(size, static_cast<jint>(retained_exits)); ++index) {
-        auto record = checked_object_call(env, history, get_method, index);
-        if (!record) continue;
-        auto name_value = static_cast<jstring>(checked_object_call(env, record, name_method));
-        const auto name = java_string(env, name_value);
-        env->DeleteLocalRef(name_value);
-        const auto reason = env->CallIntMethod(record, reason_method);
-        checked(env, "read system exit reason");
-        if (name != process_name || reason < 2 || reason > 7) {
-            env->DeleteLocalRef(record);
-            continue;
-        }
-        const auto timestamp = env->CallLongMethod(record, time_method);
-        checked(env, "read system exit timestamp");
-        const auto pid = env->CallIntMethod(record, pid_method);
-        checked(env, "read system exit PID");
-        const auto status = env->CallIntMethod(record, status_method);
-        checked(env, "read system exit status");
-        if (timestamp <= 0 || pid <= 0) return;
-        const auto root = std::filesystem::path(runtime_paths.base_directory) / "MelonLoader" / "SystemExit";
-        const auto directory = root / (std::to_string(timestamp) + '-' + std::to_string(pid));
-        if (std::filesystem::is_symlink(std::filesystem::symlink_status(root)) ||
-            std::filesystem::is_symlink(std::filesystem::symlink_status(directory)))
-            throw std::runtime_error("System exit storage is a symlink");
-        std::filesystem::create_directories(directory);
-        const auto summary = directory / "exit.txt";
-        if (std::filesystem::is_symlink(std::filesystem::symlink_status(summary)))
-            throw std::runtime_error("System exit summary is a symlink");
-        if (!std::filesystem::exists(summary) || std::filesystem::file_size(summary) == 0) {
-            const auto temporary = directory / "exit.tmp";
-            if (std::filesystem::is_symlink(std::filesystem::symlink_status(temporary)))
-                throw std::runtime_error("System exit summary temporary path is a symlink");
-            try {
-                std::ofstream output(temporary, std::ios::binary);
-                output << "timestamp_ms=" << timestamp << "\npid=" << pid << "\nreason=" << reason << "\nstatus=" << status << '\n';
-                output.close();
-                if (!output) throw std::runtime_error("Cannot save system exit summary");
-                std::filesystem::rename(temporary, summary);
-            } catch (...) {
-                std::error_code ignored;
-                std::filesystem::remove(temporary, ignored);
-                throw;
+        try {
+            LocalFrame event_frame(env);
+            auto record = checked_object_call(env, history, get_method, index);
+            if (!record) continue;
+            auto name_value = static_cast<jstring>(checked_object_call(env, record, name_method));
+            const auto name = java_string(env, name_value);
+            env->DeleteLocalRef(name_value);
+            const auto reason = env->CallIntMethod(record, reason_method);
+            checked(env, "read system exit reason");
+            if (name != process_name || reason < 2 || reason > 7) {
+                env->DeleteLocalRef(record);
+                continue;
             }
+            const auto timestamp = env->CallLongMethod(record, time_method);
+            checked(env, "read system exit timestamp");
+            const auto pid = env->CallIntMethod(record, pid_method);
+            checked(env, "read system exit PID");
+            const auto status = env->CallIntMethod(record, status_method);
+            checked(env, "read system exit status");
+            if (timestamp <= 0 || pid <= 0) continue;
+            const auto directory = root / (std::to_string(timestamp) + '-' + std::to_string(pid));
+            if (std::filesystem::is_symlink(std::filesystem::symlink_status(root)) ||
+                std::filesystem::is_symlink(std::filesystem::symlink_status(directory)))
+                throw std::runtime_error("System exit storage is a symlink");
+            std::filesystem::create_directories(directory);
+            const auto summary = directory / "exit.txt";
+            if (std::filesystem::is_symlink(std::filesystem::symlink_status(summary)))
+                throw std::runtime_error("System exit summary is a symlink");
+            if (!std::filesystem::exists(summary) || std::filesystem::file_size(summary) == 0) {
+                const auto temporary = directory / "exit.tmp";
+                if (std::filesystem::is_symlink(std::filesystem::symlink_status(temporary)))
+                    throw std::runtime_error("System exit summary temporary path is a symlink");
+                try {
+                    std::ofstream output(temporary, std::ios::binary);
+                    output << "timestamp_ms=" << timestamp << "\npid=" << pid << "\nreason=" << reason << "\nstatus=" << status << '\n';
+                    output.close();
+                    if (!output) throw std::runtime_error("Cannot save system exit summary");
+                    std::filesystem::rename(temporary, summary);
+                } catch (...) {
+                    std::error_code ignored;
+                    std::filesystem::remove(temporary, ignored);
+                    throw;
+                }
+            }
+            if (reason == 6 || (reason == 5 && sdk >= 31))
+                save_trace(env, record, trace_method, directory, reason == 5 ? "trace.pb" : "trace.txt");
+        } catch (const std::exception& error) {
+            if (env->ExceptionCheck()) env->ExceptionClear();
+            log_error(std::string("Could not retain Android system exit event: ") + error.what());
         }
-        prune_exits(root, directory);
-        if (reason == 6 || (reason == 5 && sdk >= 31))
-            save_trace(env, record, trace_method, directory, reason == 5 ? "trace.pb" : "trace.txt");
-        return;
     }
+    if (std::filesystem::is_directory(root) && !std::filesystem::is_symlink(std::filesystem::symlink_status(root)))
+        prune_exits(root, {});
 }
 }  // namespace
 

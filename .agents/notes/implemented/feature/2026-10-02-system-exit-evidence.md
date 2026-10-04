@@ -11,6 +11,10 @@ not finish its own report.
 
 ## Decision
 
+The one-event selection below is partially superseded by
+[bounded history recovery](../bug-fix/2026-10-04-bounded-exit-history.md); the trace
+format, API and ownership choices remain in force.
+
 After storage discovery and log rotation, before runtime extraction, the bootstrap
 queries ActivityManager on API 30+. It requests at most eight recent exits for
 its own package and filters by the current process name obtained from public
