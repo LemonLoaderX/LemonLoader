@@ -29,6 +29,9 @@ add_library(main SHARED
     src/arm64_il2cpp_resolver.cpp
     src/android_crypto.cpp
     src/android_environment.cpp
+    src/android_assets.cpp
+    src/android_payload.cpp
+    src/android_deployment.cpp
     src/deployment_policy.hpp
     src/bootstrap.cpp
     src/logging.cpp

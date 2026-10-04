@@ -34,6 +34,10 @@ The [producer decision](2026-10-02-minimal-produced-payload.md) owns layout-9
 production and layout-8 compatibility. Download, Release, runtime-pack, APK structural and ABI checks
 remain at their existing tooling boundaries. This consumer subtraction does not
 turn off release hash/signature validation.
+Android environment discovery is separate from android_assets read/extraction,
+android_payload configuration/orchestration and android_deployment policy/state
+transactions. Payload policy entries carry no computed content digest; only staged
+and installed deployment state owns the hashes needed by upgrade/enforce.
 
 ## Alternatives considered
 

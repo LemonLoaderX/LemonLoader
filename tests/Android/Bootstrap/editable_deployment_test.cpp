@@ -5,6 +5,9 @@
 #include <memory>
 #include <set>
 #include "android_environment.cpp"
+#include "android_assets.cpp"
+#include "android_payload.cpp"
+#include "android_deployment.cpp"
 
 namespace {
 struct Node {
@@ -169,11 +172,10 @@ int main(int argc, char** argv) {
     assert(read_payload_descriptor(payload) && payload.deployment_valid && payload.deployment_files.empty());
     policy("Mods/refresh.dll", "refresh"); policy("UserData/config", "upgrade"); policy("Mods/enforce.dll", "enforce");
     assert(read_payload_descriptor(payload) && payload.deployment_valid && payload.deployment_files.size() == 3);
-    assert(payload.deployment_files[0].hash.empty());
     std::cout << "PASS absent/stale deployment revision, hashes, sizes and profiles do not gate payload parsing\n";
     runtime_paths.package_name = "game";
-    assert(deployment_update_stamp() == "apk-1234" && frames == 0);
-    missing_update = true; assert(deployment_update_stamp().empty() && !pending && frames == 0); missing_update = false;
+    assert(apk_update_stamp() == "apk-1234" && frames == 0);
+    missing_update = true; assert(apk_update_stamp().empty() && !pending && frames == 0); missing_update = false;
     std::cout << "PASS package update stamp and unavailable-token fallback\n";
     const std::filesystem::path base(argv[1]);
     assets["LemonLoader/deployment/Mods/new.dll"] = "seed-v1";
