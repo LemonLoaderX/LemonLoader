@@ -15,7 +15,7 @@ internal sealed class LoaderJavaRuntime : JniRuntime
     {
         InvocationPointer = vm, JniVersion = JniVersion.v1_6, DestroyRuntimeOnDispose = false,
         ClassLoader = loader == 0 ? default : new JniObjectReference(loader, JniObjectReferenceType.Global),
-        TypeManager = new Types(), ObjectReferenceManager = new References(), ValueManager = new Peers()
+        TypeManager = new LoaderTypeManager(), ObjectReferenceManager = new LoaderReferenceManager(), ValueManager = new LoaderValueManager()
     }) { ApplicationClassLoader = loader; }
 
     public override Exception? GetExceptionForThrowable(ref JniObjectReference reference, JniObjectReferenceOptions options)
@@ -31,7 +31,7 @@ internal sealed class LoaderJavaRuntime : JniRuntime
         finally { exceptionDepth--; JniObjectReference.Dispose(ref reference, options); }
     }
 
-    private sealed class Types : ReflectionJniTypeManager
+    private sealed class LoaderTypeManager : ReflectionJniTypeManager
     {
         protected override IEnumerable<Type> GetTypesForSimpleReference(string name)
         {
@@ -41,7 +41,7 @@ internal sealed class LoaderJavaRuntime : JniRuntime
         }
     }
 
-    private sealed class References : JniObjectReferenceManager
+    private sealed class LoaderReferenceManager : JniObjectReferenceManager
     {
         private int globals, weak;
         public override int GlobalReferenceCount => Volatile.Read(ref globals);
@@ -56,7 +56,7 @@ internal sealed class LoaderJavaRuntime : JniRuntime
         { bool valid = value.IsValid; base.DeleteWeakGlobalReference(ref value); if (valid) Interlocked.Decrement(ref weak); }
     }
 
-    private sealed class Peers : ReflectionJniValueManager
+    private sealed class LoaderValueManager : ReflectionJniValueManager
     {
         private readonly Dictionary<int, List<WeakReference<IJavaPeerable>>> peers = new();
         public override void WaitForGCBridgeProcessing() { }

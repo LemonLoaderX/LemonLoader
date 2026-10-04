@@ -1,7 +1,6 @@
 #if ANDROID
 #nullable enable
 using System;
-using System.Threading;
 using Java.Interop;
 
 namespace MelonLoader.Android;
@@ -14,7 +13,8 @@ public static unsafe class AndroidJava
     [ThreadStatic] private static int depth;
     [ThreadStatic] private static bool detach;
     [ThreadStatic] private static long nextScope, currentScope;
-    public static JniRuntime Runtime => runtime ?? throw new InvalidOperationException("Android Java hosting is not initialized.");
+    public static JniRuntime Runtime => Host;
+    internal static LoaderJavaRuntime Host => runtime ?? throw new InvalidOperationException("Android Java hosting is not initialized.");
 
     internal static void Initialize(nint vm, nint classLoader = 0)
     {
@@ -60,17 +60,22 @@ public static unsafe class AndroidJava
 
     public ref struct ThreadScope
     {
-        private readonly int thread, level;
-        private readonly long id, parent;
+        private readonly int managedThreadId, nestingLevel;
+        private readonly long scopeId, parentScopeId;
         private bool disposed;
-        internal ThreadScope(int thread, int level, long id, long parent)
-        { this.thread = thread; this.level = level; this.id = id; this.parent = parent; }
+        internal ThreadScope(int managedThreadId, int nestingLevel, long scopeId, long parentScopeId)
+        {
+            this.managedThreadId = managedThreadId;
+            this.nestingLevel = nestingLevel;
+            this.scopeId = scopeId;
+            this.parentScopeId = parentScopeId;
+        }
         public void Dispose()
         {
-            if (disposed || id == 0) return;
-            if (thread != Environment.CurrentManagedThreadId || level != depth || id != currentScope)
+            if (disposed || scopeId == 0) return;
+            if (managedThreadId != Environment.CurrentManagedThreadId || nestingLevel != depth || scopeId != currentScope)
                 throw new InvalidOperationException("Java thread scopes must end in reverse order on their creating thread.");
-            currentScope = parent;
+            currentScope = parentScopeId;
             disposed = true;
             if (--depth == 0 && detach)
             {

@@ -41,7 +41,11 @@ public sealed class DeviceMod : MelonMod
             using (var failing = JavaCallbacks.Create<JavaRunnable>(new JavaCallbackMethod("run", (Action)(() => throw new InvalidOperationException("callback-fixture")))))
             {
                 try { failing.Peer.Run(); throw new Exception("Callback failure missing."); }
-                catch (JavaException e) { if (!e.Message.Contains("callback-fixture")) throw; e.Dispose(); }
+                catch (JavaException e)
+                {
+                    if (!e.Message.Contains("callback-fixture") || !e.Message.Contains(nameof(OnInitializeMelon))) throw;
+                    e.Dispose();
+                }
             }
             using (var comparator = JavaCallbacks.Create<JavaComparator>(new JavaCallbackMethod("compare", (Func<JavaObject, JavaObject, int>)((a, b) => 7))))
             {

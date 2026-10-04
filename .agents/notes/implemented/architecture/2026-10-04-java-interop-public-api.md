@@ -20,6 +20,15 @@ typed delegates, derives descriptors and marshals through upstream value manager
 Common Android peers adapt Activity, Context, AssetManager and InputStream.
 Advanced Mod bindings use Java.Interop directly within the same host.
 
+JavaTypeMapping owns shared descriptors/input names; JavaObjectMarshaling owns
+local-result and invocation-argument lifetimes. JavaBinding does not host callbacks.
+JavaCallbacks owns registration/native dispatch, JavaCallbackHandler compiles the
+delegate invocation, and JavaCallbackBridge owns DEX loading. AndroidThread owns
+UI task/cancellation policy; AndroidActivity owns runOnUiThread binding. Java peers
+are separate from these policies. No public wrapper hierarchy is added.
+Successful binding compilation is serialized per key; failed bindings leave the
+cache so a retained JavaException is not replayed after its caller disposes it.
+
 Binding checks actual Java receiver membership before a JNI instance call; managed
 peer types alone cannot establish it. Constructor result compatibility is checked
 at binding, and result locals are released even when upstream rejects conversion.
@@ -38,6 +47,9 @@ stay process-scoped, separate from CoreCLR's private crypto loader. Neither APK-
 DEX entries nor Patcher-specific actions are introduced. Delegate roots are retained
 until registration disposal; callback failures become Java RuntimeException.
 AndroidThread observes UI work through Tasks and supports caller cancellation.
+UI work claims execution atomically; cancellation releases queued registrations,
+while running work retains its registration until it returns. Compiled delegate
+invocation preserves managed exception stacks without DynamicInvoke unwrapping.
 
 Managed callback object arrays are converted recursively with independently owned,
 unregistered peers. A per-invocation owner list releases all created peers, including
@@ -64,6 +76,9 @@ selected JDK, and publish from fresh staging only after successful compilation.
   can carry a different actual Java class and an invalid method ID can abort ART.
 - Recursive disposal of upstream-converted arrays saves a scoped converter, but
   upstream GetValue can return existing peers owned by the caller.
+- One callback file makes the first implementation easy to navigate, but mixes
+  independent hosting, marshaling, registry and UI lifetime policies. Internal
+  concrete modules keep those responsibilities local without generic service layers.
 
 ## Consequences
 
@@ -89,6 +104,9 @@ real assets and a following game frame. Host evidence alone never qualifies ART.
 Regressions include wrong receivers/results, stale scope copies and nested/partial
 callback array ownership. The Java fixture tests exact Object dispatch; the callback
 build fixture seeds an old output class and checks repeated DEX bytes stay identical.
+Handler regressions construct the production handler without mutating its private
+native registry. Device probes cover reverse P/Invoke exception containment. UI
+work regressions cover queued/running cancellation and duplicate execution claims.
 
 ## Prior-note audit
 

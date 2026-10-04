@@ -15,7 +15,9 @@ JavaException recovery, repeated worker scopes and real InputStream buffer/seek
 cleanup. Hardening cases reject wrong receivers/results before unsafe calls, check
 stale scope copies, and verify nested callback arrays release independent peers
 on success, handler exceptions and partial conversion failures. The callback entry
-point is exercised directly; ART probes also cover registered native callbacks.
+handler is constructed through its production definition and invoked without
+modifying the private registration map. ART probes cover registered native callbacks
+and exception containment. Host UI work cases cover atomic execution/cancellation.
 Host tests do not qualify ART. AndroidManaged.Tests covers independent
 configuration/scene/hook behavior and contains no JNI function-table fixture.
 

@@ -17,7 +17,7 @@ public static class Suites
         try { parse("invalid"); throw new Exception("Java error lost."); }
         catch (JavaException e)
         {
-            Check(e.Message.Contains("invalid") && e.JavaStackTrace.Contains("NumberFormatException"), "Java exception/stack", log);
+            Check(e.Message.Contains("invalid") && e.JavaStackTrace?.Contains("NumberFormatException") == true, "Java exception/stack", log);
             e.Dispose();
         }
         Check(!JniEnvironment.Exceptions.ExceptionCheck() && parse("123") == 123, "exception recovery", log);

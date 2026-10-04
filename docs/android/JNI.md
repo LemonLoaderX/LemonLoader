@@ -110,6 +110,8 @@ and java.lang.reflect.Proxy. TPeer uses a JniTypeSignature for that interface.
 JavaCallbackMethod supplies the Java method name and a typed delegate, including
 overloads. All abstract methods must be supplied. Object identity methods are
 handled by the proxy; default methods need explicit handlers if invoked.
+Callbacks compile a typed delegate invoker once at registration; invocation avoids
+reflection dispatch and preserves the original managed exception stack.
 
 ```csharp
 using var runnable = JavaCallbacks.Create<JavaRunnable>(
@@ -144,3 +146,24 @@ This new version removes MelonLoader.Java JNI/JObject/JClass/JValue/member-ID
 interfaces and their compatibility shims. Mods that used them must migrate/rebuild.
 Mods unrelated to JNI may still load, but compatibility with the old JNI API is
 not a product requirement. Android hosting and desktop compilation remain separate.
+
+## Implementation ownership
+
+| Responsibility | Source |
+| --- | --- |
+| Borrowed VM and thread attachment | AndroidJava.cs, LoaderJavaRuntime.cs |
+| Typed member resolution and calls | JavaBinding.cs |
+| Shared descriptors and input names | JavaTypeMapping.cs |
+| Result locals and scoped callback arguments | JavaObjectMarshaling.cs |
+| Registration lifetime and native dispatch | JavaCallback.cs, JavaCallbacks.cs |
+| Compiled handler invocation | JavaCallbackHandler.cs |
+| Embedded DEX and private callback ClassLoader | JavaCallbackBridge.cs |
+| Java Runnable and InputStream peers | JavaRunnable.cs, JavaInputStream.cs |
+| Android peers and Unity Activity access | AndroidBindings.cs |
+| Task completion, cancellation and UI dispatch | AndroidThread.cs |
+
+Java.Interop owns JNI operations, peer/value types and baseline marshalers. Loader
+adapts injected hosting and scoped callback ownership; it does not define another
+public JNI object model. UI dispatch claims queued work atomically; cancellation
+can cancel observation of running work but does not release its callback until it
+returns. Mods using JavaObjectArray elements directly retain upstream ownership rules.
