@@ -9,7 +9,7 @@ Unless a block says otherwise, run commands from the Loader repository root.
 | PowerShell | 7 or later |
 | Product .NET SDK | Exact version in `global.json` (currently 10.0.204) |
 | Android SDK | CMake 3.22.1 or later and Ninja |
-| Java tools | JDK 8+ javac/jar; SDK build-tools d8 for embedded callback support |
+| Java tools | JDK 21.0.8 (`JAVA_HOME`); SDK build-tools 36.0.0 for embedded callbacks |
 | Android NDK | r27d (`27.3.13750724`) |
 | Target | Android API 26+, `arm64-v8a` |
 
@@ -42,7 +42,11 @@ Use the corresponding `-DobbySourceRoot`, `-Il2CppInteropSourceRoot`,
 `-HarmonyXSourceRoot`, `-MonoModSourceRoot` or `-JavaInteropSourceRoot` for explicit external checkouts.
 Java.Interop uses a sparse checkout of `external/Java.Interop` from dotnet/android.
 Managed builds compile the callback helper into an embedded DEX resource with
-`ANDROID_SDK_ROOT` and `JAVA_HOME` (or javac/jar on PATH). It is not a separate
+`ANDROID_SDK_ROOT` and `JAVA_HOME`. Compiler/build-tools versions come from
+`eng/AndroidDependencies.props`; different JDK vendors may use the same pinned
+compiler version. The helper targets Java 8 bytecode and API 26. Each build uses
+fresh staging and replaces the embedded DEX only after compilation succeeds;
+old output classes never enter the DEX. It is not a separate
 APK DEX entry and does not change CoreCLR crypto packaging.
 Setup's optional `-SourceRoot <directory>` creates/verifies named checkouts there
 instead; pass those explicit paths to builds. Existing old caches are left intact.

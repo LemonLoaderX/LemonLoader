@@ -20,6 +20,12 @@ typed delegates, derives descriptors and marshals through upstream value manager
 Common Android peers adapt Activity, Context, AssetManager and InputStream.
 Advanced Mod bindings use Java.Interop directly within the same host.
 
+Binding checks actual Java receiver membership before a JNI instance call; managed
+peer types alone cannot establish it. Constructor result compatibility is checked
+at binding, and result locals are released even when upstream rejects conversion.
+Thread scopes carry unique per-thread identities, so stale struct copies cannot
+end a newer attachment at the same nesting depth.
+
 Native environment discovery retains the application's ClassLoader before managed
 initialization. JniRuntime receives that loader through CreationOptions; no reflection
 mutates upstream internals. CLR-finalizer cleanup detaches its managed-owned thread
@@ -33,6 +39,14 @@ DEX entries nor Patcher-specific actions are introduced. Delegate roots are reta
 until registration disposal; callback failures become Java RuntimeException.
 AndroidThread observes UI work through Tasks and supports caller cancellation.
 
+Managed callback object arrays are converted recursively with independently owned,
+unregistered peers. A per-invocation owner list releases all created peers, including
+partial conversions. Upstream array element GetValue may reuse a caller's wrapper,
+so recursively disposing upstream-converted arrays would invalidate unrelated peers.
+Proxy identity handling matches complete Object method descriptors, not names.
+Callback DEX builds pin javac and d8 in the product manifest, invoke both with the
+selected JDK, and publish from fresh staging only after successful compilation.
+
 ## Alternatives considered
 
 - Retaining the old checked facade makes old Mods easier to load, but preserves
@@ -43,6 +57,10 @@ AndroidThread observes UI work through Tasks and supports caller cancellation.
   standard peers need only Loader hosting and caller ergonomics.
 - Registering native callbacks without Java interface helpers avoids embedded DEX,
   but cannot supply Runnable/listener implementations to ordinary Android APIs.
+- Trusting receiver type annotations avoids one IsInstanceOf call, but wrappers
+  can carry a different actual Java class and an invalid method ID can abort ART.
+- Recursive disposal of upstream-converted arrays saves a scoped converter, but
+  upstream GetValue can return existing peers owned by the caller.
 
 ## Consequences
 
@@ -65,6 +83,9 @@ JniHost exercises actual peers, arrays, errors, registry/finalization, worker sc
 large delegates and real InputStream bounded buffering/seek/release under CheckJNI.
 ART probes exercise the app loader, interface callbacks/boxing/errors, UI dispatch,
 real assets and a following game frame. Host evidence alone never qualifies ART.
+Regressions include wrong receivers/results, stale scope copies and nested/partial
+callback array ownership. The Java fixture tests exact Object dispatch; the callback
+build fixture seeds an old output class and checks repeated DEX bytes stay identical.
 
 ## Prior-note audit
 

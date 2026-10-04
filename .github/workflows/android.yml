@@ -56,12 +56,25 @@ jobs:
         with:
           global-json-file: global.json
       - uses: android-actions/setup-android@v4
+      - name: Read Java tool pin
+        id: tools
+        shell: pwsh
+        run: |
+          $pins = ([xml](Get-Content eng/AndroidDependencies.props -Raw)).Project.PropertyGroup
+          "java=$($pins.AndroidJavaCompilerVersion)" >> $env:GITHUB_OUTPUT
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ steps.tools.outputs.java }}
       - name: Prepare JNI headers
-        run: sdkmanager "ndk;27.3.13750724"
+        shell: pwsh
+        run: |
+          $pins = ([xml](Get-Content eng/AndroidDependencies.props -Raw)).Project.PropertyGroup
+          sdkmanager "ndk;$($pins.AndroidNdkRevision)" "build-tools;$($pins.AndroidBuildToolsRevision)"
+          if ($LASTEXITCODE) { throw 'Installing JNI test tools failed.' }
+      - name: Run callback proxy and DEX regressions
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/test/test-android-callbacks.ps1
       - name: Run native fixtures
         env:
           CXX: clang++
@@ -99,19 +112,27 @@ jobs:
         with:
           packages: platform-tools
 
+      - name: Read Java tool pin
+        id: tools
+        shell: pwsh
+        run: |
+          $pins = ([xml](Get-Content eng/AndroidDependencies.props -Raw)).Project.PropertyGroup
+          "java=$($pins.AndroidJavaCompilerVersion)" >> $env:GITHUB_OUTPUT
+
       - name: Set up Java callback tools
         uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: ${{ steps.tools.outputs.java }}
 
       - name: Install Android toolchain
         shell: pwsh
         run: |
+          $pins = ([xml](Get-Content eng/AndroidDependencies.props -Raw)).Project.PropertyGroup
           & sdkmanager.bat `
             "platform-tools" `
             "platforms;android-35" `
-            "build-tools;35.0.0" `
+            "build-tools;$($pins.AndroidBuildToolsRevision)" `
             "ndk;$env:NDK_VERSION"
           if ($LASTEXITCODE -ne 0) {
             throw "Installing the Android SDK components failed."

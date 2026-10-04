@@ -12,7 +12,11 @@ Each invocation uses a separate process; JVM unloading/recreation within a live
 CLR is not supported. Assertions exercise the production peer registry/finalizer,
 typed delegate binding, UTF16/NUL, string/primitive/object-array marshaling,
 JavaException recovery, repeated worker scopes and real InputStream buffer/seek
-cleanup. Host tests do not qualify ART. AndroidManaged.Tests covers independent
+cleanup. Hardening cases reject wrong receivers/results before unsafe calls, check
+stale scope copies, and verify nested callback arrays release independent peers
+on success, handler exceptions and partial conversion failures. The callback entry
+point is exercised directly; ART probes also cover registered native callbacks.
+Host tests do not qualify ART. AndroidManaged.Tests covers independent
 configuration/scene/hook behavior and contains no JNI function-table fixture.
 
 Build DeviceMod.csproj with MelonLoaderAssemblyPath pointing at the built Android

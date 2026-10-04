@@ -10,7 +10,7 @@
     <JavaInteropAssemblyPath Condition="'$(JavaInteropAssemblyPath)' == ''">$([System.IO.Path]::GetDirectoryName('$(MelonLoaderAssemblyPath)'))/Java.Interop.dll</JavaInteropAssemblyPath>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Suites.cs;DeviceMod.cs" />
+    <Compile Include="Suites.cs;Hardening.cs;DeviceMod.cs" />
     <Reference Include="MelonLoader" HintPath="$(MelonLoaderAssemblyPath)" Private="false" />
     <Reference Include="Java.Interop" HintPath="$(JavaInteropAssemblyPath)" Private="false" />
   </ItemGroup>

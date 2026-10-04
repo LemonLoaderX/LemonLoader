@@ -49,6 +49,15 @@ public static unsafe class JavaBinding
         string signature = "(" + string.Concat(arguments.Select(p => Signature(p.Type))) + ")" +
             (key.Kind == Kind.Constructor ? "V" : Signature(invoke.ReturnType));
         var members = types.GetOrAdd(key.Class, static name => new JniPeerMembers(name, typeof(JavaObject)));
+        if (key.Kind == Kind.Constructor)
+        {
+            var resultSignature = AndroidJava.Runtime.TypeManager.GetTypeSignature(invoke.ReturnType);
+            if (!resultSignature.IsValid || resultSignature.ArrayRank != 0 || resultSignature.SimpleReference == null)
+                throw new ArgumentException("Constructors require a mapped Java object return type.");
+            using var resultType = new JniType(resultSignature.SimpleReference);
+            if (!JniEnvironment.Types.IsAssignableFrom(members.JniPeerType.PeerReference, resultType.PeerReference))
+                throw new ArgumentException("Constructor return type cannot represent " + key.Class + ".");
+        }
         var call = new Call(members, key.Member + "." + signature, key.Kind, arguments.Select(p => p.Type).ToArray());
         // Resolve at binding time: missing members fail before callers enter native code.
         if (key.Kind == Kind.Static) members.StaticMethods.GetMethodInfo(call.Member);
@@ -70,7 +79,11 @@ public static unsafe class JavaBinding
     internal static string Signature(Type type)
     {
         if (type == typeof(void)) return "V";
-        if (type.IsArray) _ = Signature(type.GetElementType()!);
+        if (type.IsArray)
+        {
+            if (type.GetArrayRank() != 1) throw new ArgumentException("Use jagged arrays for nested Java arrays.");
+            _ = Signature(type.GetElementType()!);
+        }
         if (type.IsEnum || type.IsByRef || type.IsPointer) throw new ArgumentException("Use the exact Java primitive or peer type: " + type.FullName);
         var signature = AndroidJava.Runtime.TypeManager.GetTypeSignature(type);
         if (!signature.IsValid) throw new ArgumentException("No Java type mapping exists for " + type.FullName);
@@ -104,13 +117,15 @@ public static unsafe class JavaBinding
         if (call.Kind == Kind.Instance && (self == null || !self.PeerReference.IsValid))
             throw new ObjectDisposedException("Java receiver");
         var members = call.Members;
+        if (call.Kind == Kind.Instance && !JniEnvironment.Types.IsInstanceOf(self!.PeerReference, members.JniPeerType.PeerReference))
+            throw new ArgumentException("Java receiver does not implement " + members.JniPeerTypeName + ".", nameof(self));
         bool isStatic = call.Kind == Kind.Static;
         if (call.Kind == Kind.Constructor)
         {
             string signature = call.Member.Substring(7);
             var peer = JniEnvironment.Object.NewObject(members.JniPeerType.PeerReference,
                 members.JniPeerType.GetInstanceMethod("<init>", signature), args);
-            return AndroidJava.Runtime.ValueManager.CreateValue<T>(ref peer, JniObjectReferenceOptions.CopyAndDispose)!;
+            return ReadValue<T>(ref peer)!;
         }
         if (typeof(T) == typeof(VoidResult))
         {
@@ -129,7 +144,19 @@ public static unsafe class JavaBinding
         if (typeof(T) == typeof(double)) return (T)(object)(isStatic ? members.StaticMethods.InvokeDoubleMethod(call.Member, args) : members.InstanceMethods.InvokeAbstractDoubleMethod(call.Member, self!, args));
         var result = isStatic ? members.StaticMethods.InvokeObjectMethod(call.Member, args) :
             members.InstanceMethods.InvokeAbstractObjectMethod(call.Member, self!, args);
-        return AndroidJava.Runtime.ValueManager.CreateValue<T>(ref result, JniObjectReferenceOptions.CopyAndDispose)!;
+        return ReadValue<T>(ref result)!;
+    }
+
+    internal static T? ReadValue<T>(ref JniObjectReference reference)
+    {
+        try
+        {
+            var value = AndroidJava.Runtime.ValueManager.CreateValue<T>(ref reference, JniObjectReferenceOptions.Copy);
+            if (reference.IsValid && value == null)
+                throw new InvalidCastException("Java result cannot be represented as " + typeof(T).FullName + ".");
+            return value;
+        }
+        finally { JniObjectReference.Dispose(ref reference); }
     }
 
     private static T Call0<T>(Call call, IJavaPeerable? self)
@@ -248,7 +275,7 @@ public static unsafe class JavaBinding
         if (typeof(T) == typeof(float)) return (T)(object)members.StaticFields.GetSingleValue(member);
         if (typeof(T) == typeof(double)) return (T)(object)members.StaticFields.GetDoubleValue(member);
         var value = members.StaticFields.GetObjectValue(member);
-        return AndroidJava.Runtime.ValueManager.CreateValue<T>(ref value, JniObjectReferenceOptions.CopyAndDispose);
+        return ReadValue<T>(ref value);
     }
 }
 #endif

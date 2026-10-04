@@ -42,11 +42,16 @@ An empty report is a coverage gap, not a successful trace.
 dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
 dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj -c Release -p:Platform=x64
 dotnet run --project tests/Preferences/Preferences.csproj
+pwsh -NoProfile -File scripts/test/test-android-callbacks.ps1
 ```
 
 Managed behavior tests cover configuration preservation, scene fallback and
 hook-root retention. JniHost covers actual upstream peers/finalizers, typed calls,
 automatic marshaling, exceptions and real InputStream buffer/seek cleanup.
+Wrong receiver/result and stale-scope cases protect native call boundaries; nested
+callback arrays check independent ownership and partial-failure cleanup. Callback
+Java/build fixtures require the pinned JAVA_HOME and SDK build-tools and test
+Object method dispatch and exclusion of stale classes from repeated DEX builds.
 The [JNI host regression](../../tests/Android/JniHost/README.md) exercises the
 checked Mod interface with a real JVM; it does not substitute for ART acceptance.
 GameInformation uses real AssetsTools parsing with generated files/bundles and

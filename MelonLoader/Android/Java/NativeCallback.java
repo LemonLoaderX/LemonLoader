@@ -16,7 +16,7 @@ public final class NativeCallback implements Runnable, InvocationHandler {
         if (!type.isInterface()) throw new IllegalArgumentException("Callback target must be an interface.");
         for (Method method : type.getMethods()) {
             if (!java.lang.reflect.Modifier.isAbstract(method.getModifiers()) || method.getDeclaringClass() == Object.class) continue;
-            if (method.getName().equals("equals") && method.getParameterTypes().length == 1 && method.getParameterTypes()[0] == Object.class) continue;
+            if (isObjectMethod(member(method))) continue;
             String required = member(method);
             boolean found = false;
             for (String supplied : members) if (required.equals(supplied)) { found = true; break; }
@@ -25,12 +25,14 @@ public final class NativeCallback implements Runnable, InvocationHandler {
         return Proxy.newProxyInstance(loader, new Class<?>[] { type }, this);
     }
     @Override public Object invoke(Object proxy, Method method, Object[] args) {
-        if (method.getDeclaringClass() == Object.class || method.getName().equals("equals")) {
-            if (method.getName().equals("equals")) return proxy == args[0];
-            if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
-            if (method.getName().equals("toString")) return "LemonLoader callback " + token;
-        }
-        return invoke(token, member(method), args == null ? EMPTY : args);
+        String name = member(method);
+        if (name.equals("equals.(Ljava/lang/Object;)Z")) return proxy == args[0];
+        if (name.equals("hashCode.()I")) return System.identityHashCode(proxy);
+        if (name.equals("toString.()Ljava/lang/String;")) return "LemonLoader callback " + token;
+        return invoke(token, name, args == null ? EMPTY : args);
+    }
+    private static boolean isObjectMethod(String member) {
+        return member.equals("equals.(Ljava/lang/Object;)Z") || member.equals("hashCode.()I") || member.equals("toString.()Ljava/lang/String;");
     }
     private static String member(Method method) {
         StringBuilder signature = new StringBuilder(method.getName()).append(".(");

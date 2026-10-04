@@ -23,7 +23,9 @@ int value = ParseInt("42");
 Bind once. Binding resolves the member immediately and caches the compiled delegate
 and Java.Interop member metadata. Delegate parameters/return types produce the JNI
 descriptor; strings, arrays and peers use upstream value marshalers. Instance
-delegates put an IJavaPeerable receiver first. Constructors return a peer.
+delegates put an IJavaPeerable receiver first. Calls check the actual Java receiver
+class before invoking JNI. Constructors return a peer compatible with the selected
+Java class; incompatible return types fail at binding.
 
 ```csharp
 using Java.Interop;
@@ -74,7 +76,9 @@ Typed binding operations establish a thread scope automatically. For repeated
 work, surround the block with AndroidJava.AttachCurrentThread(); nested calls reuse
 the attachment. Direct Java.Interop operations require this outer scope. Dispose
 peer wrappers before ending it. End scopes in reverse order on their creating
-thread, without crossing await. Put synchronous JNI work inside Task.Run when needed.
+thread, without crossing await. Do not dispose copied scopes; stale copies and
+out-of-order disposal throw before altering attachment state. Put synchronous JNI
+work inside Task.Run when needed.
 Globals can cross threads; synchronize concurrent access/disposal yourself.
 
 Loader maintains weak managed-peer registry entries and releases abandoned peers
@@ -114,8 +118,11 @@ runnable.Peer.Run();
 ```
 
 Keep the registration alive while Java uses its proxy, then dispose it. Callback
-argument peers are borrowed for the invocation and disposed afterward; create an
-independent peer/reference if storing them. Returned primitive/string/array values
+argument peers are borrowed for the invocation and disposed afterward, including
+elements of managed object arrays and nested arrays. These are independent wrappers;
+cleanup preserves caller-owned peers. Create an independent peer/reference if storing
+them. Elements obtained yourself through JavaObjectArray follow upstream GetValue
+ownership rules. Returned primitive/string/array values
 are boxed/marshaled for Java. Callback exceptions become Java RuntimeException;
 no managed exception escapes the native entry point. A disposed Runnable is a
 no-op; other disposed interface calls throw.

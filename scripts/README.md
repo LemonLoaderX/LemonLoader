@@ -70,6 +70,7 @@ uninstalling, app-data clearing or signing changes.
 | test/test-publication-scan.ps1 | Preflight fixtures; optional real Gitleaks inputs |
 | test/test-verification-entry.ps1 | Selected sources, skipped boundaries and repack failures |
 | test/test-android-bootstrap.sh | Native/JNI/crypto/exit/extraction host fixtures |
+| test/test-android-callbacks.ps1 | Exact proxy dispatch and isolated/repeatable embedded DEX builds |
 | test/test-android-logging.sh | Log output/rotation and crash-report settings |
 | test/test-android-deployment.sh | Checked file publication; optional libc++ variant |
 | test/test-crash-reporting.sh | Explicit .NET11 Linux fatal/handled-fault subprocesses |

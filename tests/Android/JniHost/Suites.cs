@@ -9,6 +9,7 @@ public static class Suites
     public static void Run(string candidate, nint vm, nint env, Action<string> log)
     {
         using var thread = AndroidJava.AttachCurrentThread();
+        Hardening.Run(log);
         try { JavaBinding.BindInstance<Func<JavaStringBuilder, DayOfWeek>>("java/lang/StringBuilder", "length"); throw new Exception("Unsafe enum return accepted."); }
         catch (ArgumentException) { log("PASS unsupported primitive rejected"); }
         var parse = JavaBinding.BindStatic<Func<string, int>>("java/lang/Integer", "parseInt");
@@ -51,7 +52,11 @@ public static class Suites
         Exception? error = null;
         var worker = new Thread(() =>
         {
-            try { for (int i = 0; i < 2; i++) { using var scope = AndroidJava.AttachCurrentThread(); Check(text(builder) == unicode + "!", "worker typed peer", log); } }
+            try
+            {
+                Hardening.CheckScopes(log);
+                for (int i = 0; i < 2; i++) { using var scope = AndroidJava.AttachCurrentThread(); Check(text(builder) == unicode + "!", "worker typed peer", log); }
+            }
             catch (Exception e) { error = e; }
         });
         worker.Start(); worker.Join();

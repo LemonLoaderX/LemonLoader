@@ -76,7 +76,7 @@ public static unsafe class JavaCallbacks
                 {
                     JniArgumentValue* args = stackalloc JniArgumentValue[2] { new(name), new(names.PeerReference) };
                     var proxy = JniEnvironment.InstanceMethods.CallObjectMethod(helper, b.Proxy, args);
-                    var peer = AndroidJava.Runtime.ValueManager.CreateValue<TPeer>(ref proxy, JniObjectReferenceOptions.CopyAndDispose);
+                    var peer = JavaBinding.ReadValue<TPeer>(ref proxy);
                     if (peer == null) throw new InvalidCastException("Callback proxy does not implement the requested Java interface.");
                     return new JavaCallback<TPeer>(token, peer);
                 }
@@ -107,12 +107,14 @@ public static unsafe class JavaCallbacks
             var array = new JniObjectReference(arguments, JniObjectReferenceType.Local);
             if (JniEnvironment.Arrays.GetArrayLength(array) != handler.Arguments.Length) throw new ArgumentException("Java callback argument count differs.");
             var values = new object?[handler.Arguments.Length];
+            var owned = new List<IJavaPeerable>();
             try
             {
                 for (int i = 0; i < values.Length; i++)
                 {
                     var item = JniEnvironment.Arrays.GetObjectArrayElement(array, i);
-                    values[i] = AndroidJava.Runtime.ValueManager.CreateValue(ref item, JniObjectReferenceOptions.CopyAndDispose, handler.Arguments[i]);
+                    try { values[i] = ReadArgument(item, handler.Arguments[i], owned); }
+                    finally { JniObjectReference.Dispose(ref item); }
                 }
                 object? result;
                 try { result = handler.Callback.DynamicInvoke(values); }
@@ -122,7 +124,7 @@ public static unsafe class JavaCallbacks
                 try { return JniEnvironment.References.NewReturnToJniRef(reference); }
                 finally { JniObjectReference.Dispose(ref reference); }
             }
-            finally { foreach (var value in values) if (value is IJavaPeerable peer) peer.Dispose(); }
+            finally { for (int i = owned.Count - 1; i >= 0; i--) owned[i].Dispose(); }
         }
         catch (Exception e)
         {
@@ -136,6 +138,35 @@ public static unsafe class JavaCallbacks
             catch { }
             return 0;
         }
+    }
+
+    private static object? ReadArgument(JniObjectReference reference, Type type, List<IJavaPeerable> owned)
+    {
+        if (!reference.IsValid) return null;
+        // Upstream array marshaling uses GetValue for elements, which can reuse a
+        // caller's registered peer. Scoped callback arguments must own new peers.
+        if (type.IsArray && !type.GetElementType()!.IsPrimitive)
+        {
+            var elementType = type.GetElementType()!;
+            var array = Array.CreateInstance(elementType, JniEnvironment.Arrays.GetArrayLength(reference));
+            for (int i = 0; i < array.Length; i++)
+            {
+                var item = JniEnvironment.Arrays.GetObjectArrayElement(reference, i);
+                try { array.SetValue(ReadArgument(item, elementType, owned), i); }
+                finally { JniObjectReference.Dispose(ref item); }
+            }
+            return array;
+        }
+        var manager = AndroidJava.Runtime.ValueManager;
+        bool peerType = typeof(IJavaPeerable).IsAssignableFrom(type);
+        object? value = peerType
+            ? manager.CreatePeer(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type)
+            : manager.CreateValue(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type);
+        if (!peerType && value is IJavaPeerable existing && ReferenceEquals(existing, manager.PeekPeer(reference)))
+            value = manager.CreatePeer(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, existing.GetType());
+        if (value == null) throw new InvalidCastException("Java callback argument cannot be represented as " + type.FullName + ".");
+        if (value is IJavaPeerable peer) owned.Add(peer);
+        return value;
     }
 
     private sealed record Bridge(JniType Type, JniMethodInfo Constructor, JniMethodInfo Proxy,
