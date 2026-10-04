@@ -4,9 +4,11 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AssemblyName>AndroidSmokeMod</AssemblyName>
+        <JavaInteropAssemblyPath Condition="'$(JavaInteropAssemblyPath)' == ''">$([System.IO.Path]::GetDirectoryName('$(MelonLoaderAssemblyPath)'))/Java.Interop.dll</JavaInteropAssemblyPath>
     </PropertyGroup>
 
     <ItemGroup>
+        <Reference Include="Java.Interop" HintPath="$(JavaInteropAssemblyPath)" Private="false" />
         <Reference Include="MelonLoader">
             <HintPath>$(MelonLoaderAssemblyPath)</HintPath>
             <Private>false</Private>

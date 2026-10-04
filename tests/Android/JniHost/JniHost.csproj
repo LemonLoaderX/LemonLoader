@@ -11,7 +11,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="DeviceMod.cs" />
-    <Compile Include="../../../MelonLoader/JNI/*.cs" Link="JNI/%(Filename)%(Extension)" />
+    <Compile Include="../../../MelonLoader/Android/*.cs" Link="Android/%(Filename)%(Extension)" />
+    <Compile Include="../../../MelonLoader/Utils/APKAssetManager.cs" Link="APKAssetManager.cs" />
     <ProjectReference Include="../../../Dependencies/JavaInterop/Java.Interop.csproj" />
   </ItemGroup>
 </Project>

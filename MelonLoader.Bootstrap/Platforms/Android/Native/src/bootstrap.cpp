@@ -14,6 +14,7 @@ JavaVM* java_vm = nullptr;
 void* unity_handle = nullptr;
 AAssetManager* asset_manager = nullptr;
 jobject asset_manager_object = nullptr;
+jobject application_class_loader = nullptr;
 RuntimePaths runtime_paths;
 
 namespace {
@@ -67,6 +68,10 @@ jboolean native_load_impl(JNIEnv* env, jstring native_library_directory) {
                 asset_manager_object = nullptr;
             }
             asset_manager = nullptr;
+            if (application_class_loader != nullptr) {
+                env->DeleteGlobalRef(application_class_loader);
+                application_class_loader = nullptr;
+            }
             if (unity_on_load_succeeded) {
                 using unity_on_unload_fn = void (*)(JavaVM*, void*);
                 auto unity_on_unload = reinterpret_cast<unity_on_unload_fn>(
@@ -135,6 +140,10 @@ jboolean native_unload(JNIEnv*, jobject) {
 
 }  // namespace
 }  // namespace lemon::bootstrap
+
+extern "C" LEMON_EXPORT jobject GetApplicationClassLoader() {
+    return lemon::bootstrap::application_class_loader;
+}
 
 extern "C" LEMON_EXPORT JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
     return lemon::bootstrap::native_boundary("JNI_OnLoad", static_cast<jint>(JNI_ERR), [&]() -> jint {

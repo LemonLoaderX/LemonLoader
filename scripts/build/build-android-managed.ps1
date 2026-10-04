@@ -31,6 +31,7 @@ $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic
 $debugType = if ($Configuration -eq "Release") { "None" } else { "Embedded" }
 $debugSymbols = if ($Configuration -eq "Release") { "false" } else { "true" }
 $loaderPathMap = "$repositoryRoot=/_/LemonLoader"
+& (Join-Path $PSScriptRoot 'build-android-callbacks.ps1')
 
 if (!$JavaInteropSourceRoot) {
     $JavaInteropSourceRoot = Get-PinnedSourceRoot -Name DotnetAndroid `

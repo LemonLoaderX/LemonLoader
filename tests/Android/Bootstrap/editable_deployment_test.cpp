@@ -139,6 +139,7 @@ RuntimePaths runtime_paths;
 JavaVM* java_vm;
 AAssetManager* asset_manager = &manager;
 jobject asset_manager_object;
+jobject application_class_loader;
 void log_line(const std::string&) {}
 void log_error(const std::string& value) { error = value; }
 void configure_crash_reporting() {}

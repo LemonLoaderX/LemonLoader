@@ -1,6 +1,7 @@
-﻿#if ANDROID
+#if ANDROID
 #nullable enable
-using MelonLoader.Java;
+using MelonLoader.Android;
+using Java.Interop;
 using System;
 using System.IO;
 
@@ -8,378 +9,178 @@ namespace MelonLoader.Utils;
 
 public static class APKAssetManager
 {
-    private static JObject assetManager = null!;
-    private static JMethodID openMethod, listMethod;
-
+    private static AndroidAssetManager? manager;
     public static void Initialize()
     {
-        GetAndroidAssetManager();
+        if (manager != null) return;
+        using var thread = AndroidJava.AttachCurrentThread();
+        using var activity = UnityPlayer.CurrentActivity ?? throw new InvalidOperationException("Unity Activity is unavailable.");
+        manager = activity.Assets;
+    }
+
+    public static Stream? GetAssetStream(string path)
+    {
+        using var thread = AndroidJava.AttachCurrentThread();
+        try { return new APKAssetStream((manager ?? throw new InvalidOperationException("AssetManager is not initialized.")).Open(path)); }
+        catch (JavaException e)
+        {
+            string? type = JniEnvironment.Types.GetJniTypeNameFromInstance(e.PeerReference);
+            e.Dispose();
+            if (type == "java/io/FileNotFoundException") return null;
+            throw new IOException("Android asset open failed: " + path, e);
+        }
+    }
+
+    public static string[] GetDirectoryContents(string directory)
+    {
+        using var thread = AndroidJava.AttachCurrentThread();
+        try { return (manager ?? throw new InvalidOperationException("AssetManager is not initialized.")).List(directory); }
+        catch (JavaException e) { e.Dispose(); throw new IOException("Android asset listing failed: " + directory, e); }
+    }
+
+    public static bool DoesAssetExist(string path)
+    {
+        int separator = path.LastIndexOf('/');
+        string directory = separator >= 0 ? path.Substring(0, separator) : "";
+        string file = separator >= 0 ? path.Substring(separator + 1) : path;
+        return Array.IndexOf(GetDirectoryContents(directory), file) >= 0;
+    }
+
+    public static byte[] GetAssetBytes(string path)
+    {
+        using var input = GetAssetStream(path);
+        if (input == null) return [];
+        using var output = new MemoryStream();
+        input.CopyTo(output);
+        return output.ToArray();
     }
 
     public static void SaveItemToDirectory(string itemPath, string copyBase, bool includeInitial = true)
     {
         string[] contents = GetDirectoryContents(itemPath);
-        if (contents.Length == 0)
+        if (contents.Length != 0)
         {
-            string path = includeInitial ? itemPath : itemPath[(itemPath.IndexOf('/') + 1)..];
-            if (string.IsNullOrEmpty(path))
-                return;
-
-            string outPath = Path.Combine(copyBase, path);
-            string outDir = Path.GetDirectoryName(outPath)!;
-
-            if (!Directory.Exists(outDir))
-                Directory.CreateDirectory(outDir);
-
-            using FileStream fileStream = File.Open(outPath, FileMode.Create);
-            using Stream? assetStream = GetAssetStream(itemPath);
-            if (assetStream == null)
-                throw new Exception("[APKAssetManager] Failed to get asset stream: " + itemPath);
-
-            byte[] buffer = new byte[81920];
-            int bytesRead;
-            while ((bytesRead = assetStream.Read(buffer, 0, buffer.Length)) > 0)
-                fileStream.Write(buffer, 0, bytesRead);
-
+            foreach (string item in contents) SaveItemToDirectory(itemPath + "/" + item, copyBase, includeInitial);
             return;
         }
-
-        foreach (string item in contents)
-        {
-            SaveItemToDirectory(Path.Combine(itemPath, item), copyBase, includeInitial);
-        }
+        string path = includeInitial ? itemPath : itemPath.Substring(itemPath.IndexOf('/') + 1);
+        if (path.Length == 0) return;
+        string output = Path.Combine(copyBase, path);
+        Directory.CreateDirectory(Path.GetDirectoryName(output)!);
+        using var input = GetAssetStream(itemPath) ?? throw new FileNotFoundException("APK asset missing.", itemPath);
+        using var file = File.Create(output);
+        input.CopyTo(file);
     }
 
-    public static byte[] GetAssetBytes(string path)
+    /// <summary>Takes ownership of an InputStream peer and closes it deterministically.</summary>
+    public sealed class APKAssetStream : Stream
     {
-        using Stream? assetStream = GetAssetStream(path);
-        if (assetStream == null)
-            return [];
+        private readonly JavaInputStream input;
+        private readonly bool canSeek;
+        private readonly long length;
+        private JavaSByteArray? buffer;
+        private int bufferCapacity;
+        private long position;
+        private bool disposed;
 
-        using MemoryStream outputStream = new();
-        assetStream.CopyTo(outputStream);
-        return outputStream.ToArray();
-    }
-
-    public static Stream? GetAssetStream(string path)
-    {
-        using JString pathString = JNI.NewStringLocal(path);
-        JObject asset;
-        try
+        public APKAssetStream(JavaInputStream input)
         {
-            asset = JNI.CallObjectMethod<JObject>(assetManager, openMethod, new JValue(pathString));
-        }
-        catch (JThrowableException exception) when (exception.JavaClassName == "java.io.FileNotFoundException")
-        { return null; }
-        catch (JThrowableException exception) { throw new IOException("Android asset open failed: " + path, exception); }
-        if (asset == null || !asset.Valid())
-        {
-            ClearException();
-            return null;
-        }
-
-        ThrowIfException();
-
-        try { return new APKAssetStream(asset); }
-        catch { asset.Dispose(); throw; }
-    }
-
-    public static string[] GetDirectoryContents(string directory)
-    {
-        using JString pathString = JNI.NewStringLocal(directory);
-        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, listMethod, new JValue(pathString));
-        if (!assets.Valid())
-        {
-            ClearException();
-            return [];
-        }
-
-        string[] cleanAssets = new string[assets.Length];
-        for (int i = 0; i < cleanAssets.Length; i++)
-        {
-            using JString asset = assets[i];
-            cleanAssets[i] = asset.GetString();
-        }
-        ThrowIfException();
-
-        return cleanAssets;
-    }
-
-    public static bool DoesAssetExist(string path)
-    {
-        // using `list` isn't as fast as just calling open, but this allows the function to not crash on debuggable builds of apps
-        int separatorIndex = path.LastIndexOf('/');
-        string containingDir = separatorIndex >= 0 ? path[..separatorIndex] : string.Empty;
-        string fileName = separatorIndex >= 0 ? path[(separatorIndex + 1)..] : path;
-        using JString pathString = JNI.NewStringLocal(containingDir);
-        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, listMethod, new JValue(pathString));
-        if (!assets.Valid())
-        {
-            ClearException();
-            return false;
-        }
-
-        bool exists = false;
-        int length = assets.Length;
-        for (int i = 0; i < length; i++)
-        {
-            using JString asset = assets[i];
-            if (!string.Equals(fileName, asset.GetString(), StringComparison.Ordinal))
-                continue;
-
-            exists = true;
-            break;
-        }
-
-        ThrowIfException();
-
-        return exists;
-    }
-
-    private static void ClearException()
-    {
-        if (JNI.ExceptionCheck())
-            JNI.ExceptionClear();
-    }
-
-    private static void ThrowIfException()
-    {
-        if (!JNI.ExceptionCheck())
-            return;
-
-        JNI.ExceptionDescribe();
-        JNI.ExceptionClear();
-        throw new IOException("An Android AssetManager operation failed.");
-    }
-
-    private static JMethodID RequiredMethod(JClass type, string name, string signature)
-    {
-        ThrowIfException();
-        if (!type.Valid()) throw new IOException($"Android class is unavailable while resolving {name}{signature}.");
-        JMethodID method;
-        try { method = JNI.GetMethodID(type, name, signature); }
-        catch (JThrowableException exception) { throw new IOException($"Required Android method is unavailable: {name}{signature}.", exception); }
-        if (JNI.ExceptionCheck() || method.Handle == IntPtr.Zero)
-        {
-            ClearException();
-            throw new IOException($"Required Android method is unavailable: {name}{signature}.");
-        }
-        return method;
-    }
-
-    private static void GetAndroidAssetManager()
-    {
-        if (assetManager?.Valid() ?? false)
-            return;
-
-        using JClass unityClass = JNI.FindClass("com/unity3d/player/UnityPlayer");
-        JFieldID activityFieldId = JNI.GetStaticFieldID(unityClass, "currentActivity", "Landroid/app/Activity;");
-        using JObject currentActivityObj = JNI.GetStaticObjectField<JObject>(unityClass, activityFieldId);
-        using JClass activityClass = JNI.GetObjectClass(currentActivityObj);
-        using JObject loader = JNI.CallObjectMethod<JObject>(currentActivityObj,
-            activityClass.GetMethodID("getClassLoader", "()Ljava/lang/ClassLoader;"));
-        JNI.SetApplicationClassLoader(loader);
-        JObject assetManagerObj = JNI.CallObjectMethod<JObject>(currentActivityObj, JNI.GetMethodID(activityClass, "getAssets", "()Landroid/content/res/AssetManager;"));
-
-        ThrowIfException();
-        if (!assetManagerObj.Valid())
-            throw new InvalidOperationException("Android AssetManager was not available.");
-
-        using var managerClass = JNI.FindClass("android/content/res/AssetManager");
-        openMethod = managerClass.GetMethodID("open", "(Ljava/lang/String;)Ljava/io/InputStream;");
-        listMethod = managerClass.GetMethodID("list", "(Ljava/lang/String;)[Ljava/lang/String;");
-        assetManager = assetManagerObj;
-    }
-
-    public class APKAssetStream : Stream, IDisposable
-    {
-        private readonly JMethodID _availableJmid;
-        private readonly JMethodID _markJmid;
-        private readonly JMethodID _markSupportedJmid;
-        private readonly JMethodID _skipJmid;
-        private readonly JMethodID _resetJmid;
-        private readonly JMethodID _readJmid;
-        private readonly JMethodID _closeJmid;
-
-        private readonly JObject _streamObject;
-        private readonly bool _canSeek;
-        private readonly long _length;
-
-        private long _pos = 0;
-        private bool _disposed = false;
-        private JArray<sbyte>? _readBuffer;
-        private int _readBufferCapacity;
-
-        public APKAssetStream(JObject obj)
-        {
-            _streamObject = obj;
-
-            using JClass streamClass = JNI.FindClass("java/io/InputStream");
-
-            _availableJmid = RequiredMethod(streamClass, "available", "()I");
-            _readJmid = RequiredMethod(streamClass, "read", "([BII)I");
-            _markJmid = RequiredMethod(streamClass, "mark", "(I)V");
-            _markSupportedJmid = RequiredMethod(streamClass, "markSupported", "()Z");
-            _skipJmid = RequiredMethod(streamClass, "skip", "(J)J");
-            _resetJmid = RequiredMethod(streamClass, "reset", "()V");
-            _closeJmid = RequiredMethod(streamClass, "close", "()V");
-
-            _length = JNI.CallMethod<int>(_streamObject, _availableJmid);
-            ThrowIfException();
-            _canSeek = JNI.CallMethod<bool>(_streamObject, _markSupportedJmid);
-            ThrowIfException();
-            if (_canSeek)
-                JNI.CallVoidMethod(_streamObject, _markJmid, new JValue(int.MaxValue));
-
-            ThrowIfException();
-        }
-
-        public override bool CanRead => !_disposed;
-
-        public override bool CanSeek => !_disposed && _canSeek;
-
-        public override bool CanWrite => false;
-
-        public override long Length => _length;
-
-        public override long Position
-        {
-            get => _pos;
-            set => Seek(value, SeekOrigin.Begin);
-        }
-
-        public override int Read(byte[] buffer, int offset, int count)
-        {
-            try { return ReadCore(buffer, offset, count); }
-            catch (JThrowableException exception) { throw new IOException("Android asset read failed.", exception); }
-        }
-
-        private int ReadCore(byte[] buffer, int offset, int count)
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(APKAssetStream));
-            if (buffer == null)
-                throw new ArgumentNullException(nameof(buffer));
-            if (offset < 0)
-                throw new ArgumentOutOfRangeException(nameof(offset));
-            if (count < 0)
-                throw new ArgumentOutOfRangeException(nameof(count));
-            if (buffer.Length - offset < count)
-                throw new ArgumentException("Offset and count exceed the buffer length.");
-            if (count == 0)
-                return 0;
-
-            int requested = Math.Min(count, 64 * 1024);
-            if (_readBufferCapacity < requested)
+            this.input = input ?? throw new ArgumentNullException(nameof(input));
+            try
             {
-                var replacement = JNI.NewArray<sbyte>(requested);
-                ThrowIfException();
-                _readBuffer?.Dispose();
-                _readBuffer = replacement;
-                _readBufferCapacity = requested;
+                using var thread = AndroidJava.AttachCurrentThread();
+                length = input.Available;
+                canSeek = input.MarkSupported;
+                if (canSeek) input.Mark(int.MaxValue);
             }
+            catch (JavaException e) { input.Dispose(); e.Dispose(); throw new IOException("Android stream initialization failed.", e); }
+            catch { input.Dispose(); throw; }
+        }
+        public override bool CanRead => !disposed;
+        public override bool CanSeek => !disposed && canSeek;
+        public override bool CanWrite => false;
+        public override long Length => length;
+        public override long Position { get => position; set => Seek(value, SeekOrigin.Begin); }
 
-            Span<JValue> arguments = stackalloc JValue[]
-            {
-                new JValue(_readBuffer!),
-                new JValue(0),
-                new JValue(requested)
-            };
-            int read = JNI.CallMethod<int>(_streamObject, _readJmid, arguments);
-            ThrowIfException();
-
-            if (read == -1)
-                return 0;
-            if (read < 0 || read > requested)
-                throw new IOException("Android asset stream returned an invalid byte count.");
-            JNI.CopyByteArrayRegion(_readBuffer!, buffer, offset, read);
-            ThrowIfException();
-
-            _pos += read;
-            return read;
+        public override int Read(byte[] destination, int offset, int count)
+        {
+            ArgumentNullException.ThrowIfNull(destination);
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegative(count);
+            if (offset > destination.Length - count) throw new ArgumentException("Offset and count exceed the buffer length.");
+            return Read(destination.AsSpan(offset, count));
         }
 
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override unsafe int Read(Span<byte> destination)
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (destination.IsEmpty) return 0;
+            using var thread = AndroidJava.AttachCurrentThread();
+            try
+            {
+                int count = Math.Min(destination.Length, 64 * 1024);
+                if (bufferCapacity < count)
+                {
+                    var replacement = new JavaSByteArray(count);
+                    buffer?.Dispose();
+                    buffer = replacement;
+                    bufferCapacity = count;
+                }
+                int read = input.Read(buffer!, 0, count);
+                if (read == -1) return 0;
+                if (read < 0 || read > count) throw new IOException("Android stream returned an invalid byte count.");
+                fixed (byte* output = destination) JniEnvironment.Arrays.GetByteArrayRegion(buffer!.PeerReference, 0, read, (sbyte*)output);
+                position += read;
+                return read;
+            }
+            catch (JavaException e) { e.Dispose(); throw new IOException("Android asset read failed.", e); }
+        }
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            try { return SeekCore(offset, origin); }
-            catch (JThrowableException exception) { throw new IOException("Android asset seek failed.", exception); }
-        }
-
-        private long SeekCore(long offset, SeekOrigin origin)
-        {
-            if (_disposed)
-                throw new ObjectDisposedException(nameof(APKAssetStream));
-            if (!_canSeek)
-                throw new NotSupportedException("The APK asset stream does not support seeking.");
-
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (!canSeek) throw new NotSupportedException("Android stream does not support seeking.");
             long target = origin switch
             {
-                SeekOrigin.Begin => offset,
-                SeekOrigin.Current => checked(_pos + offset),
-                SeekOrigin.End => checked(_length + offset),
-                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+                SeekOrigin.Begin => offset, SeekOrigin.Current => checked(position + offset),
+                SeekOrigin.End => checked(length + offset), _ => throw new ArgumentOutOfRangeException(nameof(origin))
             };
-            if (target < 0 || target > _length)
-                throw new IOException("Attempted to seek outside the APK asset.");
-
-            if (target == _pos) return _pos;
-            if (target < _pos)
+            if (target < 0 || target > length) throw new IOException("Seek is outside the APK asset.");
+            if (target == position) return position;
+            using var thread = AndroidJava.AttachCurrentThread();
+            try
             {
-                JNI.CallVoidMethod(_streamObject, _resetJmid);
-                ThrowIfException();
-                _pos = 0;
+                if (target < position) { input.Reset(); position = 0; }
+                while (position < target)
+                {
+                    long skipped = input.Skip(target - position);
+                    if (skipped <= 0 || skipped > target - position) throw new IOException("Android stream could not reach the requested position.");
+                    position += skipped;
+                }
+                return position;
             }
-            while (_pos < target)
-            {
-                long current = JNI.CallMethod<long>(
-                    _streamObject,
-                    _skipJmid,
-                    new JValue(target - _pos));
-                ThrowIfException();
-                if (current <= 0 || current > target - _pos)
-                    throw new IOException("The APK asset stream could not reach the requested position.");
-
-                _pos += current;
-            }
-
-            ThrowIfException();
-            _pos = target;
-            return _pos;
+            catch (JavaException e) { e.Dispose(); throw new IOException("Android asset seek failed.", e); }
         }
-
-        public override void SetLength(long value) => throw new NotSupportedException();
-        public override void Flush() { }
 
         protected override void Dispose(bool disposing)
         {
-            if (_disposed)
-                return;
-            _disposed = true;
+            if (disposed) return;
+            disposed = true;
             try
             {
                 if (disposing)
                 {
-                    try
-                    {
-                        JNI.CallVoidMethod(_streamObject, _closeJmid);
-                        ThrowIfException();
-                    }
-                    catch (JThrowableException exception) { throw new IOException("Android asset close failed.", exception); }
-                    finally
-                    {
-                        try { _streamObject.Dispose(); }
-                        finally
-                        {
-                            _readBuffer?.Dispose();
-                            _readBuffer = null;
-                        }
-                    }
+                    using var thread = AndroidJava.AttachCurrentThread();
+                    try { input.Close(); }
+                    catch (JavaException e) { e.Dispose(); throw new IOException("Android asset close failed.", e); }
+                    finally { try { input.Dispose(); } finally { buffer?.Dispose(); buffer = null; } }
                 }
             }
             finally { base.Dispose(disposing); }
         }
+        public override void Flush() { }
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
     }
 }
 #endif

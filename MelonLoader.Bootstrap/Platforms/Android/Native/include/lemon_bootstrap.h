@@ -49,6 +49,8 @@ LEMON_EXPORT void LogMelonInfo(
     int info_length);
 LEMON_EXPORT uint8_t IsConsoleOpen();
 LEMON_EXPORT JavaVM* GetJavaVM();
+// Borrowed global reference, retained until process exit.
+LEMON_EXPORT jobject GetApplicationClassLoader();
 // Borrowed, process-scoped handle captured from Unity. The caller must not close it.
 LEMON_EXPORT void* GetIl2CppLibraryHandle();
 

@@ -71,6 +71,7 @@
         <EmbeddedResource Include="Resources\classdata.tpk" />
     </ItemGroup>
     <ItemGroup Condition="'$(RuntimeIdentifier)' == 'linux-bionic-arm64' And '$(TargetFramework)' == 'net10.0'">
+        <EmbeddedResource Include="../Output/AndroidCallbacks/classes.dex" LogicalName="MelonLoader.Android.Callbacks.dex" />
         <ProjectReference Include="../Dependencies/JavaInterop/Java.Interop.csproj"
                           GlobalPropertiesToRemove="RuntimeIdentifier;RuntimeIdentifiers;ForceRID;PlatformTarget;MLOutDir;TargetFramework" />
     </ItemGroup>

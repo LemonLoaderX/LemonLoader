@@ -43,7 +43,7 @@ namespace MelonLoader
             MelonLaunchOptions.Load();
 
 #if ANDROID
-            Java.JNI.Initialize(BootstrapInterop.Library.GetJavaVM());
+            Android.AndroidJava.Initialize(BootstrapInterop.Library.GetJavaVM(), BootstrapInterop.Library.GetApplicationClassLoader());
             APKAssetManager.Initialize();
 #endif
 

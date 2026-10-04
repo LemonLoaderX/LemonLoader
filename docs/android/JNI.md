@@ -1,101 +1,136 @@
-# Java access for Mods
+# Java access for Android Mods
 
-Android Mods target net10.0 and reference the Android MelonLoader.dll.
-The product runs on .NET 11; the historical loader/net6 installation folder is
-a file-layout name, not the current compiler target. Existing compiled net6 Mods
-can load on this runtime, subject to the JNI behavior changes below.
+New Android Mods target net10.0 and reference MelonLoader.dll and its pinned
+Java.Interop.dll with Copy Local disabled. Loader runs on .NET 11. The historical
+loader/net6 directory remains an installation path, not the compilation target.
 
-Use MelonLoader.Java. Loader initializes the JavaVM and app ClassLoader before
-Mods start. Mods must not create or destroy a VM, replace Loader's runtime, or ship
-a separate Java.Interop DLL. Loader supplies its pinned Java.Interop implementation.
+## Standard Java model
 
-## Calls
-
-Classes use slash-separated JNI names. Object descriptors use Lname; and arrays
-use [element. Method descriptors contain argument types followed by return type.
-Resolve member IDs once when making repeated calls. JClass shares synchronized
-instance/static caches across FindClass results; failed lookups are not cached.
+Use Java.Interop JavaObject/IJavaPeerable, JavaException and Java primitive/object
+arrays. Loader hosts the existing ART VM and app ClassLoader. Mods must not create
+or destroy a VM, replace JniRuntime, or ship another Java.Interop copy.
+MelonLoader.Android supplies typed binding, common Android peers and callbacks.
 
 ```csharp
-using MelonLoader.Java;
+using MelonLoader.Android;
 
-using var integer = JNI.FindClass("java/lang/Integer");
-using var text = JNI.NewString("42");
-int value = integer.CallStaticMethod<int>(
-    "parseInt", "(Ljava/lang/String;)I", text);
+static readonly Func<string, int> ParseInt =
+    JavaBinding.BindStatic<Func<string, int>>("java/lang/Integer", "parseInt");
+
+int value = ParseInt("42");
 ```
 
-Primitive types are bool, sbyte, char, short, int, long, float and double.
-Java byte is signed; convert byte spans with MemoryMarshal.Cast<byte, sbyte>.
-JValue accepts these primitives, a JObject, IntPtr or null; unsupported boxed
-values throw. Null JObject arguments represent Java null. JNI cannot infer every
-argument type from jvalue bits: argument order and types must match the descriptor.
-Counts, return/access kind and descriptor syntax are checked before native calls.
-
-Use ReadOnlySpan<JValue> overloads to avoid argument-array allocations:
+Bind once. Binding resolves the member immediately and caches the compiled delegate
+and Java.Interop member metadata. Delegate parameters/return types produce the JNI
+descriptor; strings, arrays and peers use upstream value marshalers. Instance
+delegates put an IJavaPeerable receiver first. Constructors return a peer.
 
 ```csharp
-var parse = integer.GetStaticMethodID("parseInt", "(Ljava/lang/String;)I");
-Span<JValue> arguments = stackalloc JValue[] { new(text) };
-int parsed = JNI.CallStaticMethod<int>(integer, parse, arguments);
+using Java.Interop;
+
+[JniTypeSignature("java/lang/StringBuilder", GenerateJavaPeer = false)]
+public sealed class StringBuilderPeer : JavaObject
+{
+    private static readonly JniPeerMembers Members =
+        new("java/lang/StringBuilder", typeof(StringBuilderPeer));
+    public override JniPeerMembers JniPeerMembers => Members;
+    public StringBuilderPeer(ref JniObjectReference reference,
+        JniObjectReferenceOptions options) : base(ref reference, options) { }
+}
+
+var create = JavaBinding.BindConstructor<Func<string, StringBuilderPeer>>(
+    "java/lang/StringBuilder");
+var append = JavaBinding.BindInstance<
+    Func<StringBuilderPeer, string, StringBuilderPeer>>(
+    "java/lang/StringBuilder", "append");
+var text = JavaBinding.BindInstance<Func<StringBuilderPeer, string>>(
+    "java/lang/StringBuilder", "toString");
+
+using var builder = create("Hello");
+using var result = append(builder, " Java");
+string message = text(result);
 ```
 
-## References
+Signatures use the declared delegate types, so overloads remain deterministic.
+Java Object[] and String[] are distinct; use JavaObjectArray<JavaObject> for
+Object[]. Java byte maps to sbyte. Types without a JniTypeSignature or upstream
+mapping fail during binding. Calls through six arguments use typed stack-based
+marshaling; larger delegates use a boxed argument buffer. Generated or unusual
+bindings can use JniPeerMembers directly.
 
-- JObject and its subclasses own their reference unless created through Borrow.
-  Use using/Dispose. Ordinary object-returning calls create global references so
-  the result can outlive a call and be passed between threads.
-- FindClass returns an owned local reference to a process-cached class. Dispose
-  on the creating thread. Its member IDs remain valid while the cached class lives.
-- NewStringLocal, NewObjectLocal and CallObjectMethodLocal return locals for short
-  same-thread work. Use LocalFrame for batches; ending it invalidates its locals.
-  Promote with ToGlobal<T>() before a local frame or thread attachment ends.
-- Borrow<T>(handle, kind) does not delete the caller's reference. Adopt<T> owns it:
-  the original owner must stop using/deleting that handle. Borrowed references still
-  obey the caller's lifetime, JNI thread/frame rules, and object type.
-- Transfer<T>() moves ownership and invalidates the source. ToLocal/ToGlobal copy
-  the reference. DeleteLocalRef/DeleteGlobalRef also dispose/invalidate the wrapper.
-  Raw handle mutation and ownership-transferring constructors are obsolete.
+GetStaticField<T> infers its field type. For other field access, explicit overload
+descriptors, nonvirtual dispatch or native registration use the standard
+JniPeerMembers/JniEnvironment interface within a thread scope. Do not duplicate
+their metadata, reference structs or ownership rules in Mods.
+
+## Lifetime and threads
+
+Returned peers own global references and implement IDisposable. Use using.
+Separate results are independently owned; Java null becomes C# null. Strings and
+managed-array results are converted and their temporary references released.
+JavaArray types remain Java-owned storage; CopyFrom/CopyTo perform bounded copies.
+
+Typed binding operations establish a thread scope automatically. For repeated
+work, surround the block with AndroidJava.AttachCurrentThread(); nested calls reuse
+the attachment. Direct Java.Interop operations require this outer scope. Dispose
+peer wrappers before ending it. End scopes in reverse order on their creating
+thread, without crossing await. Put synchronous JNI work inside Task.Run when needed.
+Globals can cross threads; synchronize concurrent access/disposal yourself.
+
+Loader maintains weak managed-peer registry entries and releases abandoned peers
+on the CLR finalizer thread. Deterministic disposal is still preferable. Raw local
+references obey JNI same-thread/frame lifetime and should be managed with upstream
+JniObjectReferenceOptions; never retain locals across Java callbacks or detach.
+
+## Android and UI callbacks
+
+UnityPlayer.CurrentActivity returns an owned current AndroidActivity peer; reacquire
+it after Activity recreation. Activity.Assets provides AndroidAssetManager and typed
+InputStream access. APKAssetManager adapts assets into .NET streams with a reusable,
+bounded Java byte buffer and IOException semantics.
 
 ```csharp
-using var thread = JNI.AttachCurrentThread();
-using var frame = JNI.LocalFrame();
-using var temporary = JNI.NewStringLocal("temporary");
-using var persistent = temporary.ToGlobal<JString>();
+await AndroidThread.RunAsync(() =>
+{
+    using var activity = UnityPlayer.CurrentActivity;
+    // Use Android peers here on the UI thread.
+}, cancellationToken);
 ```
 
-Dispose frames before thread scopes, in reverse order. Scope objects stay on their
-creating thread; never hold them across await. Put the whole synchronous JNI block
-inside Task.Run if needed. Thread scopes detach only threads attached by Loader.
-Globals can cross threads; concurrent use and disposal still require caller
-synchronization. Weak globals require promotion to a strong local/global before
-use because Java GC can clear them.
+RunAsync observes managed callback exceptions through its Task. Cancellation
+releases queued registrations; it does not interrupt an already running action.
+An Activity that never executes queued work needs caller cancellation/timeout.
 
-## Errors and arrays
+JavaCallbacks.Create<TPeer> implements Java interfaces through an embedded helper
+and java.lang.reflect.Proxy. TPeer uses a JniTypeSignature for that interface.
+JavaCallbackMethod supplies the Java method name and a typed delegate, including
+overloads. All abstract methods must be supplied. Object identity methods are
+handled by the proxy; default methods need explicit handlers if invoked.
 
-Ordinary failed Java operations immediately throw JThrowableException and clear
-pending JNI state. JavaClassName, Message and JavaStackTrace retain Java details.
-Catch this exception around the operation rather than testing an invalid result
-or relying on a later CheckExceptionAndThrow. A successful Java null is distinct
-from an exception; test result.IsNull when the method may return null.
+```csharp
+using var runnable = JavaCallbacks.Create<JavaRunnable>(
+    new JavaCallbackMethod("run", (Action)(() => Console.WriteLine("Java called C#"))));
+runnable.Peer.Run();
+```
 
-ExceptionCheck/Clear/Describe and Throw/ThrowNew are low-level escape hatches.
-Throw leaves a pending exception; clear it or return to a real Java native caller
-before performing unrelated JNI operations. ExceptionOccurred returns an owned
-local Throwable without promoting it while the exception is pending.
+Keep the registration alive while Java uses its proxy, then dispose it. Callback
+argument peers are borrowed for the invocation and disposed afterward; create an
+independent peer/reference if storing them. Returned primitive/string/array values
+are boxed/marshaled for Java. Callback exceptions become Java RuntimeException;
+no managed exception escapes the native entry point. A disposed Runnable is a
+no-op; other disposed interface calls throw.
 
-Primitive array region APIs accept spans and check managed buffer/destination
-bounds. GetArrayElements returns a managed copy; it never retains a Java pin.
-Object-array iteration returns owned objects that each require disposal.
+The callback DEX is embedded in MelonLoader.dll and loaded lazily with
+InMemoryDexClassLoader (API 26+), using the app ClassLoader as parent. APK injection
+needs no extra DEX entry. CoreCLR crypto keeps its separate private classloader.
 
-## Migration
+## Exceptions and migration
 
-Common JNI/JClass/JObject/JString names and params-array overloads remain.
-Behavior changes intentionally reject invalid IDs, access modes, signatures,
-unsupported arguments, wrong-thread locals and overwritten live handles.
-Do not depend on a copy constructor behaving like reference duplication.
-Mods using the removed JNIEnv/JavaVM table structs must migrate and rebuild.
-Raw class definition, reflected-member conversion,
-native registration, direct buffers and unimplemented raw facilities are outside
-this facade; thread/local scopes replace the old unimplemented frame placeholders.
-The native runtime's crypto helpers use their own hosting and are unaffected.
+Catch Java.Interop.JavaException. Message, InnerException and JavaStackTrace keep
+Java diagnostics. The pending exception is cleared before throwing to C#.
+Dispose a caught JavaException when done with its retained Throwable peer.
+
+This new version removes MelonLoader.Java JNI/JObject/JClass/JValue/member-ID
+interfaces and their compatibility shims. Mods that used them must migrate/rebuild.
+Mods unrelated to JNI may still load, but compatibility with the old JNI API is
+not a product requirement. Android hosting and desktop compilation remain separate.

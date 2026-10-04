@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace LemonLoader.Tests.JniLibraries;
+namespace LemonLoader.Tests.JniHost;
 
 internal static unsafe class Host
 {
@@ -35,6 +35,7 @@ internal static unsafe class Host
         if (result != 0) throw new InvalidOperationException($"JNI_CreateJavaVM: {result}");
         try
         {
+            MelonLoader.Android.AndroidJava.Initialize(vm);
             Suites.Run(args[0], vm, env, Console.WriteLine);
             return 0;
         }

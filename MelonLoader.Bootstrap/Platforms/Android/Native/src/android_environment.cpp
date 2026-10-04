@@ -1225,6 +1225,12 @@ bool initialize_android_environment(JNIEnv* env) {
     }
     asset_manager = AAssetManager_fromJava(env, assets);
     asset_manager_object = env->NewGlobalRef(assets);
+    const auto get_loader = env->GetMethodID(activity_class, "getClassLoader", "()Ljava/lang/ClassLoader;");
+    if (clear_exception(env, "Resolve application ClassLoader") || !get_loader) return false;
+    const auto loader = env->CallObjectMethod(activity, get_loader);
+    if (clear_exception(env, "Get application ClassLoader") || !loader) return false;
+    application_class_loader = env->NewGlobalRef(loader);
+    env->DeleteLocalRef(loader);
 
     env->DeleteLocalRef(assets);
     if (external_directory != nullptr) {
@@ -1237,7 +1243,7 @@ bool initialize_android_environment(JNIEnv* env) {
     env->DeleteLocalRef(unity_player);
 
     if (clear_exception(env, "Retain Android AssetManager") ||
-        asset_manager == nullptr || asset_manager_object == nullptr ||
+        asset_manager == nullptr || asset_manager_object == nullptr || application_class_loader == nullptr ||
         runtime_paths.base_directory.empty() ||
         runtime_paths.dotnet_directory.empty()) {
         log_error("Android runtime path or AssetManager discovery failed");

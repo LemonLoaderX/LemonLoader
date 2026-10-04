@@ -2,6 +2,10 @@
 
 Status: implemented
 
+The borrowed-VM build and hosting facts remain. The parallel checked Mod facade
+and no-helper restriction are superseded by the
+[standard Java API](2026-10-04-java-interop-public-api.md) for the new product version.
+
 ## Problem
 
 Handwritten JNI bindings duplicate function tables and expose unclear ownership,

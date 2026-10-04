@@ -10,7 +10,7 @@ to [Building](../docs/android/BUILDING.md), [Runtime development](../docs/androi
 
 | Entry | Purpose |
 | --- | --- |
-| setup-android-dependencies.ps1 | Prepare exact Dobby/Interop/Harmony/MonoMod source pins |
+| setup-android-dependencies.ps1 | Prepare exact Dobby/Interop/Harmony/MonoMod/Java.Interop source pins |
 | build.ps1 | Build Android, Bionic or both; explicit development/source/pack inputs |
 | verify.ps1 | Script/source/Interop checks, optional desktop/selected Android build and repack |
 | setup-runtime.ps1 | Prepare exact runtime source without switching existing checkouts |
@@ -31,6 +31,7 @@ These are callable for a targeted rebuild; build.ps1 owns normal orchestration.
 | build/build-android.ps1 | One native/managed/staging/release profile |
 | build/build-android-ndk-bootstrap.ps1 | NDK libmain.so; Android requires matching crypto pack |
 | build/build-android-managed.ps1 | Managed host/support and source-built dependencies |
+| build/build-android-callbacks.ps1 | javac/d8 callback helper embedded in managed Loader |
 | build/stage-android-package.ps1 | Assemble and validate the game-independent payload |
 | build/publish-android-release.ps1 | Archive an existing stage; refresh the default alias |
 | build/verify-android-bootstrap.ps1 | Check a bootstrap's ELF/exports/build ID |

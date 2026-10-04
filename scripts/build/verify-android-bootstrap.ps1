@@ -76,7 +76,8 @@ $requiredExports = @(
     "DestroyArm64ValueReturnAdapter",
     "ResolveArm64Il2CppInjectionTarget",
     "ConfigureLogging",
-    "GetJavaVM"
+    "GetJavaVM",
+    "GetApplicationClassLoader"
     "GetIl2CppLibraryHandle"
 )
 foreach ($symbol in $requiredExports) {

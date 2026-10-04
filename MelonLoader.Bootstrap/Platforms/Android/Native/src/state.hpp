@@ -21,6 +21,7 @@ extern JavaVM* java_vm;
 extern void* unity_handle;
 extern AAssetManager* asset_manager;
 extern jobject asset_manager_object;
+extern jobject application_class_loader;
 extern RuntimePaths runtime_paths;
 
 void log_line(const std::string& message);

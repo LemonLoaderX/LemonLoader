@@ -56,6 +56,10 @@ jobs:
         with:
           global-json-file: global.json
       - uses: android-actions/setup-android@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Prepare JNI headers
         run: sdkmanager "ndk;27.3.13750724"
       - name: Run native fixtures
@@ -68,6 +72,11 @@ jobs:
           bash scripts/test/test-android-deployment.sh
       - name: Run managed fixtures
         run: dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
+      - name: Prepare Java.Interop source
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
+      - name: Run real JVM peer and marshaling regressions
+        run: dotnet run --project tests/Android/JniHost/JniHost.csproj -c Release -- java-interop "$JAVA_HOME/lib/server/libjvm.so"
 
   build:
     needs: [release-notes, host-tests]
@@ -89,6 +98,12 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
+
+      - name: Set up Java callback tools
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
 
       - name: Install Android toolchain
         shell: pwsh

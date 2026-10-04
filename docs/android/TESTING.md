@@ -44,8 +44,9 @@ dotnet run --project tests/Android/GameInformation/GameInformation.Tests.csproj 
 dotnet run --project tests/Preferences/Preferences.csproj
 ```
 
-Managed JNI tests cover reference/finalizer ownership, asset buffer/seek/close,
-configuration preservation, scene fallback and hook-root retention.
+Managed behavior tests cover configuration preservation, scene fallback and
+hook-root retention. JniHost covers actual upstream peers/finalizers, typed calls,
+automatic marshaling, exceptions and real InputStream buffer/seek cleanup.
 The [JNI host regression](../../tests/Android/JniHost/README.md) exercises the
 checked Mod interface with a real JVM; it does not substitute for ART acceptance.
 GameInformation uses real AssetsTools parsing with generated files/bundles and

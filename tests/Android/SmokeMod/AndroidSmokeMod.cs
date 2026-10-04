@@ -127,9 +127,9 @@ public sealed class AndroidSmokeMod : MelonMod
     {
         await Task.Run(() =>
         {
-            using (MelonLoader.Java.JNI.AttachCurrentThread())
+            using (MelonLoader.Android.AndroidJava.AttachCurrentThread())
             {
-                int version = MelonLoader.Java.JNI.GetVersion();
+                int version = (int)Java.Interop.JniEnvironment.JniVersion;
                 bool payloadExists = APKAssetManager.DoesAssetExist("LemonLoader/payload.json");
                 LoggerInstance.Msg($"JniWorker {version:X} {payloadExists}");
             }

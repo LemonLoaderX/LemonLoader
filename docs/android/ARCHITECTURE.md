@@ -74,6 +74,10 @@ unchanged. Android generates a structured runtimeconfig with `LatestMajor`
 roll-forward and ships the selected .NET 11 CoreCLR pack. The historical
 `loader/net6` installation path remains a layout contract, not the compiler target.
 See [JNI interface](JNI.md) for Mod ownership, calls and migration rules.
+Native environment discovery retains the application ClassLoader as a borrowed
+process-scoped global before managed hosting starts. Java.Interop uses it as its
+class fallback. Lazy callback helpers use their own child loader and remain
+separate from private CoreCLR crypto hosting.
 
 ## Build seam
 
