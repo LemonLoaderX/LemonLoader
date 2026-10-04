@@ -54,4 +54,5 @@ if (!$rejected) { throw 'Retired runtime profile was accepted.' }
 & (Join-Path $PSScriptRoot 'test-runtime-profiles.ps1')
 & (Join-Path $PSScriptRoot 'test-publication-scan.ps1')
 & (Join-Path $PSScriptRoot 'test-verification-entry.ps1')
+& (Join-Path $PSScriptRoot 'test-interop-generation.ps1')
 Write-Host "Loader script syntax and helpers passed ($count scripts; SkipBash=$SkipBash)."

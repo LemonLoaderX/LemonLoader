@@ -68,6 +68,10 @@ pwsh -NoProfile -File scripts/verify.ps1 -RuntimeProfile android -AndroidNdkRoot
 This selects pinned Interop regressions, a Win64 build and one Android
 build/repack. `-SkipAndroid -SkipDesktop` narrows it to script/source/Interop tests.
 Explicit source/pack paths and Development follow [Building](BUILDING.md).
+Add `-HostTests -JvmLibrary "<absolute-jvm-library>" -JavaHome "<jdk>"
+-AndroidSdkRoot "<sdk>"` to include managed behavior, game information, actual JVM
+JNI and callback Java/DEX fixtures. HostTests is explicit so script-only checks
+do not require a JVM/Android SDK. Native WSL tests remain a separate boundary.
 It does not implicitly run Patcher, native WSL suites, devices or a CoreCLR source
 build. Shared managed changes need desktop validation; runtime/packaging changes
 need both Android and Bionic builds sequentially because staging is shared.

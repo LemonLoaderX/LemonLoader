@@ -67,6 +67,10 @@ $directory = if ($Development) { 'DevelopmentReleases' } else { 'Releases' }
 [IO.File]::WriteAllText((Join-Path $root "Output/$directory/LemonLoader-runtime-$RuntimeProfile-arm64.zip"), 'synthetic archive bytes')
 [IO.File]::AppendAllText((Join-Path $root 'Output/calls.txt'), "build`n")
 '@
+Write-Fixture (Join-Path $product 'scripts/test/test-android-callbacks.ps1') @'
+param($AndroidSdkRoot, $JavaHome)
+if ($AndroidSdkRoot -cne 'fixture SDK' -or $JavaHome -cne 'fixture JDK') { throw 'Host tool paths changed.' }
+'@
 Write-Fixture (Join-Path $product 'scripts/build/publish-android-release.ps1') @'
 param($Configuration)
 $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -109,6 +113,11 @@ if ($dotnetLog.Count -ne 2 -or [IO.File]::ReadAllText((Join-Path $product 'Outpu
     throw 'Skipped build boundaries still ran.'
 }
 Invoke-FixtureGit $source @('checkout', '--quiet', '--detach', $second)
+Reject { & $entry -Il2CppInteropSourceRoot $source -HostTests -Development -SkipAndroid -SkipDesktop } 'requires -JvmLibrary'
+$dotnetLog.Clear()
+& $entry -Il2CppInteropSourceRoot $source -HostTests -JvmLibrary (Join-Path $source 'input.txt') -AndroidSdkRoot 'fixture SDK' `
+    -JavaHome 'fixture JDK' -Development -SkipAndroid -SkipDesktop
+if ($dotnetLog.Count -ne 5 -or !$dotnetLog[4].Contains('java-interop')) { throw 'Host suites were not selected.' }
 Reject { & $entry -Il2CppInteropSourceRoot $source -SkipAndroid -SkipDesktop } 'does not match pinned'
 Write-Fixture (Join-Path $source 'input.txt') 'local tracked edit'
 & $entry -Il2CppInteropSourceRoot $source -Development -SkipAndroid -SkipDesktop

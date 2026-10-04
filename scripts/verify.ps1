@@ -11,7 +11,11 @@ param(
     [string]$JavaInteropSourceRoot,
     [Alias('AllowDirtyDependencies')][switch]$Development,
     [switch]$SkipAndroid,
-    [switch]$SkipDesktop
+    [switch]$SkipDesktop,
+    [switch]$HostTests,
+    [string]$JvmLibrary,
+    [string]$AndroidSdkRoot = $env:ANDROID_SDK_ROOT,
+    [string]$JavaHome = $env:JAVA_HOME
 )
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -33,6 +37,18 @@ if ($Development) {
 foreach ($name in @('Il2CppInterop.Runtime.Tests', 'Il2CppInterop.Generator.Tests')) {
     & dotnet run --project (Join-Path $interop "$name/$name.csproj") --configuration Release
     if ($LASTEXITCODE -ne 0) { throw "$name failed with exit code $LASTEXITCODE." }
+}
+if ($HostTests) {
+    if ([string]::IsNullOrWhiteSpace($JvmLibrary) -or !(Test-Path -LiteralPath $JvmLibrary -PathType Leaf)) {
+        throw 'HostTests requires -JvmLibrary pointing to the host JVM shared library.'
+    }
+    foreach ($project in @('Managed/AndroidManaged.Tests.csproj', 'GameInformation/GameInformation.Tests.csproj')) {
+        & dotnet run --project (Join-Path $repositoryRoot "tests/Android/$project") -c Release -p:Platform=x64
+        if ($LASTEXITCODE -ne 0) { throw "$project failed with exit code $LASTEXITCODE." }
+    }
+    & dotnet run --project (Join-Path $repositoryRoot 'tests/Android/JniHost/JniHost.csproj') -c Release -- java-interop $JvmLibrary
+    if ($LASTEXITCODE -ne 0) { throw "JNI host tests failed with exit code $LASTEXITCODE." }
+    & (Join-Path $PSScriptRoot 'test/test-android-callbacks.ps1') -AndroidSdkRoot $AndroidSdkRoot -JavaHome $JavaHome
 }
 if (!$SkipDesktop) {
     & dotnet build (Join-Path $repositoryRoot 'MelonLoader.sln') --configuration Release -p:Platform=x64 -p:PublishAot=false
