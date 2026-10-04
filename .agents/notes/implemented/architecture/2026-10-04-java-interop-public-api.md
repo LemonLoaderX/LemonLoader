@@ -43,6 +43,9 @@ Managed callback object arrays are converted recursively with independently owne
 unregistered peers. A per-invocation owner list releases all created peers, including
 partial conversions. Upstream array element GetValue may reuse a caller's wrapper,
 so recursively disposing upstream-converted arrays would invalidate unrelated peers.
+Object arguments resolve their runtime mapping before scoped conversion. Array peer
+wrappers keep Java-owned storage, including cycles; managed-array conversion has a
+nesting limit so recursive runtime mappings cannot exhaust the managed stack.
 Proxy identity handling matches complete Object method descriptors, not names.
 Callback DEX builds pin javac and d8 in the product manifest, invoke both with the
 selected JDK, and publish from fresh staging only after successful compilation.

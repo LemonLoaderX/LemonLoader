@@ -121,7 +121,10 @@ Keep the registration alive while Java uses its proxy, then dispose it. Callback
 argument peers are borrowed for the invocation and disposed afterward, including
 elements of managed object arrays and nested arrays. These are independent wrappers;
 cleanup preserves caller-owned peers. Create an independent peer/reference if storing
-them. Elements obtained yourself through JavaObjectArray follow upstream GetValue
+them. Object arguments retain runtime type conversion; nested arrays use the same
+scoped ownership, with a 64-level limit on recursive managed-array conversion.
+Java array peer wrappers keep Java-owned storage, including cyclic arrays.
+Elements obtained yourself through JavaObjectArray follow upstream GetValue
 ownership rules. Returned primitive/string/array values
 are boxed/marshaled for Java. Callback exceptions become Java RuntimeException;
 no managed exception escapes the native entry point. A disposed Runnable is a

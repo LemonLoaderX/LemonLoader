@@ -140,9 +140,17 @@ public static unsafe class JavaCallbacks
         }
     }
 
-    private static object? ReadArgument(JniObjectReference reference, Type type, List<IJavaPeerable> owned)
+    private static object? ReadArgument(JniObjectReference reference, Type type, List<IJavaPeerable> owned, int depth = 0)
     {
         if (!reference.IsValid) return null;
+        if (depth >= 64) throw new ArgumentException("Java callback array nesting exceeds the conversion limit.");
+        if (type == typeof(object))
+        {
+            var name = JniEnvironment.Types.GetJniTypeNameFromInstance(reference);
+            type = JniTypeSignature.TryParse(name!, out var signature)
+                ? AndroidJava.Runtime.TypeManager.GetType(signature) ?? typeof(JavaObject)
+                : typeof(JavaObject);
+        }
         // Upstream array marshaling uses GetValue for elements, which can reuse a
         // caller's registered peer. Scoped callback arguments must own new peers.
         if (type.IsArray && !type.GetElementType()!.IsPrimitive)
@@ -152,7 +160,7 @@ public static unsafe class JavaCallbacks
             for (int i = 0; i < array.Length; i++)
             {
                 var item = JniEnvironment.Arrays.GetObjectArrayElement(reference, i);
-                try { array.SetValue(ReadArgument(item, elementType, owned), i); }
+                try { array.SetValue(ReadArgument(item, elementType, owned, depth + 1), i); }
                 finally { JniObjectReference.Dispose(ref item); }
             }
             return array;
@@ -162,8 +170,6 @@ public static unsafe class JavaCallbacks
         object? value = peerType
             ? manager.CreatePeer(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type)
             : manager.CreateValue(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type);
-        if (!peerType && value is IJavaPeerable existing && ReferenceEquals(existing, manager.PeekPeer(reference)))
-            value = manager.CreatePeer(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, existing.GetType());
         if (value == null) throw new InvalidCastException("Java callback argument cannot be represented as " + type.FullName + ".");
         if (value is IJavaPeerable peer) owned.Add(peer);
         return value;

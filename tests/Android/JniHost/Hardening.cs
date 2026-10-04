@@ -80,6 +80,40 @@ internal static class Hardening
             AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != globals)
             throw new Exception($"Untyped callback array ownership failed: caller={unrelated.PeerReference.IsValid}, global delta={AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount - globals}.");
         log("PASS object callback array ownership");
+        IJavaPeerable? dynamicArray = null;
+        InvokeCallback((Action<object>)(value => dynamicArray = (IJavaPeerable)value), objectArguments);
+        if (JniEnvironment.Exceptions.ExceptionCheck() || dynamicArray == null || dynamicArray.PeerReference.IsValid ||
+            !payload.PeerReference.IsValid || !unrelated.PeerReference.IsValid ||
+            AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != globals)
+            throw new Exception("Runtime-typed callback array ownership failed.");
+        log("PASS runtime-typed callback array ownership");
+
+        using var cyclic = new JavaObjectArray<JavaObject>(1);
+        cyclic[0] = cyclic;
+        using var cyclicArguments = new JavaObjectArray<JavaObject>(new JavaObject[] { cyclic });
+        int cyclicGlobals = AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount;
+        InvokeCallback((Action<object>)(value => dynamicArray = (IJavaPeerable)value), cyclicArguments);
+        if (JniEnvironment.Exceptions.ExceptionCheck() || dynamicArray!.PeerReference.IsValid ||
+            !cyclic.PeerReference.IsValid || AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != cyclicGlobals)
+            throw new Exception("Cyclic callback array cleanup failed.");
+        log("PASS cyclic callback array peer ownership");
+        using var boxed = new JavaObjectArray<object>(new object[] { 42, "value", unrelated });
+        using var boxedArguments = new JavaObjectArray<JavaObject>(new JavaObject[] { boxed });
+        Action<object[]> boxedCallback = values =>
+        {
+            if (values[0] is not int number || number != 42 || values[1] is not string text || text != "value" ||
+                values[2] is not IJavaPeerable peer || ReferenceEquals(peer, unrelated))
+                throw new Exception("Object callback boxing/string conversion changed.");
+        };
+        InvokeCallback(boxedCallback, boxedArguments);
+        if (JniEnvironment.Exceptions.ExceptionCheck()) throw new Exception("Object callback boxing failed.");
+        globals = AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount;
+        InvokeCallback(boxedCallback, boxedArguments);
+        if (JniEnvironment.Exceptions.ExceptionCheck() || !unrelated.PeerReference.IsValid ||
+            AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != globals)
+            throw new Exception("Object callback boxing cleanup failed.");
+        log("PASS object callback boxing/string ownership");
+        globals = AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount;
         JavaObjectArray<JavaObject>? borrowed = null;
         InvokeCallback((Action<JavaObjectArray<JavaObject>>)(value => borrowed = value), objectArguments);
         if (JniEnvironment.Exceptions.ExceptionCheck() || borrowed == null || borrowed.PeerReference.IsValid ||
