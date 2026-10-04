@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>ANDROID</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Host.cs;Suites.cs;JavaInteropRuntime.cs" />
+    <Compile Include="../../../MelonLoader/JNI/*.cs" Link="Baseline/%(Filename)%(Extension)" />
+    <PackageReference Include="Rxmxnx.JNetInterface" Version="1.2.0" />
+    <ProjectReference Include="JavaInterop.Source.csproj" />
+  </ItemGroup>
+</Project>

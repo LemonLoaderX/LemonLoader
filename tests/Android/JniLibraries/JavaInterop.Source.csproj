@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Java.Interop</AssemblyName>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <NoWarn>$(NoWarn);CS8981;CS1591</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(JavaInteropSource)/src/Java.Interop/**/*.cs"
+             Exclude="$(JavaInteropSource)/src/Java.Interop/obj/**;$(JavaInteropSource)/src/Java.Interop/bin/**;$(JavaInteropSource)/src/Java.Interop/Java.Interop/JniLocationException.cs" />
+    <ProjectReference Include="JniEnvironmentGenerator.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="GenerateEnvironment" BeforeTargets="CoreCompile">
+    <Error Condition="!Exists('$(JavaInteropSource)/src/Java.Interop/Java.Interop/JniRuntime.cs')" Text="Set JavaInteropSource to dotnet/android external/Java.Interop." />
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="dotnet &quot;$(MSBuildThisFileDirectory)bin/JniEnvironmentGenerator/$(Configuration)/net10.0/JniEnvironmentGenerator.dll&quot; &quot;$(IntermediateOutputPath)JniEnvironment.g.cs&quot; &quot;$(IntermediateOutputPath)jni.c&quot;" />
+    <ItemGroup><Compile Include="$(IntermediateOutputPath)JniEnvironment.g.cs" /></ItemGroup>
+  </Target>
+</Project>
