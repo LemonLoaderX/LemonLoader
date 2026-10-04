@@ -18,12 +18,12 @@ internal static unsafe class Host
 
     public static int Main(string[] args)
     {
-        if (args.Length != 2)
+        if (args.Length != 2 || args[0] != "java-interop")
         {
-            Console.Error.WriteLine("Usage: Host <baseline|java-interop|jnet> <absolute JVM library path>");
+            Console.Error.WriteLine("Usage: Host java-interop <absolute JVM library path>");
             return 2;
         }
-        // Own the host VM independently of the candidate. Candidates only borrow it.
+        // Own the host VM independently; Loader only borrows it.
         nint library = NativeLibrary.Load(args[1]);
         var create = (delegate* unmanaged<nint*, nint*, VmArguments*, int>)NativeLibrary.GetExport(library, "JNI_CreateJavaVM");
         nint checkedJni = Marshal.StringToHGlobalAnsi("-Xcheck:jni");
@@ -36,7 +36,7 @@ internal static unsafe class Host
         try
         {
             MelonLoader.Android.AndroidJava.Initialize(vm);
-            Suites.Run(args[0], vm, env, Console.WriteLine);
+            Suites.Run(Console.WriteLine);
             return 0;
         }
         catch (Exception exception)

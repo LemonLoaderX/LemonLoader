@@ -6,7 +6,7 @@ namespace LemonLoader.Tests.JniHost;
 
 public static class Suites
 {
-    public static void Run(string candidate, nint vm, nint env, Action<string> log)
+    public static void Run(Action<string> log)
     {
         using var thread = AndroidJava.AttachCurrentThread();
         Hardening.Run(log);

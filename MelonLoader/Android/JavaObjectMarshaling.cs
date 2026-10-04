@@ -21,16 +21,16 @@ internal static class JavaObjectMarshaling
         finally { JniObjectReference.Dispose(ref reference); }
     }
 
-    internal sealed class CallbackArguments : IDisposable
+    internal ref struct CallbackArguments
     {
-        private readonly List<IJavaPeerable> owned = new();
+        private List<IJavaPeerable>? owned;
         internal object?[] Values { get; }
 
         internal CallbackArguments(JniObjectReference arguments, Type[] parameterTypes)
         {
             if (!arguments.IsValid || JniEnvironment.Arrays.GetArrayLength(arguments) != parameterTypes.Length)
                 throw new ArgumentException("Java callback argument count differs.");
-            Values = new object?[parameterTypes.Length];
+            Values = parameterTypes.Length == 0 ? Array.Empty<object?>() : new object?[parameterTypes.Length];
             try
             {
                 for (int i = 0; i < Values.Length; i++)
@@ -71,12 +71,13 @@ internal static class JavaObjectMarshaling
             var manager = AndroidJava.Runtime.ValueManager;
             object? value = manager.CreateValue(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type);
             if (value == null) throw new InvalidCastException("Java callback argument cannot be represented as " + type.FullName + ".");
-            if (value is IJavaPeerable peer) owned.Add(peer);
+            if (value is IJavaPeerable peer) (owned ??= new List<IJavaPeerable>()).Add(peer);
             return value;
         }
 
         public void Dispose()
         {
+            if (owned == null) return;
             Exception? failure = null;
             for (int i = owned.Count - 1; i >= 0; i--)
             {
@@ -84,6 +85,7 @@ internal static class JavaObjectMarshaling
                 catch (Exception exception) { failure ??= exception; }
             }
             owned.Clear();
+            owned = null;
             if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
         }
     }

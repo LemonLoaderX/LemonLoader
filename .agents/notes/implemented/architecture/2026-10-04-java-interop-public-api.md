@@ -52,7 +52,8 @@ while running work retains its registration until it returns. Compiled delegate
 invocation preserves managed exception stacks without DynamicInvoke unwrapping.
 
 Managed callback object arrays are converted recursively with independently owned,
-unregistered peers. A per-invocation owner list releases all created peers, including
+unregistered peers. A stack-scoped argument owner allocates its peer list only when
+needed and releases all created peers, including
 partial conversions. Upstream array element GetValue may reuse a caller's wrapper,
 so recursively disposing upstream-converted arrays would invalidate unrelated peers.
 Object arguments resolve their runtime mapping before scoped conversion. Array peer

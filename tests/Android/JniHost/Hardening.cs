@@ -209,6 +209,19 @@ internal static class Hardening
         catch (ArgumentException) { }
         var toString = JavaBinding.BindStatic<Func<object[], string>>("java/util/Arrays", "toString");
         if (toString(new object[] { 42, "value" }) != "[42, value]") throw new Exception("Object descriptor mapping failed.");
+        var bindings = new Func<int, int>[8];
+        Parallel.For(0, bindings.Length, i => bindings[i] = JavaBinding.BindStatic<Func<int, int>>("java/lang/Integer", "bitCount"));
+        if (bindings.Any(value => !ReferenceEquals(value, bindings[0])) || bindings[0](7) != 3)
+            throw new Exception("Concurrent binding returned different delegates.");
+        for (int i = 0; i < 2; i++)
+        {
+            try { JavaBinding.BindStatic<Action>("java/lang/System", "missingLoaderFixture"); throw new Exception("Missing method accepted."); }
+            catch (JavaException exception)
+            {
+                if (!exception.PeerReference.IsValid) throw new Exception("Disposed Java binding exception replayed.");
+                exception.Dispose();
+            }
+        }
         log("PASS shared descriptor/name validation");
     }
 

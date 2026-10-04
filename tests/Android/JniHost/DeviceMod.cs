@@ -14,7 +14,7 @@ public sealed class DeviceMod : MelonMod
     {
         try
         {
-            Suites.Run("java-interop", 0, 0, LoggerInstance.Msg);
+            Suites.Run(LoggerInstance.Msg);
             using var asset = APKAssetManager.GetAssetStream("LemonLoader/payload.json");
             if (asset == null || asset.ReadByte() < 0) throw new Exception("Payload unreadable.");
             asset.Seek(0, SeekOrigin.Begin);
