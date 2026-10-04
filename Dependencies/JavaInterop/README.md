@@ -8,9 +8,12 @@ to product build scripts for an explicit checkout.
 This project compiles upstream managed files and runs its JNI environment
 generator. It targets net10.0, uses direct function-table calls, and produces no
 native shim or helper JAR/DEX. Loader hosts an externally owned JavaVM and disables
-managed-peer registration; its own small adapter owns exceptions and references.
+upstream generated-managed-subclass registration. Loader supplies a weak peer
+registry, finalizer/thread hosting and standard JavaException conversion.
 Release builds suppress debug data and stage the upstream MIT license.
 
 The Android workload build and peer generators are unnecessary for this hosting
-model. No upstream source or binary is rewritten by this build. Java.Interop is
-an internal product dependency; Mods use MelonLoader.Java.
+model. No upstream source or binary is rewritten by this build. Mods reference
+this single product-supplied Java.Interop assembly and use its standard peer model;
+MelonLoader.Android adds typed calls, platform peers and an independent embedded
+callback helper. See [Java access](../../docs/android/JNI.md).
