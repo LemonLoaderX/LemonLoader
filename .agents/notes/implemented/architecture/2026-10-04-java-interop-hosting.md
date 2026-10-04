@@ -14,6 +14,8 @@ Compile pinned dotnet/android Java.Interop files with their upstream JNI generat
 Use direct function-table calls, borrow the existing VM, and disable managed-peer
 registration before initialization. This dependency introduces no helper JAR/DEX
 or native shim. Product dependencies never rewrite upstream source or binaries.
+Java.Interop is supplied once with the Loader assemblies; support-module builds
+exclude its transitive copy. Its source documentation stays outside runtime inputs.
 
 MelonLoader.Java remains the Mod interface. Ordinary errors immediately throw
 JThrowableException after clearing Java state. Its class, summary and Android

@@ -45,4 +45,10 @@
         <PackageReference Include="MonoMod.Utils" Version="$(MonoModVersion)" ExcludeAssets="Runtime" />
         <PackageReference Include="Samboy063.Tomlet" Version="$(TomletVersion)" ExcludeAssets="Runtime" />
     </ItemGroup>
+    <Target Name="UseLoaderJavaInterop" BeforeTargets="_CopyFilesMarkedCopyLocal" Condition="'$(RuntimeIdentifier)' == 'linux-bionic-arm64'">
+        <ItemGroup>
+            <ReferenceCopyLocalPaths Remove="@(ReferenceCopyLocalPaths)" Condition="'%(Filename)' == 'Java.Interop'" />
+        </ItemGroup>
+        <Delete Files="$(TargetDir)Java.Interop.dll;$(TargetDir)Java.Interop.xml" />
+    </Target>
 </Project>

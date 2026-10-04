@@ -269,6 +269,7 @@ foreach ($relativeProject in $projects) {
 
 $interopBin = Join-Path $Il2CppInteropSourceRoot "bin"
 $managedOutput = Join-Path $outputDirectory "MelonLoader\net6"
+Remove-Item -LiteralPath (Join-Path $managedOutput 'Java.Interop.xml') -Force -ErrorAction SilentlyContinue
 $monoModOutput = Join-Path $repositoryRoot `
     "Output\Dependencies\MonoMod\$($dependencies.AndroidMonoModVersion)"
 foreach ($monoModAssembly in @("MonoMod.RuntimeDetour.dll", "MonoMod.Utils.dll")) {
