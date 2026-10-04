@@ -2,18 +2,30 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>Java.Interop</AssemblyName>
+    <Version>1.0.0</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS8981;CS1591</NoWarn>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(JavaInteropSource)/src/Java.Interop/**/*.cs"
              Exclude="$(JavaInteropSource)/src/Java.Interop/obj/**;$(JavaInteropSource)/src/Java.Interop/bin/**;$(JavaInteropSource)/src/Java.Interop/Java.Interop/JniLocationException.cs" />
     <ProjectReference Include="JniEnvironmentGenerator.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
+  <Target Name="ValidateSource" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(JavaInteropSource)/src/Java.Interop/Java.Interop/JniRuntime.cs')" Text="Run scripts/setup-android-dependencies.ps1 to prepare Java.Interop source." />
+  </Target>
+  <Target Name="VerifySourceRevision" BeforeTargets="PrepareForBuild">
+    <Exec Command="git -C &quot;$(JavaInteropSourceRoot)&quot; rev-parse HEAD" ConsoleToMSBuild="true" StandardOutputImportance="low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="ActualJavaInteropRevision" />
+    </Exec>
+    <Error Condition="'$(ActualJavaInteropRevision)' != '$(JavaInteropRevision)'" Text="Java.Interop source does not match the product pin." />
+  </Target>
   <Target Name="GenerateEnvironment" BeforeTargets="CoreCompile">
-    <Error Condition="!Exists('$(JavaInteropSource)/src/Java.Interop/Java.Interop/JniRuntime.cs')" Text="Set JavaInteropSource to dotnet/android external/Java.Interop." />
     <MakeDir Directories="$(IntermediateOutputPath)" />
     <Exec Command="dotnet &quot;$(MSBuildThisFileDirectory)bin/JniEnvironmentGenerator/$(Configuration)/net10.0/JniEnvironmentGenerator.dll&quot; &quot;$(IntermediateOutputPath)JniEnvironment.g.cs&quot; &quot;$(IntermediateOutputPath)jni.c&quot;" />
     <ItemGroup><Compile Include="$(IntermediateOutputPath)JniEnvironment.g.cs" /></ItemGroup>

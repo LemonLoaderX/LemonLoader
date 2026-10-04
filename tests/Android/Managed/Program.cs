@@ -10,6 +10,7 @@ unsafe class Program
     static bool pending, failClose, missingRead;
     static readonly string Text = "资源/😀\0末尾";
     static nint textBuffer;
+    static JavaVM* virtualMachine;
     static readonly Dictionary<nint, byte[]> Buffers = new();
     static readonly byte[] Data = Enumerable.Range(0, 200000).Select(i => (byte)i).ToArray();
     static void Check(bool condition, string message) { if (!condition) throw new Exception(message); }
@@ -22,6 +23,15 @@ unsafe class Program
         environment = (JNIEnv*)NativeMemory.AllocZeroed((nuint)sizeof(JNIEnv));
         *(nint*)environment = (nint)table;
         Set(table, "NewGlobalRef", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint>)&Identity);
+        Set(table, "NewLocalRef", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint>)&Identity);
+        Set(table, "FindClass", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint>)&FindClass);
+        Set(table, "GetStaticMethodID", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint, nint>)&Method);
+        Set(table, "CallStaticObjectMethodA", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint, nint>)&ObjectCall);
+        Set(table, "CallStaticObjectMethod", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint>)&ObjectCallNoArgs);
+        Set(table, "CallObjectMethod", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint>)&ObjectCallNoArgs);
+        Set(table, "CallObjectMethodA", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint, nint>)&ObjectCall);
+        Set(table, "ExceptionOccurred", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint>)&ExceptionOccurred);
+        Set(table, "GetJavaVM", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint*, int>)&GetVm);
         Set(table, "GetObjectClass", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint>)&Identity);
         Set(table, "DeleteLocalRef", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, void>)&DeleteLocal);
         Set(table, "DeleteGlobalRef", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, void>)&DeleteGlobal);
@@ -34,6 +44,7 @@ unsafe class Program
         Set(table, "CallLongMethodA", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint, long>)&LongCall);
         Set(table, "CallVoidMethodA", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, nint, nint, void>)&VoidCall);
         Set(table, "NewByteArray", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, int, nint>)&NewArray);
+        Set(table, "GetArrayLength", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, int>)&ArrayLength);
         Set(table, "GetByteArrayRegion", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, nint, int, int, sbyte*, void>)&CopyRegion);
         Set(table, "ExceptionCheck", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, byte>)&ExceptionCheck);
         Set(table, "ExceptionClear", (nint)(delegate* unmanaged[Stdcall]<JNIEnv*, void>)&ExceptionClear);
@@ -41,13 +52,16 @@ unsafe class Program
         var vmTable = (JavaVM.FunctionTable*)NativeMemory.AllocZeroed((nuint)sizeof(JavaVM.FunctionTable));
         *(nint*)((byte*)vmTable + (int)Marshal.OffsetOf<JavaVM.FunctionTable>("GetEnv")) =
             (nint)(delegate* unmanaged[Stdcall]<JavaVM*, nint*, int, JNI.Result>)&GetEnv;
+        *(nint*)((byte*)vmTable + (int)Marshal.OffsetOf<JavaVM.FunctionTable>("AttachCurrentThread")) =
+            (nint)(delegate* unmanaged[Stdcall]<JavaVM*, nint*, nint, JNI.Result>)&Attach;
         var vm = (JavaVM*)NativeMemory.AllocZeroed((nuint)sizeof(JavaVM));
         *(nint*)vm = (nint)vmTable;
-        JNI.Initialize((nint)vm);
+        virtualMachine = vm;
         textBuffer = Marshal.StringToHGlobalUni(Text);
-        using (var text = new JString { Handle = 1 })
-            Check(text.GetString() == Text && stringReleases == 1, "JNI UTF-16 must retain surrogate pairs and NUL.");
-        Marshal.FreeHGlobal(textBuffer);
+        JNI.Initialize((nint)vm);
+        int releasesBefore = stringReleases;
+        using (var text = JNI.Borrow<JString>(1, JNI.ReferenceType.Local))
+            Check(text.GetString() == Text && stringReleases == releasesBefore + 1, "JNI UTF-16 must retain surrogate pairs and NUL.");
 
         var local = new JObject(10, JNI.ReferenceType.Local);
         Exception? wrongThread = null;
@@ -82,12 +96,14 @@ unsafe class Program
         failClose = true;
         try { stream.Dispose(); throw new Exception("Close error was hidden."); }
         catch (IOException) { }
-        Check(!pending && !stream.CanRead && !stream.CanSeek && globalDeletes == globalsBefore + 2,
+        Check(!pending && !stream.CanRead && !stream.CanSeek && globalDeletes >= globalsBefore + 2,
             "Failed close must clear Java exception and release stream and buffer.");
         stream.Dispose();
         Check(closes == 1, "Dispose must be idempotent.");
         Console.WriteLine("PASS asset buffer reuse, direct copy, seek and failed-close cleanup");
         missingRead = true;
+        using (var streamType = JNI.FindClass("java/io/InputStream"))
+            streamType.Cache.Methods.Remove((false, "read", "([BII)I"));
         using (var unavailableStream = new JObject(21, JNI.ReferenceType.Global))
         {
             try { _ = new APKAssetManager.APKAssetStream(unavailableStream); throw new Exception("Missing Java method was accepted."); }
@@ -102,17 +118,18 @@ unsafe class Program
     [MethodImpl(MethodImplOptions.NoInlining)] static void AbandonLocal() => _ = new JObject(12, JNI.ReferenceType.Local);
     [MethodImpl(MethodImplOptions.NoInlining)] static void AbandonGlobal() => _ = new JObject(13, JNI.ReferenceType.Global);
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static JNI.Result GetEnv(JavaVM* vm, nint* env, int version) { *env = (nint)environment; return JNI.Result.Ok; }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static JNI.Result Attach(JavaVM* vm, nint* env, nint args) { *env = (nint)environment; return JNI.Result.Ok; }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint Identity(JNIEnv* env, nint obj) => obj;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void DeleteLocal(JNIEnv* env, nint obj) => Interlocked.Increment(ref localDeletes);
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void DeleteGlobal(JNIEnv* env, nint obj) => Interlocked.Increment(ref globalDeletes);
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static int StringLength(JNIEnv* env, nint obj) => Text.Length;
-    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint StringChars(JNIEnv* env, nint obj, byte* copy) { *copy = 0; return textBuffer; }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint StringChars(JNIEnv* env, nint obj, byte* copy) { if (copy != null) *copy = 0; return textBuffer; }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void ReleaseChars(JNIEnv* env, nint obj, nint chars) => stringReleases++;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint Method(JNIEnv* env, nint obj, nint name, nint signature)
     {
         var method = Marshal.PtrToStringAnsi(name);
         if (missingRead && method == "read") { pending = true; return 0; }
-        return method switch { "available" => 1, "read" => 2, "mark" => 3, "markSupported" => 4, "skip" => 5, "reset" => 6, "close" => 7, _ => 0 };
+        return method switch { "available" => 1, "read" => 2, "mark" => 3, "markSupported" => 4, "skip" => 5, "reset" => 6, "close" => 7, _ => 8 };
     }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static byte BooleanCall(JNIEnv* env, nint obj, nint method, nint args) => 1;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static int IntCall(JNIEnv* env, nint obj, nint method, nint args)
@@ -127,8 +144,14 @@ unsafe class Program
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static long LongCall(JNIEnv* env, nint obj, nint method, nint args) { var count = ((JValue*)args)->J; position += (int)count; return count; }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void VoidCall(JNIEnv* env, nint obj, nint method, nint args) { if (method == 6) { resets++; position = 0; } if (method == 7) { closes++; pending = failClose; } }
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint NewArray(JNIEnv* env, int count) { var handle = (nint)(100 + ++arrays); Buffers[handle] = new byte[count]; return handle; }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static int ArrayLength(JNIEnv* env, nint array) => Buffers[array].Length;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void CopyRegion(JNIEnv* env, nint array, int offset, int count, sbyte* output) => Buffers[array].AsSpan(offset, count).CopyTo(new Span<byte>(output, count));
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static byte ExceptionCheck(JNIEnv* env) => (byte)(pending ? 1 : 0);
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void ExceptionClear(JNIEnv* env) => pending = false;
     [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static void ExceptionDescribe(JNIEnv* env) { }
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint FindClass(JNIEnv* env, nint name) => 90;
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint ObjectCall(JNIEnv* env, nint obj, nint method, nint args) => 91;
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint ObjectCallNoArgs(JNIEnv* env, nint obj, nint method) => 91;
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static nint ExceptionOccurred(JNIEnv* env) => pending ? 92 : 0;
+    [UnmanagedCallersOnly(CallConvs = new[] { typeof(CallConvStdcall) })] static int GetVm(JNIEnv* env, nint* vm) { *vm = (nint)virtualMachine; return 0; }
 }

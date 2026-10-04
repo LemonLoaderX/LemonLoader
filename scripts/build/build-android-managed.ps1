@@ -10,6 +10,7 @@ param(
     [string]$MonoModSourceRoot,
 
     [string]$HarmonyXSourceRoot,
+    [string]$JavaInteropSourceRoot,
     [switch]$AllowDirtyDependencies
 )
 
@@ -30,6 +31,17 @@ $outputDirectory = Join-Path $repositoryRoot "Output\$Configuration\linux-bionic
 $debugType = if ($Configuration -eq "Release") { "None" } else { "Embedded" }
 $debugSymbols = if ($Configuration -eq "Release") { "false" } else { "true" }
 $loaderPathMap = "$repositoryRoot=/_/LemonLoader"
+
+if (!$JavaInteropSourceRoot) {
+    $JavaInteropSourceRoot = Get-PinnedSourceRoot -Name DotnetAndroid `
+        -Revision $dependencies.JavaInteropRevision -RepositoryRoot $repositoryRoot
+}
+Assert-AndroidSourceCheckout -Path $JavaInteropSourceRoot -Revision $dependencies.JavaInteropRevision -AllowUntracked
+dotnet build (Join-Path $repositoryRoot 'Dependencies/JavaInterop/Java.Interop.csproj') `
+    --configuration $Configuration --no-incremental "-p:JavaInteropSourceRoot=$JavaInteropSourceRoot" `
+    -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true `
+    "-p:PathMap=$JavaInteropSourceRoot=/_/dotnet-android"
+if ($LASTEXITCODE) { throw 'Building Java.Interop failed.' }
 
 function Invoke-AndroidMonoModBuild {
     param([string]$SourceRoot)
@@ -243,6 +255,7 @@ foreach ($relativeProject in $projects) {
         -p:ForceRID=linux-bionic-arm64 `
         -p:AndroidNdkRoot="$AndroidNdkRoot" `
         -p:Il2CppInteropSourceRoot="$Il2CppInteropSourceRoot" `
+        "-p:JavaInteropSourceRoot=$JavaInteropSourceRoot" `
         -p:MLOutDir="$outputDirectory" `
         "-p:DebugType=$debugType" `
         "-p:DebugSymbols=$debugSymbols" `

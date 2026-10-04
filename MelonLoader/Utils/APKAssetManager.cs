@@ -9,6 +9,7 @@ namespace MelonLoader.Utils;
 public static class APKAssetManager
 {
     private static JObject assetManager = null!;
+    private static JMethodID openMethod, listMethod;
 
     public static void Initialize()
     {
@@ -62,9 +63,15 @@ public static class APKAssetManager
 
     public static Stream? GetAssetStream(string path)
     {
-        using JString pathString = JNI.NewString(path);
-        using JClass assetManagerClass = JNI.GetObjectClass(assetManager);
-        JObject asset = JNI.CallObjectMethod<JObject>(assetManager, JNI.GetMethodID(assetManagerClass, "open", "(Ljava/lang/String;)Ljava/io/InputStream;"), new JValue(pathString));
+        using JString pathString = JNI.NewStringLocal(path);
+        JObject asset;
+        try
+        {
+            asset = JNI.CallObjectMethod<JObject>(assetManager, openMethod, new JValue(pathString));
+        }
+        catch (JThrowableException exception) when (exception.JavaClassName == "java.io.FileNotFoundException")
+        { return null; }
+        catch (JThrowableException exception) { throw new IOException("Android asset open failed: " + path, exception); }
         if (asset == null || !asset.Valid())
         {
             ClearException();
@@ -79,9 +86,8 @@ public static class APKAssetManager
 
     public static string[] GetDirectoryContents(string directory)
     {
-        using JString pathString = JNI.NewString(directory);
-        using JClass assetManagerClass = JNI.GetObjectClass(assetManager);
-        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, JNI.GetMethodID(assetManagerClass, "list", "(Ljava/lang/String;)[Ljava/lang/String;"), new JValue(pathString));
+        using JString pathString = JNI.NewStringLocal(directory);
+        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, listMethod, new JValue(pathString));
         if (!assets.Valid())
         {
             ClearException();
@@ -89,7 +95,7 @@ public static class APKAssetManager
         }
 
         string[] cleanAssets = new string[assets.Length];
-        for (int i = 0; i < assets.Length; i++)
+        for (int i = 0; i < cleanAssets.Length; i++)
         {
             using JString asset = assets[i];
             cleanAssets[i] = asset.GetString();
@@ -105,9 +111,8 @@ public static class APKAssetManager
         int separatorIndex = path.LastIndexOf('/');
         string containingDir = separatorIndex >= 0 ? path[..separatorIndex] : string.Empty;
         string fileName = separatorIndex >= 0 ? path[(separatorIndex + 1)..] : path;
-        using JString pathString = JNI.NewString(containingDir);
-        using JClass assetManagerClass = JNI.GetObjectClass(assetManager);
-        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, JNI.GetMethodID(assetManagerClass, "list", "(Ljava/lang/String;)[Ljava/lang/String;"), new JValue(pathString));
+        using JString pathString = JNI.NewStringLocal(containingDir);
+        using JObjectArray<JString> assets = JNI.CallObjectMethod<JObjectArray<JString>>(assetManager, listMethod, new JValue(pathString));
         if (!assets.Valid())
         {
             ClearException();
@@ -115,7 +120,8 @@ public static class APKAssetManager
         }
 
         bool exists = false;
-        for (int i = 0; i < assets.Length; i++)
+        int length = assets.Length;
+        for (int i = 0; i < length; i++)
         {
             using JString asset = assets[i];
             if (!string.Equals(fileName, asset.GetString(), StringComparison.Ordinal))
@@ -150,7 +156,9 @@ public static class APKAssetManager
     {
         ThrowIfException();
         if (!type.Valid()) throw new IOException($"Android class is unavailable while resolving {name}{signature}.");
-        var method = JNI.GetMethodID(type, name, signature);
+        JMethodID method;
+        try { method = JNI.GetMethodID(type, name, signature); }
+        catch (JThrowableException exception) { throw new IOException($"Required Android method is unavailable: {name}{signature}.", exception); }
         if (JNI.ExceptionCheck() || method.Handle == IntPtr.Zero)
         {
             ClearException();
@@ -168,12 +176,18 @@ public static class APKAssetManager
         JFieldID activityFieldId = JNI.GetStaticFieldID(unityClass, "currentActivity", "Landroid/app/Activity;");
         using JObject currentActivityObj = JNI.GetStaticObjectField<JObject>(unityClass, activityFieldId);
         using JClass activityClass = JNI.GetObjectClass(currentActivityObj);
+        using JObject loader = JNI.CallObjectMethod<JObject>(currentActivityObj,
+            activityClass.GetMethodID("getClassLoader", "()Ljava/lang/ClassLoader;"));
+        JNI.SetApplicationClassLoader(loader);
         JObject assetManagerObj = JNI.CallObjectMethod<JObject>(currentActivityObj, JNI.GetMethodID(activityClass, "getAssets", "()Landroid/content/res/AssetManager;"));
 
         ThrowIfException();
         if (!assetManagerObj.Valid())
             throw new InvalidOperationException("Android AssetManager was not available.");
 
+        using var managerClass = JNI.FindClass("android/content/res/AssetManager");
+        openMethod = managerClass.GetMethodID("open", "(Ljava/lang/String;)Ljava/io/InputStream;");
+        listMethod = managerClass.GetMethodID("list", "(Ljava/lang/String;)[Ljava/lang/String;");
         assetManager = assetManagerObj;
     }
 
@@ -200,7 +214,7 @@ public static class APKAssetManager
         {
             _streamObject = obj;
 
-            using JClass streamClass = JNI.GetObjectClass(_streamObject);
+            using JClass streamClass = JNI.FindClass("java/io/InputStream");
 
             _availableJmid = RequiredMethod(streamClass, "available", "()I");
             _readJmid = RequiredMethod(streamClass, "read", "([BII)I");
@@ -236,6 +250,12 @@ public static class APKAssetManager
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            try { return ReadCore(buffer, offset, count); }
+            catch (JThrowableException exception) { throw new IOException("Android asset read failed.", exception); }
+        }
+
+        private int ReadCore(byte[] buffer, int offset, int count)
+        {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(APKAssetStream));
             if (buffer == null)
@@ -259,12 +279,13 @@ public static class APKAssetManager
                 _readBufferCapacity = requested;
             }
 
-            int read = JNI.CallMethod<int>(
-                _streamObject,
-                _readJmid,
+            Span<JValue> arguments = stackalloc JValue[]
+            {
                 new JValue(_readBuffer!),
                 new JValue(0),
-                new JValue(requested));
+                new JValue(requested)
+            };
+            int read = JNI.CallMethod<int>(_streamObject, _readJmid, arguments);
             ThrowIfException();
 
             if (read == -1)
@@ -281,6 +302,12 @@ public static class APKAssetManager
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
         public override long Seek(long offset, SeekOrigin origin)
+        {
+            try { return SeekCore(offset, origin); }
+            catch (JThrowableException exception) { throw new IOException("Android asset seek failed.", exception); }
+        }
+
+        private long SeekCore(long offset, SeekOrigin origin)
         {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(APKAssetStream));
@@ -339,6 +366,7 @@ public static class APKAssetManager
                         JNI.CallVoidMethod(_streamObject, _closeJmid);
                         ThrowIfException();
                     }
+                    catch (JThrowableException exception) { throw new IOException("Android asset close failed.", exception); }
                     finally
                     {
                         try { _streamObject.Dispose(); }

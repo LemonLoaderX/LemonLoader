@@ -8,6 +8,10 @@
         <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
         <DebugType>embedded</DebugType>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'linux-bionic-arm64'">
+        <OutputPath>$(MLOutDir)/MelonLoader/net6</OutputPath>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
 
     <ItemGroup>
         <ProjectReference Include="$(SolutionDir)\MelonLoader\MelonLoader.csproj" />

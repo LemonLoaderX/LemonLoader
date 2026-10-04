@@ -2,6 +2,8 @@
   <PropertyGroup>
     <AndroidNdkRevision>27.3.13750724</AndroidNdkRevision>
     <AndroidApiLevel>26</AndroidApiLevel>
+    <JavaInteropRevision>5b9effb3e32df58a91257f7f92aa595679862a33</JavaInteropRevision>
+    <JavaInteropRepositoryUrl>https://github.com/dotnet/android.git</JavaInteropRepositoryUrl>
 
     <AndroidDobbyRevision>be22f55a2adab028bb2d3264589df1cb3f1aea9f</AndroidDobbyRevision>
     <AndroidDobbyRepositoryUrl>https://github.com/LemonLoaderX/Dobby.git</AndroidDobbyRepositoryUrl>

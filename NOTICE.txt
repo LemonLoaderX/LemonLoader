@@ -7,6 +7,9 @@ developed by Lava Gang and licensed under Apache-2.0.
 LemonLoader Android port
 Copyright 2026 Jitsu
 
+This product includes Java.Interop from dotnet/android, licensed under MIT.
+Copyright (c) .NET Foundation Contributors. See licenses/Java.Interop/LICENSE.
+
 This product includes plthook (https://github.com/kubo/plthook):
 
 Copyright 2013-2024 Kubo Takehiro <kubo@jiubao.org>

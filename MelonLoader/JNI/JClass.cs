@@ -1,148 +1,89 @@
-﻿#if ANDROID
+#if ANDROID
+#nullable enable
+using System;
 using System.Collections.Generic;
 
 namespace MelonLoader.Java;
 
+/// <summary>A Java class with separate, synchronized instance and static member caches.</summary>
 public class JClass : JObject
 {
-    private Dictionary<(string, string), JFieldID> FieldCache { get; set; } = new();
-
-    private Dictionary<(string, string), JMethodID> MethodCache { get; set; } = new();
-
-    public JClass() : base() { }
-
-    public JFieldID GetFieldID(string name, string sig)
+    internal sealed class Members
     {
-        (string, string) key = new(name, sig);
-
-        if (this.FieldCache.TryGetValue(key, out JFieldID found))
+        internal readonly Dictionary<(bool Static, string Name, string Signature), JMethodID> Methods = new();
+        internal readonly Dictionary<(bool Static, string Name, string Signature), JFieldID> Fields = new();
+    }
+    private Members? cache;
+    internal Members Cache
+    {
+        get
         {
-            return found;
+            if (cache == null) System.Threading.Interlocked.CompareExchange(ref cache, new Members(), null);
+            return cache;
         }
-        else
+        set => cache = value;
+    }
+
+    private JMethodID Method(string name, string signature, bool isStatic)
+    {
+        ValidateAccess();
+        lock (Cache)
         {
-            JFieldID id = JNI.GetFieldID(this, name, sig);
-            this.FieldCache.Add(key, id);
+            var key = (isStatic, name, signature);
+            if (!Cache.Methods.TryGetValue(key, out var id))
+            {
+                id = JNI.ResolveMethod(this, name, signature, isStatic);
+                Cache.Methods.Add(key, id);
+            }
             return id;
         }
     }
 
-    public JFieldID GetStaticFieldID(string name, string sig)
+    private JFieldID Field(string name, string signature, bool isStatic)
     {
-        (string, string) key = new(name, sig);
-
-        if (this.FieldCache.TryGetValue(key, out JFieldID found))
+        ValidateAccess();
+        lock (Cache)
         {
-            return found;
-        }
-        else
-        {
-            JFieldID id = JNI.GetStaticFieldID(this, name, sig);
-            this.FieldCache.Add(key, id);
+            var key = (isStatic, name, signature);
+            if (!Cache.Fields.TryGetValue(key, out var id))
+            {
+                id = JNI.ResolveField(this, name, signature, isStatic);
+                Cache.Fields.Add(key, id);
+            }
             return id;
         }
     }
 
-    public JMethodID GetMethodID(string name, string sig)
-    {
-        (string, string) key = new(name, sig);
+    public JMethodID GetMethodID(string name, string signature) => Method(name, signature, false);
+    public JMethodID GetStaticMethodID(string name, string signature) => Method(name, signature, true);
+    public JFieldID GetFieldID(string name, string signature) => Field(name, signature, false);
+    public JFieldID GetStaticFieldID(string name, string signature) => Field(name, signature, true);
 
-        if (this.MethodCache.TryGetValue(key, out JMethodID found))
-        {
-            return found;
-        }
-        else
-        {
-            JMethodID id = JNI.GetMethodID(this, name, sig);
-            this.MethodCache.Add(key, id);
-            return id;
-        }
-    }
+    public T GetStaticObjectField<T>(string name, string signature) where T : JObject, new() =>
+        JNI.GetStaticObjectField<T>(this, GetStaticFieldID(name, signature));
+    public T GetStaticField<T>(string name) => JNI.GetStaticField<T>(this, GetStaticFieldID(name, JNI.GetTypeSignature<T>()));
+    public void SetStaticField<T>(string name, T value) => JNI.SetStaticField(this, GetStaticFieldID(name, JNI.GetTypeSignature<T>()), value);
+    public T GetObjectField<T>(JObject instance, string name, string signature) where T : JObject, new() =>
+        JNI.GetObjectField<T>(instance, GetFieldID(name, signature));
+    public T GetField<T>(JObject instance, string name) => JNI.GetField<T>(instance, GetFieldID(name, JNI.GetTypeSignature<T>()));
+    public void SetObjectField(JObject instance, string name, string signature, JObject value) => JNI.SetObjectField(instance, GetFieldID(name, signature), value);
+    public void SetField<T>(JObject instance, string name, T value) => JNI.SetField(instance, GetFieldID(name, JNI.GetTypeSignature<T>()), value);
 
-    public JMethodID GetStaticMethodID(string name, string sig)
-    {
-        (string, string) key = new(name, sig);
-
-        if (this.MethodCache.TryGetValue(key, out JMethodID found))
-        {
-            return found;
-        }
-        else
-        {
-            JMethodID id = JNI.GetStaticMethodID(this, name, sig);
-            this.MethodCache.Add(key, id);
-            return id;
-        }
-    }
-
-    public T GetStaticObjectField<T>(string name, string sig) where T : JObject, new()
-    {
-        return JNI.GetStaticObjectField<T>(this, this.GetStaticFieldID(name, sig));
-    }
-
-    public T GetStaticField<T>(string name)
-    {
-        return JNI.GetStaticField<T>(this, this.GetStaticFieldID(name, JNI.GetTypeSignature<T>()));
-    }
-
-    public void SetStaticField<T>(string name, T value)
-    {
-        JNI.SetStaticField<T>(this, this.GetStaticFieldID(name, JNI.GetTypeSignature<T>()), value);
-    }
-
-    public T GetObjectField<T>(JObject obj, string name, string sig) where T : JObject, new()
-    {
-        return JNI.GetObjectField<T>(obj, this.GetFieldID(name, sig));
-    }
-
-    public T GetField<T>(JObject obj, string name)
-    {
-        return JNI.GetField<T>(obj, this.GetFieldID(name, JNI.GetTypeSignature<T>()));
-    }
-
-    public void SetObjectField(JObject obj, string name, string sig, JObject value)
-    {
-        JNI.SetObjectField(obj, this.GetFieldID(name, sig), value);
-    }
-
-    public void SetField<T>(JObject obj, string name, T value)
-    {
-        JNI.SetField<T>(obj, this.GetFieldID(name, JNI.GetTypeSignature<T>()), value);
-    }
-
-    public T CallStaticObjectMethod<T>(string name, string sig, params JValue[] args) where T : JObject, new()
-    {
-        return JNI.CallStaticObjectMethod<T>(this, this.GetStaticMethodID(name, sig), args);
-    }
-
-    public T CallStaticMethod<T>(string name, string sig, params JValue[] args)
-    {
-        return JNI.CallStaticMethod<T>(this, this.GetStaticMethodID(name, sig), args);
-    }
-
-    public void CallStaticVoidMethod(string name, string sig, params JValue[] args)
-    {
-        JNI.CallStaticVoidMethod(this, this.GetStaticMethodID(name, sig), args);
-    }
-
-    public T CallObjectMethod<T>(JObject obj, string name, string sig, params JValue[] args) where T : JObject, new()
-    {
-        return JNI.CallObjectMethod<T>(obj, this.GetMethodID(name, sig), args);
-    }
-
-    public T CallMethod<T>(JObject obj, string name, string sig, params JValue[] args)
-    {
-        return JNI.CallMethod<T>(obj, this.GetMethodID(name, sig), args);
-    }
-
-    public void CallVoidMethod(JObject obj, string name, string sig, params JValue[] args)
-    {
-        JNI.CallVoidMethod(obj, this.GetMethodID(name, sig), args);
-    }
-
-    public T NewObject<T>(string name, string sig, params JValue[] args) where T : JObject, new()
-    {
-        return JNI.NewObject<T>(this, this.GetMethodID(name, sig), args);
-    }
+    public T CallStaticObjectMethod<T>(string name, string signature, params JValue[] args) where T : JObject, new() =>
+        JNI.CallStaticObjectMethod<T>(this, GetStaticMethodID(name, signature), args);
+    public T CallStaticMethod<T>(string name, string signature, params JValue[] args) =>
+        JNI.CallStaticMethod<T>(this, GetStaticMethodID(name, signature), args);
+    public void CallStaticVoidMethod(string name, string signature, params JValue[] args) =>
+        JNI.CallStaticVoidMethod(this, GetStaticMethodID(name, signature), args);
+    public T CallObjectMethod<T>(JObject instance, string name, string signature, params JValue[] args) where T : JObject, new() =>
+        JNI.CallObjectMethod<T>(instance, GetMethodID(name, signature), args);
+    public T CallMethod<T>(JObject instance, string name, string signature, params JValue[] args) =>
+        JNI.CallMethod<T>(instance, GetMethodID(name, signature), args);
+    public void CallVoidMethod(JObject instance, string name, string signature, params JValue[] args) =>
+        JNI.CallVoidMethod(instance, GetMethodID(name, signature), args);
+    public T NewObject<T>(string name, string signature, params JValue[] args) where T : JObject, new() =>
+        JNI.NewObject<T>(this, GetMethodID(name, signature), args);
+    public T NewObject<T>(string signature, params JValue[] args) where T : JObject, new() =>
+        JNI.NewObject<T>(this, GetMethodID("<init>", signature), args);
 }
 #endif

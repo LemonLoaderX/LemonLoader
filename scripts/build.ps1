@@ -8,6 +8,7 @@ param(
     [string]$Il2CppInteropSourceRoot,
     [string]$HarmonyXSourceRoot,
     [string]$MonoModSourceRoot,
+    [string]$JavaInteropSourceRoot,
     [Alias('AllowDirtyDependencies')][switch]$Development
 )
 
@@ -23,5 +24,6 @@ foreach ($profile in $profiles) {
         -AndroidNdkRoot $AndroidNdkRoot -CoreClrRuntimePackRoot $CoreClrRuntimePackRoot `
         -DobbySourceRoot $DobbySourceRoot -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `
         -HarmonyXSourceRoot $HarmonyXSourceRoot -MonoModSourceRoot $MonoModSourceRoot `
+        -JavaInteropSourceRoot $JavaInteropSourceRoot `
         -AllowDirtyDependencies:$Development
 }

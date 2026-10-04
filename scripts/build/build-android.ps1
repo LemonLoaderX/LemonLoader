@@ -14,6 +14,7 @@ param(
     [string]$MonoModSourceRoot,
 
     [string]$HarmonyXSourceRoot,
+    [string]$JavaInteropSourceRoot,
 
     [string]$DotnetRuntimeVersion,
 
@@ -55,6 +56,7 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `
     -MonoModSourceRoot $MonoModSourceRoot `
     -HarmonyXSourceRoot $HarmonyXSourceRoot `
+    -JavaInteropSourceRoot $JavaInteropSourceRoot `
     -AllowDirtyDependencies:$AllowDirtyDependencies
 
 & (Join-Path $PSScriptRoot "stage-android-package.ps1") `
@@ -68,6 +70,7 @@ if ([string]::IsNullOrWhiteSpace($AndroidNdkRoot)) {
     -Il2CppInteropSourceRoot $Il2CppInteropSourceRoot `
     -MonoModSourceRoot $MonoModSourceRoot `
     -HarmonyXSourceRoot $HarmonyXSourceRoot `
+    -JavaInteropSourceRoot $JavaInteropSourceRoot `
     -DevelopmentBuild:$AllowDirtyDependencies
 
 & (Join-Path $PSScriptRoot "publish-android-release.ps1") `

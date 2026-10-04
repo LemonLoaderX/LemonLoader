@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>JniMigrationProbe</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Suites.cs;DeviceMod.cs" />
+    <Reference Include="MelonLoader" HintPath="$(MelonLoaderAssemblyPath)" Private="false" />
+  </ItemGroup>
+</Project>

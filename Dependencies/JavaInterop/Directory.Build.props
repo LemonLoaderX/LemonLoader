@@ -1,0 +1,13 @@
+<Project>
+  <Import Project="../../eng/AndroidDependencies.props" />
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <BaseIntermediateOutputPath>obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin/$(MSBuildProjectName)/</BaseOutputPath>
+    <IsPackable>false</IsPackable>
+    <RuntimeIdentifier></RuntimeIdentifier>
+    <RuntimeIdentifiers></RuntimeIdentifiers>
+    <JavaInteropSourceRoot Condition="'$(JavaInteropSourceRoot)' == ''">$(MSBuildThisFileDirectory)../../.dependencies/DotnetAndroid/$(JavaInteropRevision)</JavaInteropSourceRoot>
+    <JavaInteropSource>$(JavaInteropSourceRoot)/external/Java.Interop</JavaInteropSource>
+  </PropertyGroup>
+</Project>

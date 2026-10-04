@@ -1,1465 +1,313 @@
-﻿#if ANDROID
-namespace MelonLoader.Java;
+#if ANDROID
 #nullable enable
-
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
+using Java.Interop;
 
-/// <summary>
-/// Represents the Java Native Interface
-/// </summary>
-public unsafe static partial class JNI
+namespace MelonLoader.Java;
+
+/// <summary>Checked JNI operations. Object results own global references unless marked Local.</summary>
+public static unsafe partial class JNI
 {
-    internal static JavaVM* VM;
-
-    [ThreadStatic]
-    internal static JNIEnv* env;
-
-    [ThreadStatic]
-    private static bool attachedByLemonLoader;
-
-    internal static JNIEnv* Env
+    internal static JniObjectReference Ref(JObject? value)
     {
-        get
-        {
-            if (env == null)
-            {
-                Initialize(IntPtr.Zero);
-            }
-
-            return env;
-        }
+        var reference = value?.Reference ?? default;
+        if (value?.ReferenceType == ReferenceType.WeakGlobal)
+            throw new InvalidOperationException("Promote weak globals with ToLocal or ToGlobal before use.");
+        EnsureThread();
+        return reference;
     }
 
-    internal static Dictionary<string, JClass> ClassCache { get; set; } = new();
-    internal static IntPtr lastVmPtr = IntPtr.Zero;
-
-    public static void Initialize(IntPtr vmPtr)
+    internal static T Wrap<T>(JniObjectReference reference) where T : JObject, new()
     {
-        if (vmPtr == IntPtr.Zero)
-            vmPtr = lastVmPtr;
-        if (vmPtr == IntPtr.Zero)
-            throw new InvalidOperationException("The Java VM has not been initialized.");
-
-        lastVmPtr = vmPtr;
-
-        unsafe
-        {
-            VM = (JavaVM*)vmPtr;
-
-            IntPtr envPtr = IntPtr.Zero;
-            Result res = VM->Functions->GetEnv(VM, out envPtr, (int)Version.V1_6);
-
-            if (res == Result.Ok && envPtr != IntPtr.Zero)
-            {
-                env = (JNIEnv*)envPtr;
-                return;
-            }
-
-            res = VM->Functions->AttachCurrentThread(VM, out JNIEnv* localEnv, IntPtr.Zero);
-            if (res != Result.Ok || localEnv == null)
-                throw new InvalidOperationException($"Attaching the current thread to the Java VM failed with status {res}.");
-
-            env = localEnv;
-            attachedByLemonLoader = true;
-        }
+        T value = new();
+        value.SetReference(reference, true);
+        return value;
     }
 
-    public static void DetachCurrentThread()
+    private static T Global<T>(JniObjectReference local) where T : JObject, new()
     {
-        if (!attachedByLemonLoader || VM == null)
-            return;
-
-        Result result = VM->Functions->DetachCurrentThread(VM);
-        if (result != Result.Ok)
-            throw new InvalidOperationException(
-                $"Detaching the current thread from the Java VM failed with status {result}.");
-
-        env = null;
-        attachedByLemonLoader = false;
+        CheckExceptionAndThrow();
+        if (!local.IsValid) return Wrap<T>(default);
+        try { return Wrap<T>(CopyGlobal(local)); }
+        finally { JniObjectReference.Dispose(ref local); }
     }
 
-    public static int GetVersion()
+    private static JniObjectReference CopyGlobal(JniObjectReference value)
     {
-        unsafe
-        {
-            return Env->Functions->GetVersion(Env);
-        }
+        CheckExceptionAndThrow();
+        var result = value.NewGlobalRef();
+        CheckExceptionAndThrow();
+        return result;
     }
 
-    public static JClass DefineClass(string name, JObject loader, sbyte[] bytes)
+    /// <summary>Borrow a native reference. Disposing the wrapper never deletes that reference.</summary>
+    public static T Borrow<T>(IntPtr handle, ReferenceType type) where T : JObject, new()
     {
-        unsafe
-        {
-            IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-            IntPtr res;
-            try
-            {
-                fixed (sbyte* bytesPtr = bytes)
-                    res = Env->Functions->DefineClass(
-                        Env,
-                        nameAnsi,
-                        loader.Handle,
-                        (IntPtr)bytesPtr,
-                        bytes.Length);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(nameAnsi);
-            }
+        EnsureThread();
+        T value = new();
+        value.SetReference(new JniObjectReference(handle, ToInteropType(type)), false);
+        return value;
+    }
 
-            using JClass local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JClass>(local);
-        }
+    /// <summary>Take ownership of a native reference. The caller must not delete or reuse it.</summary>
+    public static T Adopt<T>(IntPtr handle, ReferenceType type) where T : JObject, new()
+    {
+        EnsureThread();
+        var reference = new JniObjectReference(handle, ToInteropType(type));
+        if (reference.Type == JniObjectReferenceType.Local) JniEnvironment.References.CreatedReference(reference);
+        return Wrap<T>(reference);
+    }
+
+    public static T NewGlobalRef<T>(JObject value) where T : JObject, new()
+    { var source = value.Reference; EnsureThread(); return CopyClassCache(value, Wrap<T>(CopyGlobal(source))); }
+    public static T NewLocalRef<T>(JObject value) where T : JObject, new()
+    {
+        var source = value.Reference;
+        EnsureThread(); CheckExceptionAndThrow();
+        var result = source.NewLocalRef();
+        CheckExceptionAndThrow();
+        return CopyClassCache(value, Wrap<T>(result));
+    }
+    private static T CopyClassCache<T>(JObject source, T result) where T : JObject
+    {
+        if (source is JClass sourceClass && result is JClass resultClass) resultClass.Cache = sourceClass.Cache;
+        return result;
+    }
+    public static T NewWeakGlobalRef<T>(JObject value) where T : JObject, new()
+    {
+        var source = Ref(value); CheckExceptionAndThrow();
+        var result = source.NewWeakGlobalRef(); CheckExceptionAndThrow();
+        return Wrap<T>(result);
+    }
+
+    public static void DeleteGlobalRef(JObject value) => DeleteReference(value, ReferenceType.Global);
+    public static void DeleteLocalRef(JObject value) => DeleteReference(value, ReferenceType.Local);
+    public static void DeleteWeakGlobalRef(JObject value) => DeleteReference(value, ReferenceType.WeakGlobal);
+    private static void DeleteReference(JObject value, ReferenceType type)
+    {
+        if (value == null || value.IsDisposed) return;
+        if (!value.IsNull && value.ReferenceType != type) throw new ArgumentException("Reference kind does not match.");
+        value.Dispose();
     }
 
     public static JClass FindClass(string name)
     {
-        unsafe
+        EnsureThread();
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Class name is required.", nameof(name));
+        name = name.Replace('.', '/');
+        lock (classes)
         {
-            lock (ClassCache)
+            if (!classes.TryGetValue(name, out var cached))
             {
-                if (ClassCache.TryGetValue(name, out JClass? found))
-                    return NewLocalRef<JClass>(found);
-
-                IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-                IntPtr res;
-                try
+                JniObjectReference local;
+                if (runtime!.ApplicationClassLoader.IsValid)
                 {
-                    res = Env->Functions->FindClass(Env, nameAnsi);
+                    using var type = new JniType("java/lang/Class");
+                    var javaName = JniEnvironment.Strings.NewString(name.Replace('/', '.'));
+                    try
+                    {
+                        JniArgumentValue* args = stackalloc JniArgumentValue[3]
+                        {
+                            new(javaName), new(false), new(runtime.ApplicationClassLoader)
+                        };
+                        local = JniEnvironment.StaticMethods.CallStaticObjectMethod(type.PeerReference,
+                            type.GetStaticMethod("forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;"), args);
+                    }
+                    finally { JniObjectReference.Dispose(ref javaName); }
                 }
-                finally
-                {
-                    Marshal.FreeHGlobal(nameAnsi);
-                }
-
-                using JClass local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-                if (!local.Valid())
-                    return new JClass();
-
-                JClass global = NewGlobalRef<JClass>(local);
-                ClassCache.Add(name, global);
-
-                return NewLocalRef<JClass>(global);
+                else local = JniEnvironment.Types.FindClass(name);
+                cached = Global<JClass>(local);
+                classes.Add(name, cached);
             }
+            var result = NewLocalRef<JClass>(cached);
+            result.Cache = cached.Cache;
+            return result;
         }
     }
 
-    public static JMethodID FromReflectedMethod(JObject method)
+    public static JClass GetObjectClass(JObject value) => Global<JClass>(JniEnvironment.Types.GetObjectClass(Ref(value)));
+    public static JClass GetSuperClass(JClass value) => Global<JClass>(JniEnvironment.Types.GetSuperclass(Ref(value)));
+    public static bool IsSameObject(JObject? first, JObject? second) => JniEnvironment.Types.IsSameObject(Ref(first), Ref(second));
+    public static bool IsInstanceOf(JObject value, JClass type) => JniEnvironment.Types.IsInstanceOf(Ref(value), Ref(type));
+    public static bool IsAssignableFrom(JClass sub, JClass sup) => JniEnvironment.Types.IsAssignableFrom(Ref(sub), Ref(sup));
+
+    internal static JMethodID ResolveMethod(JClass type, string name, string signature, bool isStatic)
     {
-        unsafe
+        ValidateSignature(signature, true);
+        var reference = Ref(type);
+        var info = isStatic ? JniEnvironment.StaticMethods.GetStaticMethodID(reference, name, signature) :
+            JniEnvironment.InstanceMethods.GetMethodID(reference, name, signature);
+        return new JMethodID(info, signature, name);
+    }
+    internal static JFieldID ResolveField(JClass type, string name, string signature, bool isStatic)
+    {
+        ValidateSignature(signature, false);
+        return new(isStatic ? JniEnvironment.StaticFields.GetStaticFieldID(Ref(type), name, signature) :
+            JniEnvironment.InstanceFields.GetFieldID(Ref(type), name, signature), signature);
+    }
+
+    private static void ValidateSignature(string signature, bool method)
+    {
+        if (string.IsNullOrEmpty(signature)) throw new ArgumentException("JNI signature is required.");
+        int position = 0;
+        if (method)
         {
-            return Env->Functions->FromReflectedMethod(Env, method.Handle);
+            if (signature[position++] != '(') throw new ArgumentException("Method signature must start with '('.");
+            while (position < signature.Length && signature[position] != ')') ParseType(signature, ref position, false);
+            if (position >= signature.Length || signature[position++] != ')') throw new ArgumentException("Unterminated method signature.");
         }
+        ParseType(signature, ref position, method);
+        if (position != signature.Length) throw new ArgumentException("Unexpected trailing JNI signature data.");
     }
 
-    public static JFieldID FromReflectedField(JObject field)
+    private static void ParseType(string signature, ref int position, bool allowVoid)
     {
-        unsafe
+        bool array = false;
+        while (position < signature.Length && signature[position] == '[') { position++; array = true; }
+        if (position >= signature.Length) throw new ArgumentException("Incomplete JNI type.");
+        char type = signature[position++];
+        if (type == 'L')
         {
-            return Env->Functions->FromReflectedField(Env, field.Handle);
+            int end = signature.IndexOf(';', position);
+            if (end <= position || signature.Substring(position, end - position).IndexOf('.') >= 0)
+                throw new ArgumentException("Use slash-separated JNI object signatures.");
+            position = end + 1;
         }
+        else if ("ZBCSIJFD".IndexOf(type) < 0 && !(type == 'V' && allowVoid && !array))
+            throw new ArgumentException("Invalid JNI type.");
     }
 
-    public static JObject ToReflectedMethod(JClass cls, JMethodID methodID, bool isStatic)
+    private static void ValidateField(JFieldID field, string result)
     {
-        unsafe
+        if (field.Signature == null) return;
+        if (result == "object" ? field.Signature[0] != 'L' && field.Signature[0] != '[' : field.Signature != result)
+            throw new ArgumentException("Field type does not match JNI signature.");
+    }
+    public static JMethodID GetMethodID(JClass type, string name, string signature) => type.GetMethodID(name, signature);
+    public static JMethodID GetStaticMethodID(JClass type, string name, string signature) => type.GetStaticMethodID(name, signature);
+    public static JFieldID GetFieldID(JClass type, string name, string signature) => type.GetFieldID(name, signature);
+    public static JFieldID GetStaticFieldID(JClass type, string name, string signature) => type.GetStaticFieldID(name, signature);
+
+    private static void ValidateCall(JMethodID method, int count, string result)
+    {
+        if (method.Signature == null) return;
+        string signature = method.Signature;
+        int parameters = 0, i = 1;
+        while (i < signature.Length && signature[i] != ')')
         {
-            IntPtr res = Env->Functions->ToReflectedMethod(Env, cls.Handle, methodID, Convert.ToByte(isStatic));
-
-            using JObject local = new() { Handle = res, ReferenceType = ReferenceType.Local };
-            return NewGlobalRef<JObject>(local);
+            while (signature[i] == '[') i++;
+            if (signature[i] == 'L') { i = signature.IndexOf(';', i); if (i < 0) throw new ArgumentException("Invalid JNI signature."); }
+            i++; parameters++;
         }
+        if (i >= signature.Length - 1 || count != parameters) throw new ArgumentException("Argument count does not match JNI signature.");
+        char returned = signature[i + 1];
+        if (result == "object" ? returned != 'L' && returned != '[' : !signature.AsSpan(i + 1).SequenceEqual(result.AsSpan()))
+            throw new ArgumentException("Return type does not match JNI signature.");
     }
 
-    public static JClass GetSuperClass(JClass sub)
+    public static JString NewString(string value) { EnsureThread(); return Global<JString>(JniEnvironment.Strings.NewString(value)); }
+    public static JString NewStringLocal(string value) { EnsureThread(); return Wrap<JString>(JniEnvironment.Strings.NewString(value)); }
+    public static string GetJStringString(JString value) => JniEnvironment.Strings.ToString(Ref(value)) ?? "";
+    public static int GetStringLength(JString value) => JniEnvironment.Strings.GetStringLength(Ref(value));
+    public static string GetStringRegion(JString value, int start, int length)
     {
-        unsafe
-        {
-            IntPtr res = Env->Functions->GetSuperClass(Env, sub.Handle);
-
-            using JClass local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JClass>(local);
-        }
+        if (start < 0 || length < 0 || start > GetStringLength(value) - length) throw new ArgumentOutOfRangeException(nameof(start));
+        return GetJStringString(value).Substring(start, length);
     }
 
-    public static bool IsAssignableFrom(JClass sub, JClass sup)
+    public static T AllocObject<T>(JClass type) where T : JObject, new() => Global<T>(JniEnvironment.Object.AllocObject(Ref(type)));
+    public static T NewObject<T>(JClass type, JMethodID constructor, params JValue[] args) where T : JObject, new() =>
+        NewObject<T>(type, constructor, (ReadOnlySpan<JValue>)args);
+    public static T NewObject<T>(JClass type, JMethodID constructor, ReadOnlySpan<JValue> args) where T : JObject, new()
     {
-        unsafe
-        {
-            return Convert.ToBoolean(Env->Functions->IsAssignableFrom(Env, sub.Handle, sup.Handle));
-        }
+        var reference = Ref(type);
+        if (constructor.Name != null && constructor.Name != "<init>") throw new ArgumentException("NewObject requires a constructor ID.");
+        ValidateCall(constructor, args.Length, "V");
+        fixed (JValue* values = args) return Global<T>(JniEnvironment.Object.NewObject(reference, constructor.Require(false), (JniArgumentValue*)values));
     }
 
-    public static JObject ToReflectedField(JClass cls, JFieldID fieldID, bool isStatic)
+    public static T NewObjectLocal<T>(JClass type, JMethodID constructor, ReadOnlySpan<JValue> args) where T : JObject, new()
     {
-        throw new NotImplementedException();
+        var reference = Ref(type);
+        if (constructor.Name != null && constructor.Name != "<init>") throw new ArgumentException("NewObject requires a constructor ID.");
+        ValidateCall(constructor, args.Length, "V");
+        fixed (JValue* values = args) return Wrap<T>(JniEnvironment.Object.NewObject(reference, constructor.Require(false), (JniArgumentValue*)values));
     }
 
-    public static void Throw(JThrowable throwable)
+    public static T CallObjectMethodLocal<T>(JObject value, JMethodID method, ReadOnlySpan<JValue> args) where T : JObject, new()
     {
-        unsafe
-        {
-            int res = Env->Functions->Throw(Env, throwable.Handle);
-        }
+        var reference = Ref(value);
+        ValidateCall(method, args.Length, "object");
+        fixed (JValue* values = args) return Wrap<T>(JniEnvironment.InstanceMethods.CallObjectMethod(reference, method.Require(false), (JniArgumentValue*)values));
     }
 
-    public static void ThrowNew(JClass cls, string message)
+    public static T CallStaticObjectMethodLocal<T>(JClass type, JMethodID method, ReadOnlySpan<JValue> args) where T : JObject, new()
     {
-        unsafe
-        {
-            IntPtr messageAnsi = Marshal.StringToHGlobalAnsi(message);
-            try
-            {
-                Env->Functions->ThrowNew(Env, cls.Handle, messageAnsi);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(messageAnsi);
-            }
-        }
+        var reference = Ref(type);
+        ValidateCall(method, args.Length, "object");
+        fixed (JValue* values = args) return Wrap<T>(JniEnvironment.StaticMethods.CallStaticObjectMethod(reference, method.Require(true), (JniArgumentValue*)values));
+    }
+
+    public static JObjectArray<T> NewObjectArray<T>(int length, JClass elementClass, T? initial = null) where T : JObject, new()
+    {
+        if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+        return Global<JObjectArray<T>>(JniEnvironment.Arrays.NewObjectArray(length, Ref(elementClass), Ref(initial)));
+    }
+
+    public static T GetObjectField<T>(JObject value, JFieldID field) where T : JObject, new() =>
+        ReadObjectField<T>(value, field, false);
+    public static T GetStaticObjectField<T>(JClass type, JFieldID field) where T : JObject, new() =>
+        ReadObjectField<T>(type, field, true);
+    private static T ReadObjectField<T>(JObject value, JFieldID field, bool isStatic) where T : JObject, new()
+    {
+        ValidateField(field, "object");
+        return Global<T>(isStatic ? JniEnvironment.StaticFields.GetStaticObjectField(Ref(value), field.Require(true)) :
+            JniEnvironment.InstanceFields.GetObjectField(Ref(value), field.Require(false)));
+    }
+    public static void SetObjectField(JObject value, JFieldID field, JObject? data)
+    { ValidateField(field, "object"); JniEnvironment.InstanceFields.SetObjectField(Ref(value), field.Require(false), Ref(data)); }
+    public static void SetStaticObjectField<T>(JClass type, JFieldID field, T? data) where T : JObject, new()
+    { ValidateField(field, "object"); JniEnvironment.StaticFields.SetStaticObjectField(Ref(type), field.Require(true), Ref(data)); }
+
+    public static int GetArrayLength<T>(JArray<T> value) => JniEnvironment.Arrays.GetArrayLength(Ref(value));
+    public static int GetArrayLength<T>(JObjectArray<T> value) where T : JObject, new() => JniEnvironment.Arrays.GetArrayLength(Ref(value));
+    public static T GetObjectArrayElement<T>(JObjectArray<T> value, int index) where T : JObject, new() =>
+        Global<T>(JniEnvironment.Arrays.GetObjectArrayElement(Ref(value), index));
+    public static void SetObjectArrayElement<T>(JObjectArray<T> value, int index, T? element) where T : JObject, new() =>
+        JniEnvironment.Arrays.SetObjectArrayElement(Ref(value), index, Ref(element));
+    public static T[] GetArrayElements<T>(JArray<T> value) => GetArrayRegion(value, 0, value.Length);
+    public static T[] GetArrayRegion<T>(JArray<T> value, int start, int length)
+    {
+        if (length < 0) throw new ArgumentOutOfRangeException(nameof(length));
+        var result = new T[length];
+        GetArrayRegion(value, start, result.AsSpan());
+        return result;
+    }
+    public static void SetArrayRegion<T>(JArray<T> value, int start, int length, T[] source)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        if (length < 0 || length > source.Length) throw new ArgumentOutOfRangeException(nameof(length));
+        SetArrayRegion(value, start, (ReadOnlySpan<T>)source.AsSpan(0, length));
+    }
+    public static T GetArrayElement<T>(JArray<T> value, int index) => GetArrayRegion(value, index, 1)[0];
+    public static void SetArrayElement<T>(JArray<T> value, int index, T data) => SetArrayRegion(value, index, (ReadOnlySpan<T>)new T[] { data });
+    internal static void CopyByteArrayRegion(JArray<sbyte> value, byte[] buffer, int offset, int count)
+    {
+        if (buffer == null) throw new ArgumentNullException(nameof(buffer));
+        if (offset < 0 || count < 0 || offset > buffer.Length - count) throw new ArgumentOutOfRangeException(nameof(offset));
+        GetArrayRegion(value, 0, MemoryMarshal.Cast<byte, sbyte>(buffer.AsSpan(offset, count)));
     }
 
     public static JThrowable ExceptionOccurred()
     {
-        unsafe
-        {
-            IntPtr res = Env->Functions->ExceptionOccurred(Env);
-
-            using JThrowable local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JThrowable>(local);
-        }
-    }
-
-    public static void ExceptionDescribe()
-    {
-        unsafe
-        {
-            Env->Functions->ExceptionDescribe(Env);
-        }
-    }
-
-    public static void ExceptionClear()
-    {
-        unsafe
-        {
-            Env->Functions->ExceptionClear(Env);
-        }
-    }
-
-    public static void FatalError(string message)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static int PushLocalFrame(int capacity)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static JObject PopLocalFrame(JObject result)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static T NewGlobalRef<T>(JObject lobj) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->NewGlobalRef(Env, lobj.Handle);
-            return new T() { Handle = res, ReferenceType = JNI.ReferenceType.Global };
-        }
-    }
-
-    public static void DeleteGlobalRef(JObject gref)
-    {
-        unsafe
-        {
-            if (gref == null)
-                return;
-
-            if (!gref.Valid())
-                return;
-
-            Env->Functions->DeleteGlobalRef(Env, gref.Handle);
-        }
-    }
-
-    public static void CheckExceptionAndThrow()
-    {
-        if (ExceptionCheck())
-        {
-            JThrowable throwable = ExceptionOccurred();
-            ExceptionClear();
-            throw new JThrowableException(throwable);
-        }
-    }
-
-    public static void DeleteLocalRef(JObject lref)
-    {
-        unsafe
-        {
-            if (lref == null)
-                return;
-
-            if (!lref.Valid())
-                return;
-
-            Env->Functions->DeleteLocalRef(Env, lref.Handle);
-        }
-    }
-
-    public static bool IsSameObject(JObject obj1, JObject obj2)
-    {
-        unsafe
-        {
-            return Convert.ToBoolean(Env->Functions->IsSameObject(Env, obj1.Handle, obj2.Handle));
-        }
-    }
-
-    public static T NewLocalRef<T>(JObject obj) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->NewLocalRef(Env, obj.Handle);
-            return new T() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-        }
-    }
-
-    public static int EnsureLocalCapacity(int capacity)
-    {
-        unsafe
-        {
-            return Env->Functions->EnsureLocalCapacity(Env, capacity);
-        }
-    }
-
-    public static T AllocObject<T>(JClass cls) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->AllocObject(Env, cls.Handle);
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T NewObject<T>(JClass cls, JMethodID methodID, params JValue[] args) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res;
-            fixed (JValue* argsPtr = args)
-                res = Env->Functions->NewObjectA(Env, cls.Handle, methodID, (IntPtr)argsPtr);
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static JClass GetObjectClass(JObject obj)
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->GetObjectClass(Env, obj.Handle);
-
-            using JClass local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JClass>(local);
-        }
-    }
-
-    public static bool IsInstanceOf(JObject obj, JClass cls)
-    {
-        unsafe
-        {
-            return Convert.ToBoolean(Env->Functions->IsInstanceOf(Env, obj.Handle, cls.Handle));
-        }
-    }
-
-    public static JMethodID GetMethodID(JClass cls, string name, string sig)
-    {
-        unsafe
-        {
-            IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-            IntPtr sigAnsi = Marshal.StringToHGlobalAnsi(sig);
-
-            JMethodID id = Env->Functions->GetMethodID(Env, cls.Handle, nameAnsi, sigAnsi);
-
-            Marshal.FreeHGlobal(nameAnsi);
-            Marshal.FreeHGlobal(sigAnsi);
-            return id;
-        }
-    }
-
-    public static T CallObjectMethod<T>(JObject obj, JMethodID methodID, params JValue[] args) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res;
-            fixed (JValue* argsPtr = args)
-                res = Env->Functions->CallObjectMethodA(
-                    Env,
-                    obj.Handle,
-                    methodID,
-                    (IntPtr)argsPtr);
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T CallMethod<T>(JObject obj, JMethodID methodID, params JValue[] args)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-            fixed (JValue* argsPtr = args)
-            {
-                IntPtr pointer = (IntPtr)argsPtr;
-                if (t == typeof(bool))
-                    return (T)(object)Convert.ToBoolean(Env->Functions->CallBooleanMethodA(Env, obj.Handle, methodID, pointer));
-                if (t == typeof(sbyte))
-                    return (T)(object)Env->Functions->CallByteMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(char))
-                    return (T)(object)Env->Functions->CallCharMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(short))
-                    return (T)(object)Env->Functions->CallShortMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(int))
-                    return (T)(object)Env->Functions->CallIntMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(long))
-                    return (T)(object)Env->Functions->CallLongMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(float))
-                    return (T)(object)Env->Functions->CallFloatMethodA(Env, obj.Handle, methodID, pointer);
-                if (t == typeof(double))
-                    return (T)(object)Env->Functions->CallDoubleMethodA(Env, obj.Handle, methodID, pointer);
-            }
-            throw new ArgumentException($"CallMethod Type {t} not supported.");
-        }
-    }
-
-    public static void CallVoidMethod(JObject obj, JMethodID methodID, params JValue[] args)
-    {
-        unsafe
-        {
-            fixed (JValue* argsPtr = args)
-                Env->Functions->CallVoidMethodA(Env, obj.Handle, methodID, (IntPtr)argsPtr);
-        }
-    }
-
-    public static T CallNonvirtualObjectMethod<T>(JObject obj, JClass cls, JMethodID methodID, params JValue[] args) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res;
-            fixed (JValue* argsPtr = args)
-                res = Env->Functions->CallNonvirtualObjectMethodA(
-                    Env,
-                    obj.Handle,
-                    cls.Handle,
-                    methodID,
-                    (IntPtr)argsPtr);
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T CallNonvirtualMethod<T>(JObject obj, JClass cls, JMethodID methodID, params JValue[] args)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-            fixed (JValue* argsPtr = args)
-            {
-                IntPtr pointer = (IntPtr)argsPtr;
-                if (t == typeof(bool))
-                    return (T)(object)Convert.ToBoolean(Env->Functions->CallNonvirtualBooleanMethodA(Env, obj.Handle, cls.Handle, methodID, pointer));
-                if (t == typeof(sbyte))
-                    return (T)(object)Env->Functions->CallNonvirtualByteMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(char))
-                    return (T)(object)Env->Functions->CallNonvirtualCharMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(short))
-                    return (T)(object)Env->Functions->CallNonvirtualShortMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(int))
-                    return (T)(object)Env->Functions->CallNonvirtualIntMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(long))
-                    return (T)(object)Env->Functions->CallNonvirtualLongMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(float))
-                    return (T)(object)Env->Functions->CallNonvirtualFloatMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-                if (t == typeof(double))
-                    return (T)(object)Env->Functions->CallNonvirtualDoubleMethodA(Env, obj.Handle, cls.Handle, methodID, pointer);
-            }
-            throw new ArgumentException($"CallNonvirtualMethod Type {t} not supported.");
-        }
-    }
-
-    public static void CallNonvirtualVoidMethod(JObject obj, JClass cls, JMethodID methodID, params JValue[] args)
-    {
-        unsafe
-        {
-            fixed (JValue* argsPtr = args)
-                Env->Functions->CallNonvirtualVoidMethodA(
-                    Env,
-                    obj.Handle,
-                    cls.Handle,
-                    methodID,
-                    (IntPtr)argsPtr);
-        }
-    }
-
-    public static JFieldID GetFieldID(JClass cls, string name, string sig)
-    {
-        unsafe
-        {
-            IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-            IntPtr sigAnsi = Marshal.StringToHGlobalAnsi(sig);
-
-            JFieldID id = Env->Functions->GetFieldID(Env, cls.Handle, nameAnsi, sigAnsi);
-
-            Marshal.FreeHGlobal(nameAnsi);
-            Marshal.FreeHGlobal(sigAnsi);
-            return id;
-        }
-    }
-
-    public static T GetObjectField<T>(JObject obj, JFieldID fieldID) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->GetObjectField(Env, obj.Handle, fieldID);
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T GetField<T>(JObject obj, JFieldID fieldID)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-
-            if (t == typeof(bool))
-            {
-                return (T)(object)Convert.ToBoolean(Env->Functions->GetBooleanField(Env, obj.Handle, fieldID));
-            }
-            else if (t == typeof(sbyte))
-            {
-                return (T)(object)Env->Functions->GetByteField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(char))
-            {
-                return (T)(object)Env->Functions->GetCharField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(short))
-            {
-                return (T)(object)Env->Functions->GetShortField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(int))
-            {
-                return (T)(object)Env->Functions->GetIntField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(long))
-            {
-                return (T)(object)Env->Functions->GetLongField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(float))
-            {
-                return (T)(object)Env->Functions->GetFloatField(Env, obj.Handle, fieldID);
-            }
-            else if (t == typeof(double))
-            {
-                return (T)(object)Env->Functions->GetDoubleField(Env, obj.Handle, fieldID);
-            }
-            else
-            {
-                throw new ArgumentException($"GetField Type {t} not supported.");
-            }
-        }
-    }
-
-    public static void SetObjectField(JObject obj, JFieldID fieldID, JObject val)
-    {
-        unsafe
-        {
-            Env->Functions->SetObjectField(Env, obj.Handle, fieldID, val.Handle);
-        }
-    }
-
-    public static void SetField<T>(JObject obj, JFieldID fieldID, T value)
-    {
-        unsafe
-        {
-            switch (value)
-            {
-                case bool b:
-                    Env->Functions->SetBooleanField(Env, obj.Handle, fieldID, Convert.ToByte(b));
-                    break;
-
-                case sbyte b:
-                    Env->Functions->SetByteField(Env, obj.Handle, fieldID, b);
-                    break;
-
-                case char c:
-                    Env->Functions->SetCharField(Env, obj.Handle, fieldID, c);
-                    break;
-
-                case short s:
-                    Env->Functions->SetShortField(Env, obj.Handle, fieldID, s);
-                    break;
-
-                case int i:
-                    Env->Functions->SetIntField(Env, obj.Handle, fieldID, i);
-                    break;
-
-                case long l:
-                    Env->Functions->SetLongField(Env, obj.Handle, fieldID, l);
-                    break;
-
-                case float f:
-                    Env->Functions->SetFloatField(Env, obj.Handle, fieldID, f);
-                    break;
-
-                case double d:
-                    Env->Functions->SetDoubleField(Env, obj.Handle, fieldID, d);
-                    break;
-
-                default:
-                    throw new ArgumentException($"SetField Type {value?.GetType()} not supported.");
-            }
-        }
-    }
-
-    public static JMethodID GetStaticMethodID(JClass cls, string name, string sig)
-    {
-        unsafe
-        {
-            IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-            IntPtr sigAnsi = Marshal.StringToHGlobalAnsi(sig);
-            try
-            {
-                return Env->Functions->GetStaticMethodID(Env, cls.Handle, nameAnsi, sigAnsi);
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(nameAnsi);
-                Marshal.FreeHGlobal(sigAnsi);
-            }
-        }
-    }
-
-    public static T CallStaticObjectMethod<T>(JClass cls, JMethodID methodID, params JValue[] args) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res;
-            fixed (JValue* argsPtr = args)
-                res = Env->Functions->CallStaticObjectMethodA(
-                    Env,
-                    cls.Handle,
-                    methodID.Handle,
-                    (IntPtr)argsPtr);
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T CallStaticMethod<T>(JClass cls, JMethodID methodID, params JValue[] args)
-    {
-        Type t = typeof(T);
-        unsafe
-        {
-            fixed (JValue* argsPtr = args)
-            {
-                IntPtr pointer = (IntPtr)argsPtr;
-                if (t == typeof(bool))
-                    return (T)(object)Convert.ToBoolean(Env->Functions->CallStaticBooleanMethodA(Env, cls.Handle, methodID, pointer));
-                if (t == typeof(sbyte))
-                    return (T)(object)Env->Functions->CallStaticByteMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(char))
-                    return (T)(object)Env->Functions->CallStaticCharMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(short))
-                    return (T)(object)Env->Functions->CallStaticShortMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(int))
-                    return (T)(object)Env->Functions->CallStaticIntMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(long))
-                    return (T)(object)Env->Functions->CallStaticLongMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(float))
-                    return (T)(object)Env->Functions->CallStaticFloatMethodA(Env, cls.Handle, methodID, pointer);
-                if (t == typeof(double))
-                    return (T)(object)Env->Functions->CallStaticDoubleMethodA(Env, cls.Handle, methodID, pointer);
-            }
-        }
-        throw new ArgumentException($"CallStaticMethod Type {t} not supported.");
-    }
-
-    public static void CallStaticVoidMethod(JClass cls, JMethodID methodID, params JValue[] args)
-    {
-        unsafe
-        {
-            fixed (JValue* argsPtr = args)
-                Env->Functions->CallStaticVoidMethodA(
-                    Env,
-                    cls.Handle,
-                    methodID,
-                    (IntPtr)argsPtr);
-        }
-    }
-
-    public static JFieldID GetStaticFieldID(JClass cls, string name, string sig)
-    {
-        unsafe
-        {
-            IntPtr nameAnsi = Marshal.StringToHGlobalAnsi(name);
-            IntPtr sigAnsi = Marshal.StringToHGlobalAnsi(sig);
-
-            JFieldID id = Env->Functions->GetStaticFieldID(Env, cls.Handle, nameAnsi, sigAnsi);
-
-            Marshal.FreeHGlobal(nameAnsi);
-            Marshal.FreeHGlobal(sigAnsi);
-            return id;
-        }
-    }
-
-    public static T GetStaticObjectField<T>(JClass cls, JFieldID fieldID) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->GetStaticObjectField(Env, cls.Handle, fieldID);
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static T GetStaticField<T>(JClass cls, JFieldID fieldID)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-
-            if (t == typeof(bool))
-            {
-                return (T)(object)Convert.ToBoolean(Env->Functions->GetStaticBooleanField(Env, cls.Handle, fieldID));
-            }
-            else if (t == typeof(sbyte))
-            {
-                return (T)(object)Env->Functions->GetStaticByteField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(char))
-            {
-                return (T)(object)Env->Functions->GetStaticCharField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(short))
-            {
-                return (T)(object)Env->Functions->GetStaticShortField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(int))
-            {
-                return (T)(object)Env->Functions->GetStaticIntField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(long))
-            {
-                return (T)(object)Env->Functions->GetStaticLongField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(float))
-            {
-                return (T)(object)Env->Functions->GetStaticFloatField(Env, cls.Handle, fieldID);
-            }
-            else if (t == typeof(double))
-            {
-                return (T)(object)Env->Functions->GetStaticDoubleField(Env, cls.Handle, fieldID);
-            }
-            else
-            {
-                throw new ArgumentException($"GetStaticField Type {t} not supported.");
-            }
-        }
-    }
-
-    public static void SetStaticObjectField<T>(JClass cls, JFieldID fieldID, T value) where T : JObject, new()
-    {
-        unsafe
-        {
-            Env->Functions->SetStaticObjectField(Env, cls.Handle, fieldID, value.Handle);
-        }
-    }
-
-    public static void SetStaticField<T>(JClass cls, JFieldID fieldID, T value)
-    {
-        unsafe
-        {
-            switch (value)
-            {
-                case bool b:
-                    Env->Functions->SetStaticBooleanField(Env, cls.Handle, fieldID, Convert.ToByte(b));
-                    break;
-
-                case sbyte b:
-                    Env->Functions->SetStaticByteField(Env, cls.Handle, fieldID, b);
-                    break;
-
-                case char c:
-                    Env->Functions->SetStaticCharField(Env, cls.Handle, fieldID, c);
-                    break;
-
-                case short s:
-                    Env->Functions->SetStaticShortField(Env, cls.Handle, fieldID, s);
-                    break;
-
-                case int i:
-                    Env->Functions->SetStaticIntField(Env, cls.Handle, fieldID, i);
-                    break;
-
-                case long l:
-                    Env->Functions->SetStaticLongField(Env, cls.Handle, fieldID, l);
-                    break;
-
-                case float f:
-                    Env->Functions->SetStaticFloatField(Env, cls.Handle, fieldID, f);
-                    break;
-
-                case double d:
-                    Env->Functions->SetStaticDoubleField(Env, cls.Handle, fieldID, d);
-                    break;
-
-                default:
-                    throw new ArgumentException($"SetField Type {typeof(T)} not supported.");
-            }
-        }
-    }
-
-    public static JString NewString(string str)
-    {
-        unsafe
-        {
-            IntPtr strUni = Marshal.StringToHGlobalUni(str);
-
-            IntPtr res = Env->Functions->NewString(Env, strUni, str.Length);
-
-            Marshal.FreeHGlobal(strUni);
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JString>(local);
-        }
-    }
-
-    public static int GetStringLength(JString str)
-    {
-        unsafe
-        {
-            return Env->Functions->GetStringLength(Env, str.Handle);
-        }
-    }
-
-    public static string GetJStringString(JString str)
-    {
-        unsafe
-        {
-            if (!str.Valid())
-                return "";
-
-            var currentEnv = Env;
-            int length = currentEnv->Functions->GetStringLength(currentEnv, str.Handle);
-            IntPtr res = currentEnv->Functions->GetStringChars(currentEnv, str.Handle, out byte isCopy);
-            if (res == IntPtr.Zero)
-                return string.Empty;
-
-            try { return Marshal.PtrToStringUni(res, length) ?? string.Empty; }
-            finally { currentEnv->Functions->ReleaseStringChars(currentEnv, str.Handle, res); }
-        }
-    }
-
-    private static void ReleaseStringChars(JString str, IntPtr chars)
-    {
-        Env->Functions->ReleaseStringChars(Env, str.Handle, chars);
-    }
-
-    public static int GetArrayLength<T>(JArray<T> jarray)
-    {
-        unsafe
-        {
-            return Env->Functions->GetArrayLength(Env, jarray.Handle);
-        }
-    }
-
-    public static int GetArrayLength<T>(JObjectArray<T> jarray) where T : JObject, new()
-    {
-        unsafe
-        {
-            return Env->Functions->GetArrayLength(Env, jarray.Handle);
-        }
-    }
-
-    public static T GetObjectArrayElement<T>(JObjectArray<T> array, int index) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->GetObjectArrayElement(Env, array.Handle, index);
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<T>(local);
-        }
-    }
-
-    public static void SetObjectArrayElement<T>(JObjectArray<T> array, int index, T value) where T : JObject, new()
-    {
-        unsafe
-        {
-            Env->Functions->SetObjectArrayElement(Env, array.Handle, index, value.Handle);
-        }
-    }
-
-    public static JArray<T> NewArray<T>(int length)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-            IntPtr res;
-
-            if (t == typeof(bool))
-            {
-                res = Env->Functions->NewBooleanArray(Env, length);
-            }
-            else if (t == typeof(sbyte))
-            {
-                res = Env->Functions->NewByteArray(Env, length);
-            }
-            else if (t == typeof(char))
-            {
-                res = Env->Functions->NewCharArray(Env, length);
-            }
-            else if (t == typeof(short))
-            {
-                res = Env->Functions->NewShortArray(Env, length);
-            }
-            else if (t == typeof(int))
-            {
-                res = Env->Functions->NewIntArray(Env, length);
-            }
-            else if (t == typeof(long))
-            {
-                res = Env->Functions->NewLongArray(Env, length);
-            }
-            else if (t == typeof(float))
-            {
-                res = Env->Functions->NewFloatArray(Env, length);
-            }
-            else if (t == typeof(double))
-            {
-                res = Env->Functions->NewDoubleArray(Env, length);
-            }
-            else
-            {
-                throw new ArgumentException($"CallStaticMethod Type {t} not supported.");
-            }
-
-            using JObject local = new() { Handle = res, ReferenceType = JNI.ReferenceType.Local };
-            return NewGlobalRef<JArray<T>>(local);
-        }
-    }
-
-    public static T[] GetArrayElements<T>(JArray<T> array)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-            int length = GetArrayLength(array);
-
-            if (t == typeof(bool))
-            {
-                byte* arr = Env->Functions->GetBooleanArrayElements(Env, array.Handle, out byte isCopy);
-
-                bool[] buf = new bool[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = Convert.ToBoolean(arr[i]);
-
-                Env->Functions->ReleaseBooleanArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(sbyte))
-            {
-                sbyte* arr = Env->Functions->GetByteArrayElements(Env, array.Handle, out byte isCopy);
-
-                sbyte[] buf = new sbyte[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseByteArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(char))
-            {
-                char* arr = Env->Functions->GetCharArrayElements(Env, array.Handle, out byte isCopy);
-
-                char[] buf = new char[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseCharArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(short))
-            {
-                short* arr = Env->Functions->GetShortArrayElements(Env, array.Handle, out byte isCopy);
-
-                short[] buf = new short[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseShortArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(int))
-            {
-                int* arr = Env->Functions->GetIntArrayElements(Env, array.Handle, out byte isCopy);
-
-                int[] buf = new int[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseIntArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(long))
-            {
-                long* arr = Env->Functions->GetLongArrayElements(Env, array.Handle, out byte isCopy);
-
-                long[] buf = new long[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseLongArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(float))
-            {
-                float* arr = Env->Functions->GetFloatArrayElements(Env, array.Handle, out byte isCopy);
-
-                float[] buf = new float[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseFloatArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else if (t == typeof(double))
-            {
-                double* arr = Env->Functions->GetDoubleArrayElements(Env, array.Handle, out byte isCopy);
-
-                double[] buf = new double[length];
-
-                for (int i = 0; i < length; i++)
-                    buf[i] = arr[i];
-
-                Env->Functions->ReleaseDoubleArrayElements(Env, array.Handle, arr, (int)JNI.ReleaseMode.Abort);
-                return (T[])(object)buf;
-            }
-            else
-            {
-                throw new ArgumentException($"GetArrayElements Type {t} not supported.");
-            }
-        }
-    }
-
-    internal static void CopyByteArrayRegion(JArray<sbyte> array, byte[] destination, int offset, int count)
-    {
-        if (destination == null) throw new ArgumentNullException(nameof(destination));
-        if (offset < 0 || count < 0 || destination.Length - offset < count)
-            throw new ArgumentOutOfRangeException(nameof(count));
-        if (count == 0) return;
-        fixed (byte* target = &destination[offset])
-        {
-            var currentEnv = Env;
-            currentEnv->Functions->GetByteArrayRegion(currentEnv, array.Handle, 0, count, (sbyte*)target);
-        }
-    }
-
-    public static T[] GetArrayRegion<T>(JArray<T> array, int start, int len)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-
-            if (t == typeof(bool))
-            {
-                fixed (byte* buf = new byte[len])
-                {
-                    Env->Functions->GetBooleanArrayRegion(Env, array.Handle, start, len, buf);
-
-                    bool[] res = new bool[len];
-                    for (int i = 0; i < len; i++)
-                    {
-                        res[i] = Convert.ToBoolean(buf[i]);
-                    }
-                    return (T[])(object)res;
-                }
-            }
-            else if (t == typeof(sbyte))
-            {
-                sbyte[] buf = new sbyte[len];
-
-                fixed (sbyte* b = buf)
-                {
-                    Env->Functions->GetByteArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(char))
-            {
-                char[] buf = new char[len];
-
-                fixed (char* b = buf)
-                {
-                    Env->Functions->GetCharArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(short))
-            {
-                short[] buf = new short[len];
-
-                fixed (short* b = buf)
-                {
-                    Env->Functions->GetShortArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(int))
-            {
-                int[] buf = new int[len];
-
-                fixed (int* b = buf)
-                {
-                    Env->Functions->GetIntArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(long))
-            {
-                long[] buf = new long[len];
-
-                fixed (long* b = buf)
-                {
-                    Env->Functions->GetLongArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(float))
-            {
-                float[] buf = new float[len];
-
-                fixed (float* b = buf)
-                {
-                    Env->Functions->GetFloatArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else if (t == typeof(double))
-            {
-                double[] buf = new double[len];
-
-                fixed (double* b = buf)
-                {
-                    Env->Functions->GetDoubleArrayRegion(Env, array.Handle, start, len, b);
-                    return (T[])(object)buf;
-                }
-            }
-            else
-            {
-                throw new ArgumentException($"GetArrayRegion Type {t} not supported.");
-            }
-        }
-    }
-
-    public static T GetArrayElement<T>(JArray<T> array, int index)
-    {
-        Type t = typeof(T);
-
-        if (t == typeof(bool))
-        {
-            byte b;
-            Env->Functions->GetBooleanArrayRegion(Env, array.Handle, index, 1, &b);
-            return (T)(object)Convert.ToBoolean(b);
-        }
-        else if (t == typeof(sbyte))
-        {
-            sbyte b;
-            Env->Functions->GetByteArrayRegion(Env, array.Handle, index, 1, &b);
-            return (T)(object)b;
-        }
-        else if (t == typeof(char))
-        {
-            char c;
-            Env->Functions->GetCharArrayRegion(Env, array.Handle, index, 1, &c);
-            return (T)(object)c;
-        }
-        else if (t == typeof(short))
-        {
-            short s;
-            Env->Functions->GetShortArrayRegion(Env, array.Handle, index, 1, &s);
-            return (T)(object)s;
-        }
-        else if (t == typeof(int))
-        {
-            int i;
-            Env->Functions->GetIntArrayRegion(Env, array.Handle, index, 1, &i);
-            return (T)(object)i;
-        }
-        else if (t == typeof(long))
-        {
-            long l;
-            Env->Functions->GetLongArrayRegion(Env, array.Handle, index, 1, &l);
-            return (T)(object)l;
-        }
-        else if (t == typeof(float))
-        {
-            float f;
-            Env->Functions->GetFloatArrayRegion(Env, array.Handle, index, 1, &f);
-            return (T)(object)f;
-        }
-        else if (t == typeof(double))
-        {
-            double d;
-            Env->Functions->GetDoubleArrayRegion(Env, array.Handle, index, 1, &d);
-            return (T)(object)d;
-        }
-        else
-        {
-            throw new ArgumentException($"GetArrayElement Type {t} not supported.");
-        }
-    }
-
-    public static void SetArrayRegion<T>(JArray<T> array, int start, int len, T[] elems)
-    {
-        unsafe
-        {
-            Type t = typeof(T);
-
-            if (t == typeof(bool))
-            {
-                fixed (byte* buf = elems.Select(b => Convert.ToByte(b)).ToArray())
-                {
-                    Env->Functions->SetBooleanArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(sbyte))
-            {
-                fixed (sbyte* buf = (sbyte[])(object)elems)
-                {
-                    Env->Functions->SetByteArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(char))
-            {
-                fixed (char* buf = (char[])(object)elems)
-                {
-                    Env->Functions->SetCharArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(short))
-            {
-                fixed (short* buf = (short[])(object)elems)
-                {
-                    Env->Functions->SetShortArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(int))
-            {
-                fixed (int* buf = (int[])(object)elems)
-                {
-                    Env->Functions->SetIntArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(long))
-            {
-                fixed (long* buf = (long[])(object)elems)
-                {
-                    Env->Functions->SetLongArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(float))
-            {
-                fixed (float* buf = (float[])(object)elems)
-                {
-                    Env->Functions->SetFloatArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else if (t == typeof(double))
-            {
-                fixed (double* buf = (double[])(object)elems)
-                {
-                    Env->Functions->SetDoubleArrayRegion(Env, array.Handle, start, len, buf);
-                }
-            }
-            else
-            {
-                throw new ArgumentException($"SetArrayRegion Type {t} not supported.");
-            }
-        }
-    }
-
-    public static void SetArrayElement<T>(JArray<T> array, int index, T value)
-    {
-        Type t = typeof(T);
-
-        if (t == typeof(bool))
-        {
-            byte b = Convert.ToByte(value);
-            Env->Functions->SetBooleanArrayRegion(Env, array.Handle, index, 1, &b);
-        }
-        else if (t == typeof(sbyte))
-        {
-            sbyte b = (sbyte)(object)value!;
-            Env->Functions->SetByteArrayRegion(Env, array.Handle, index, 1, &b);
-        }
-        else if (t == typeof(char))
-        {
-            char c = (char)(object)value!;
-            Env->Functions->SetCharArrayRegion(Env, array.Handle, index, 1, &c);
-        }
-        else if (t == typeof(short))
-        {
-            short s = (short)(object)value!;
-            Env->Functions->SetShortArrayRegion(Env, array.Handle, index, 1, &s);
-        }
-        else if (t == typeof(int))
-        {
-            int c = (int)(object)value!;
-            Env->Functions->SetIntArrayRegion(Env, array.Handle, index, 1, &c);
-        }
-        else if (t == typeof(long))
-        {
-            long l = (long)(object)value!;
-            Env->Functions->SetLongArrayRegion(Env, array.Handle, index, 1, &l);
-        }
-        else if (t == typeof(float))
-        {
-            float f = (float)(object)value!;
-            Env->Functions->SetFloatArrayRegion(Env, array.Handle, index, 1, &f);
-        }
-        else if (t == typeof(double))
-        {
-            double d = (double)(object)value!;
-            Env->Functions->SetDoubleArrayRegion(Env, array.Handle, index, 1, &d);
-        }
-        else
-        {
-            throw new ArgumentException($"SetArrayElement Type {t} not supported.");
-        }
-    }
-
-    private static int RegisterNatives(JClass cls, IntPtr methods, int nmethods)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static int UnregisterNatives(JClass cls)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static int MonitorEnter(JObject obj)
-    {
-        unsafe
-        {
-            return Env->Functions->MonitorEnter(Env, obj.Handle);
-        }
-    }
-
-    public static int MonitorExit(JObject obj)
-    {
-        unsafe
-        {
-            return Env->Functions->MonitorExit(Env, obj.Handle);
-        }
-    }
-
-    private static JavaVM* GetJavaVM()
-    {
-        throw new NotImplementedException();
-    }
-
-    public static string? GetStringRegion(JString str, int start, int len)
-    {
-        unsafe
-        {
-            if (len == 0)
-                return string.Empty;
-
-            char[] buffer = new char[len];
-            fixed (char* chars = buffer)
-                Env->Functions->GetStringRegion(Env, str.Handle, start, len, (nint)chars);
-
-            return new string(buffer);
-        }
-    }
-
-    private static IntPtr GetPrimitiveArrayCritical<T>(JArray<T> array)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static void ReleasePrimitiveArrayCritical<T>(JArray<T> array, IntPtr carray, int mode)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static string GetStringCritical(JString str)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static void ReleaseStringCritical(JString str)
-    {
-        throw new NotImplementedException();
-    }
-
-    public static T NewWeakGlobalRef<T>(JObject obj) where T : JObject, new()
-    {
-        unsafe
-        {
-            IntPtr res = Env->Functions->NewWeakGlobalRef(Env, obj.Handle);
-            return new T() { Handle = res, ReferenceType = JNI.ReferenceType.WeakGlobal };
-        }
-    }
-
-    public static void DeleteWeakGlobalRef(JObject obj)
-    {
-        unsafe
-        {
-            Env->Functions->DeleteWeakGlobalRef(Env, obj.Handle);
-        }
-    }
-
-    public static bool ExceptionCheck()
-    {
-        unsafe
-        {
-            return Convert.ToBoolean(Env->Functions->ExceptionCheck(Env));
-        }
-    }
-
-    private static JObject NewDirectByteBuffer(IntPtr address, int capacity)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static IntPtr GetDirectBufferAddress(JObject buf)
-    {
-        throw new NotImplementedException();
-    }
-
-    private static int GetDirectBufferCapacity(JObject obj)
-    {
-        throw new NotImplementedException();
-    }
+        EnsureThread();
+        return Wrap<JThrowable>(JniEnvironment.Exceptions.ExceptionOccurred());
+    }
+    public static void Throw(JThrowable throwable) => JniEnvironment.Exceptions.Throw(Ref(throwable));
+    public static void ThrowNew(JClass type, string message) => JniEnvironment.Exceptions.ThrowNew(Ref(type), message);
+    public static int EnsureLocalCapacity(int capacity) { EnsureThread(); JniEnvironment.References.EnsureLocalCapacity(capacity); return 0; }
+    public static int MonitorEnter(JObject value) { JniEnvironment.Monitors.MonitorEnter(Ref(value)); return 0; }
+    public static int MonitorExit(JObject value) { JniEnvironment.Monitors.MonitorExit(Ref(value)); return 0; }
 }
 #endif

@@ -24,7 +24,9 @@ function Get-AndroidDependencies {
         "AndroidHarmonyXRepositoryUrl",
         "AndroidMonoModVersion",
         "AndroidMonoModRevision",
-        "AndroidMonoModRepositoryUrl")) {
+        "AndroidMonoModRepositoryUrl",
+        "JavaInteropRevision",
+        "JavaInteropRepositoryUrl")) {
         if ([string]::IsNullOrWhiteSpace([string]$properties.$name)) {
             throw "Android dependency manifest property '$name' is missing."
         }
@@ -34,7 +36,8 @@ function Get-AndroidDependencies {
         "AndroidDobbyRevision",
         "AndroidIl2CppInteropRevision",
         "AndroidHarmonyXRevision",
-        "AndroidMonoModRevision")) {
+        "AndroidMonoModRevision",
+        "JavaInteropRevision")) {
         if ([string]$properties.$name -notmatch '^[0-9a-f]{40}$') {
             throw "Android dependency manifest property '$name' is not a Git revision."
         }
@@ -44,7 +47,8 @@ function Get-AndroidDependencies {
         "AndroidDobbyRepositoryUrl",
         "AndroidIl2CppInteropRepositoryUrl",
         "AndroidHarmonyXRepositoryUrl",
-        "AndroidMonoModRepositoryUrl")) {
+        "AndroidMonoModRepositoryUrl",
+        "JavaInteropRepositoryUrl")) {
         $uri = $null
         if (-not [Uri]::TryCreate(
             [string]$properties.$name,
@@ -113,7 +117,8 @@ function Assert-AndroidSourceCheckout {
 
 function Initialize-AndroidSourceCheckout {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Url,
-          [Parameter(Mandatory)][string]$Revision, [switch]$Recursive, [switch]$AllowUntracked)
+          [Parameter(Mandatory)][string]$Revision, [switch]$Recursive, [switch]$AllowUntracked,
+          [string[]]$SparsePaths)
     if (Test-Path -LiteralPath $Path) {
         Assert-AndroidSourceCheckout -Path $Path -Revision $Revision -Recursive:$Recursive -AllowUntracked:$AllowUntracked
         return
@@ -133,6 +138,10 @@ function Initialize-AndroidSourceCheckout {
         if ($LASTEXITCODE -ne 0) {
             & git -c core.longpaths=true -C $staging fetch --no-tags origin $Revision
             if ($LASTEXITCODE -ne 0) { throw "Pinned revision '$Revision' is unavailable from '$Url'." }
+        }
+        if ($SparsePaths) {
+            & git -C $staging sparse-checkout set @SparsePaths
+            if ($LASTEXITCODE -ne 0) { throw "Could not select source folders." }
         }
         & git -c core.longpaths=true -C $staging checkout --detach $Revision
         if ($LASTEXITCODE -ne 0) { throw "Could not check out pinned revision '$Revision'." }

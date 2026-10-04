@@ -45,3 +45,12 @@ foreach ($source in $sources) {
         -Revision $source.Revision -Recursive:$source.Recursive
     Write-Host "$($source.Name) @ $($source.Revision.Substring(0, 12)): $destination"
 }
+
+$javaDestination = if ($SourceRoot) {
+    [IO.Path]::GetFullPath((Join-Path $SourceRoot 'DotnetAndroid'))
+} else {
+    Get-PinnedSourceRoot -Name DotnetAndroid -Revision $dependencies.JavaInteropRevision -RepositoryRoot $repositoryRoot
+}
+Initialize-AndroidSourceCheckout -Path $javaDestination -Url $dependencies.JavaInteropRepositoryUrl `
+    -Revision $dependencies.JavaInteropRevision -SparsePaths @('external/Java.Interop')
+Write-Host "Java.Interop @ $($dependencies.JavaInteropRevision.Substring(0, 12)): $javaDestination"

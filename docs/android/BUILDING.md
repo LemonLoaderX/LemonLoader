@@ -15,20 +15,20 @@ Unless a block says otherwise, run commands from the Loader repository root.
 Exact product dependency versions and source revisions are defined in
 `eng/AndroidDependencies.props`. Scripts read that file; revision hashes are not
 duplicated in command defaults. Runtime selection lives in
-`eng/runtime-profiles.json`: product SDK, Loader TFM (`net6.0`) and embedded
+`eng/runtime-profiles.json`: product SDK, Android Loader TFM (`net10.0`) and embedded
 runtime (.NET 11) are different inputs, not conflicting version requirements.
 
 ## Source dependencies
 
-The build needs the maintained Dobby, Il2CppInterop, HarmonyX, and MonoMod source
-forks. Resolve their URLs and revisions from the product manifest with:
+The build needs Dobby, Il2CppInterop, HarmonyX, MonoMod and dotnet/android's
+Java.Interop source. Resolve URLs and revisions from the product manifest with:
 
 ```powershell
 pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
 ```
 
-Setup/build selects a sibling `../Dobby`, `../Il2CppInterop`, `../HarmonyX` or
-`../MonoMod` only when its HEAD matches this product's manifest. Otherwise setup
+Setup/build selects a sibling `../Dobby`, `../Il2CppInterop`, `../HarmonyX`,
+`../MonoMod` or `../DotnetAndroid` only when its HEAD matches this product's manifest. Otherwise setup
 creates an isolated `.dependencies/<name>/<revision>` checkout. Existing sources
 are verified without fetching or switching revisions; local changes are preserved.
 Different product pins never switch a shared checkout. Builds do not fetch.
@@ -38,7 +38,8 @@ required. Configure local NuGet/temp caches through standard environment variabl
 when needed; product commands do not redirect them to a parent temp directory.
 
 Use the corresponding `-DobbySourceRoot`, `-Il2CppInteropSourceRoot`,
-`-HarmonyXSourceRoot` or `-MonoModSourceRoot` for explicit external checkouts.
+`-HarmonyXSourceRoot`, `-MonoModSourceRoot` or `-JavaInteropSourceRoot` for explicit external checkouts.
+Java.Interop uses a sparse checkout of `external/Java.Interop` from dotnet/android.
 Setup's optional `-SourceRoot <directory>` creates/verifies named checkouts there
 instead; pass those explicit paths to builds. Existing old caches are left intact.
 

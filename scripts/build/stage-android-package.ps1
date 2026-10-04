@@ -18,6 +18,7 @@ param(
     [string]$MonoModSourceRoot,
 
     [string]$HarmonyXSourceRoot,
+    [string]$JavaInteropSourceRoot,
 
     [ValidateSet('android','bionic')][string]$RuntimeProfile,
     [switch]$DevelopmentBuild
@@ -161,6 +162,9 @@ foreach ($legalFile in @("LICENSE.md", "NOTICE.txt")) {
         -Destination (Join-Path $packageRoot $legalFile)
 }
 $dependencyLicenses = [ordered]@{
+    "Java.Interop/LICENSE" = Join-Path $(if ($JavaInteropSourceRoot) { $JavaInteropSourceRoot } else {
+        Get-PinnedSourceRoot -Name DotnetAndroid -Revision $dependencies.JavaInteropRevision -RepositoryRoot $repositoryRoot
+    }) 'external/Java.Interop/LICENSE'
     "Dobby/LICENSE" = Join-Path $dependencySourceRoots.Dobby "LICENSE"
     "Il2CppInterop/LICENSE" = Join-Path $dependencySourceRoots.Il2CppInterop "LICENSE"
     "HarmonyX/LICENSE" = Join-Path $dependencySourceRoots.HarmonyX "LICENSE"
@@ -219,6 +223,7 @@ if ($Configuration -eq "Release") {
 if ($Configuration -eq "Release") {
     $sourceBuiltAssemblies = @(
         (Join-Path $melonOutput "net6\MelonLoader.dll"),
+        (Join-Path $melonOutput "net6\Java.Interop.dll"),
         (Join-Path $melonOutput "net6\MelonLoader.NativeHost.dll"),
         (Join-Path $melonOutput "net6\Il2CppInterop.Common.dll"),
         (Join-Path $melonOutput "net6\Il2CppInterop.HarmonySupport.dll"),

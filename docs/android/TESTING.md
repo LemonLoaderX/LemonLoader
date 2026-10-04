@@ -46,9 +46,8 @@ dotnet run --project tests/Preferences/Preferences.csproj
 
 Managed JNI tests cover reference/finalizer ownership, asset buffer/seek/close,
 configuration preservation, scene fallback and hook-root retention.
-The opt-in [JNI library experiment](../../tests/Android/JniLibraries/README.md)
-compares candidate wrappers with a borrowed JVM/ART instance; it does not change
-production dependencies or substitute for full device acceptance.
+The [JNI host regression](../../tests/Android/JniHost/README.md) exercises the
+checked Mod interface with a real JVM; it does not substitute for ART acceptance.
 GameInformation uses real AssetsTools parsing with generated files/bundles and
 tracked source streams. Preferences checks actual save outcomes, fallback and
 events without real Unity logging/watchers. See [failure contracts](HARDENING.md)

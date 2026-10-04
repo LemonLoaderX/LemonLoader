@@ -6,6 +6,7 @@ owning repository root; a parent checkout is not required.
 | Task | Guide |
 | --- | --- |
 | Install Loader, add Mods or edit an APK | [Usage](android/USAGE.md) |
+| Access Java from a Mod | [JNI interface](android/JNI.md) |
 | Implement an installer | [Payload layout](android/ARTIFACTS.md), [deployment policies](android/DEPLOYMENT.md) |
 | Build Loader | [Building](android/BUILDING.md) |
 | Build or update CoreCLR packs | [Runtime development](android/RUNTIME-DEVELOPMENT.md), [runtime troubleshooting](android/RUNTIME-TROUBLESHOOTING.md) |

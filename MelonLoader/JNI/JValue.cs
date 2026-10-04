@@ -91,7 +91,7 @@ public readonly struct JValue
     public JValue(JObject obj)
     {
         this = new JValue();
-        this.L = obj.Handle;
+        this.L = obj?.Handle ?? IntPtr.Zero;
     }
 
     public JValue(object value)
@@ -134,6 +134,13 @@ public readonly struct JValue
             case JObject obj:
                 this.L = obj.Handle;
                 break;
+            case IntPtr handle:
+                this.L = handle;
+                break;
+            case null:
+                break;
+            default:
+                throw new ArgumentException("Use a Java primitive, JObject or IntPtr argument.", nameof(value));
         }
     }
 
@@ -154,5 +161,6 @@ public readonly struct JValue
     public static implicit operator JValue(double d) => new JValue(d);
 
     public static implicit operator JValue(JObject obj) => new JValue(obj);
+    public static implicit operator JValue(IntPtr handle) => new JValue(handle);
 }
 #endif

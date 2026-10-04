@@ -69,11 +69,11 @@ The NDK bootstrap additionally identifies itself with
 `MELONLOADER_BOOTSTRAP_KIND=ndk`. This keeps Android directory discovery and
 managed-runtime startup out of desktop code.
 
-MelonLoader remains compiled for `net6.0`. Android generates a structured
-runtimeconfig with `LatestMajor` roll-forward and ships the selected .NET 11
-CoreCLR runtime pack. This
-keeps the upstream target unchanged and replaces the legacy port's runtimeconfig
-text mutation with an MSBuild-owned setting.
+Android managed Loader targets `net10.0` for Java.Interop; desktop targets remain
+unchanged. Android generates a structured runtimeconfig with `LatestMajor`
+roll-forward and ships the selected .NET 11 CoreCLR pack. The historical
+`loader/net6` installation path remains a layout contract, not the compiler target.
+See [JNI interface](JNI.md) for Mod ownership, calls and migration rules.
 
 ## Build seam
 

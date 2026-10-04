@@ -1,8 +1,8 @@
 # Android CoreCLR runtime
 
 Android LemonLoader uses one managed backend: ARM64 CoreCLR from .NET 11,
-with Android (default) and Linux Bionic profiles. MelonLoader remains targeted at
-`net6.0`; its runtimeconfig requests `LatestMajor` roll-forward into the private
+with Android (default) and Linux Bionic profiles. Android managed Loader targets
+`net10.0`; its runtimeconfig requests `LatestMajor` roll-forward into the private
 runtime.
 
 The maintained version and source revision are defined once in

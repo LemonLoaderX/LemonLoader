@@ -21,7 +21,8 @@ public class JObjectArray<T> : JObject, IEnumerable<T> where T : JObject, new()
 
     public IEnumerator<T> GetEnumerator()
     {
-        for (int i = 0; i < this.Length; i++)
+        int length = Length;
+        for (int i = 0; i < length; i++)
         {
             yield return JNI.GetObjectArrayElement(this, i);
         }

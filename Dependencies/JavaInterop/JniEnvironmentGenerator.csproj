@@ -4,7 +4,5 @@
     <OutputType>Exe</OutputType>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="$(JavaInteropSource)/build-tools/jnienv-gen/*.cs" />
-  </ItemGroup>
+  <ItemGroup><Compile Include="$(JavaInteropSource)/build-tools/jnienv-gen/*.cs" /></ItemGroup>
 </Project>

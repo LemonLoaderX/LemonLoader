@@ -8,6 +8,7 @@
         <LibPrefix>lib</LibPrefix>
         <LibExt>.a</LibExt>
         <RollForward>LatestMajor</RollForward>
+        <DotNetTarget>net10.0</DotNetTarget>
 
         <AndroidApiLevel Condition="'$(AndroidApiLevel)' == ''">23</AndroidApiLevel>
         <AndroidNdkRoot Condition="'$(AndroidNdkRoot)' == ''">$(ANDROID_NDK_ROOT)</AndroidNdkRoot>

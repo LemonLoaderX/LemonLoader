@@ -1,8 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <LangVersion>latest</LangVersion>
-    <BaseIntermediateOutputPath>obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
-    <BaseOutputPath>bin/$(MSBuildProjectName)/</BaseOutputPath>
-    <IsPackable>false</IsPackable>
-  </PropertyGroup>
-</Project>

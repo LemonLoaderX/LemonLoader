@@ -8,6 +8,7 @@ param(
     [string]$Il2CppInteropSourceRoot,
     [string]$HarmonyXSourceRoot,
     [string]$MonoModSourceRoot,
+    [string]$JavaInteropSourceRoot,
     [Alias('AllowDirtyDependencies')][switch]$Development,
     [switch]$SkipAndroid,
     [switch]$SkipDesktop
@@ -41,7 +42,8 @@ if (!$SkipAndroid) {
     & (Join-Path $PSScriptRoot 'build.ps1') -Configuration Release -RuntimeProfile $profile.name `
         -AndroidNdkRoot $AndroidNdkRoot -CoreClrRuntimePackRoot $CoreClrRuntimePackRoot `
         -DobbySourceRoot $DobbySourceRoot -Il2CppInteropSourceRoot $interop `
-        -HarmonyXSourceRoot $HarmonyXSourceRoot -MonoModSourceRoot $MonoModSourceRoot -Development:$Development
+        -HarmonyXSourceRoot $HarmonyXSourceRoot -MonoModSourceRoot $MonoModSourceRoot `
+        -JavaInteropSourceRoot $JavaInteropSourceRoot -Development:$Development
     $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'Output/Release/linux-bionic-arm64/package/lemonloader-release.json') -Raw | ConvertFrom-Json
     if ($manifest.runtimeProfile -cne $profile.name -or $manifest.runtimeRid -cne $profile.rid -or
         [bool]$manifest.developmentBuild -ne [bool]$Development) {

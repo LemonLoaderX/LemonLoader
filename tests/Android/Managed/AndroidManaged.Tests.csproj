@@ -10,6 +10,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../Dependencies/JavaInterop/Java.Interop.csproj" />
     <Compile Include="../../../MelonLoader/JNI/*.cs" Link="JNI/%(Filename)%(Extension)" />
     <Compile Include="../../../MelonLoader/Utils/APKAssetManager.cs" Link="APKAssetManager.cs" />
     <Compile Include="../../../MelonLoader/LoaderConfig.cs" Link="LoaderConfig.cs" />

@@ -5,8 +5,18 @@ public class JThrowable : JObject
 {
     public JThrowable() { }
 
-    public string GetMessage() => JNI.FindClass("java/lang/Throwable").CallObjectMethod<JString>(this, "getMessage", "()Ljava/lang/String;").GetString();
+    public string GetMessage()
+    {
+        using var type = JNI.FindClass("java/lang/Throwable");
+        using var value = type.CallObjectMethod<JString>(this, "getMessage", "()Ljava/lang/String;");
+        return value.IsNull ? "" : value.GetString();
+    }
 
-    public override string ToString() => JNI.FindClass("java/lang/Throwable").CallObjectMethod<JString>(this, "toString", "()Ljava/lang/String;").GetString();
+    public override string ToString()
+    {
+        using var type = JNI.FindClass("java/lang/Throwable");
+        using var value = type.CallObjectMethod<JString>(this, "toString", "()Ljava/lang/String;");
+        return value.IsNull ? "" : value.GetString();
+    }
 }
 #endif

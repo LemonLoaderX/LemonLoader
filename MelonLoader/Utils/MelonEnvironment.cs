@@ -7,7 +7,7 @@ namespace MelonLoader.Utils
     public static class MelonEnvironment
     {
         private const string OurRuntimeName =
-#if !NET6_0
+#if !NET6_0_OR_GREATER
             "net35";
 #else
             "net6";

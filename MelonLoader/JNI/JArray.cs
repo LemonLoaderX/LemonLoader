@@ -8,7 +8,7 @@ public class JArray<T> : JObject, IEnumerable<T>
 {
     public JArray() : base() { }
 
-    public JArray(int size) : base(JNI.NewArray<T>(size)) { }
+    public JArray(int size) { TakeFrom(JNI.NewArray<T>(size)); }
 
     public int Length => JNI.GetArrayLength(this);
 
@@ -25,7 +25,8 @@ public class JArray<T> : JObject, IEnumerable<T>
 
     public IEnumerator<T> GetEnumerator()
     {
-        for (int i = 0; i < this.Length; i++)
+        int length = Length;
+        for (int i = 0; i < length; i++)
         {
             yield return JNI.GetArrayElement(this, i);
         }
