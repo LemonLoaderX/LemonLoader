@@ -166,10 +166,7 @@ public static unsafe class JavaCallbacks
             return array;
         }
         var manager = AndroidJava.Runtime.ValueManager;
-        bool peerType = typeof(IJavaPeerable).IsAssignableFrom(type);
-        object? value = peerType
-            ? manager.CreatePeer(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type)
-            : manager.CreateValue(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type);
+        object? value = manager.CreateValue(ref reference, JniObjectReferenceOptions.CopyAndDoNotRegister, type);
         if (value == null) throw new InvalidCastException("Java callback argument cannot be represented as " + type.FullName + ".");
         if (value is IJavaPeerable peer) owned.Add(peer);
         return value;

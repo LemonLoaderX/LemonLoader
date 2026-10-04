@@ -120,6 +120,22 @@ internal static class Hardening
             !payload.PeerReference.IsValid || AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != globals)
             throw new Exception("Callback Java array peer ownership failed.");
         log("PASS callback Java array peer ownership");
+        using var primitive = new JavaSByteArray(new sbyte[] { 1, 2, 3 });
+        using var primitiveArguments = new JavaObjectArray<JavaObject>(new JavaObject[] { primitive });
+        JavaSByteArray? primitivePeer = null;
+        Action<JavaSByteArray> primitiveCallback = value =>
+        {
+            primitivePeer = value;
+            if (ReferenceEquals(value, primitive) || !value.ToArray().SequenceEqual(new sbyte[] { 1, 2, 3 }))
+                throw new Exception("Primitive callback array wrapper changed.");
+        };
+        InvokeCallback(primitiveCallback, primitiveArguments);
+        int primitiveGlobals = AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount;
+        InvokeCallback(primitiveCallback, primitiveArguments);
+        if (JniEnvironment.Exceptions.ExceptionCheck() || primitivePeer == null || primitivePeer.PeerReference.IsValid ||
+            !primitive.PeerReference.IsValid || AndroidJava.Runtime.ObjectReferenceManager.GlobalReferenceCount != primitiveGlobals)
+            throw new Exception("Primitive callback array wrapper ownership failed.");
+        log("PASS callback primitive array peer ownership");
 
         using var list = JavaBinding.BindConstructor<Func<WrongPeer>>("java/util/ArrayList")();
         using var invalidPayload = new JavaObjectArray<JavaObject>(new JavaObject[] { list, unrelated });
