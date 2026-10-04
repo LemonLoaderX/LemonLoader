@@ -142,3 +142,49 @@ assets and SHA-256 sidecars. Loader CI consumes those exact assets. Do not publi
 development packs or relabel them as formal builds. Upstream updates require
 reviewing one revision, updating both active pins, rebuilding/preparing both
 targets and repeating acceptance. Do not reapply legacy fixes already upstream.
+
+### Release metadata
+
+Use `CoreCLR <version> (<first-12-source-revision-chars>)` as the title for every
+runtime release, including historical releases with older tag names. The revision
+identifies the pack's runtime source, which can differ from a packaging tag's target.
+Keep the following body structure; fill it from the actual published inputs:
+
+```markdown
+Runtime packs for embedding CoreCLR in LemonLoader.
+
+## Source
+
+- Runtime: .NET <version>
+- Revision: `<full-source-revision>`
+
+## Changes
+
+<Changes relative to the preceding release, or the initial pack's scope.>
+
+## Packages
+
+| Archive | Crypto backend |
+| --- | --- |
+| `dotnet-runtime-<version>-<rid>.zip` | <backend> |
+
+<Archive contents and available SHA-256 verification.>
+
+## Compatibility
+
+<Architecture, minimum Android API, host requirements and relevant limitations.>
+```
+
+Describe each release's own requirements; do not rewrite historical support to
+match today's Loader. Keep titles independent of the GitHub prerelease flag and
+state upstream preview limitations in compatibility text when applicable.
+Correct prose without rebuilding:
+
+```powershell
+gh release edit "<tag>" --repo LemonLoaderX/runtime `
+    --title "<title>" --notes-file "<notes.md>"
+```
+
+Preserve published tags, assets, prerelease status and Latest selection during
+metadata-only corrections. Keep temporary notes and release snapshots in ignored
+Output; this guide owns the format.
