@@ -1,4 +1,4 @@
-﻿#if X64 && (WINDOWS || OSX || LINUX)
+﻿#if (X64 && (WINDOWS || OSX || LINUX)) || (ARM64 && OSX)
 using System.Diagnostics;
 using System.Formats.Tar;
 using System.IO.Compression;

@@ -95,7 +95,7 @@ internal static class DotnetHandler
         }
 #endif
         
-#if X64 && (WINDOWS || OSX || LINUX)
+#if (X64 && (WINDOWS || OSX || LINUX)) || (ARM64 && OSX)
         // Try to download portable runtime from repository then attempt to use it again
         MelonDebug.Log($"Attempting to download .NET runtime from repository and load hostfxr from: {portableDir}");
         if (DotnetPortable.AttemptInstall()
