@@ -108,8 +108,9 @@ An Activity that never executes queued work needs caller cancellation/timeout.
 JavaCallbacks.Create<TPeer> implements Java interfaces through an embedded helper
 and java.lang.reflect.Proxy. TPeer uses a JniTypeSignature for that interface.
 JavaCallbackMethod supplies the Java method name and a typed delegate, including
-overloads. All abstract methods must be supplied. Object identity methods are
-handled by the proxy; default methods need explicit handlers if invoked.
+overloads. All instance methods, including default interface methods, must have
+explicit handlers. Missing handlers are rejected when creating the proxy. Object
+identity methods are handled by the proxy; static methods are not callbacks.
 Callbacks compile a typed delegate invoker once at registration; invocation avoids
 reflection dispatch and preserves the original managed exception stack.
 
@@ -152,14 +153,16 @@ not a product requirement. Android hosting and desktop compilation remain separa
 | Responsibility | Source |
 | --- | --- |
 | Borrowed VM and thread attachment | AndroidJava.cs, LoaderJavaRuntime.cs |
-| Typed member resolution and calls | JavaBinding.cs |
+| Public binding API | JavaBinding.cs |
+| Delegate compilation and member cache | JavaMethodBinding.cs |
+| Typed invocation and argument lifetime | JavaInvocation.cs |
 | Shared descriptors and input names | JavaTypeMapping.cs |
 | Result locals and scoped callback arguments | JavaObjectMarshaling.cs |
 | Registration lifetime and native dispatch | JavaCallback.cs, JavaCallbacks.cs |
 | Compiled handler invocation | JavaCallbackHandler.cs |
 | Embedded DEX and private callback ClassLoader | JavaCallbackBridge.cs |
 | Java Runnable and InputStream peers | JavaRunnable.cs, JavaInputStream.cs |
-| Android peers and Unity Activity access | AndroidBindings.cs |
+| Android peers and Unity Activity access | AndroidActivity.cs, AndroidContext.cs, AndroidAssetManager.cs, UnityPlayer.cs |
 | Task completion, cancellation and UI dispatch | AndroidThread.cs |
 
 Java.Interop owns JNI operations, peer/value types and baseline marshalers. Loader

@@ -16,7 +16,8 @@ JavaException and array/value marshalers form the single Java model. The old
 JNI/JObject/JClass/JValue interfaces and fake ABI fixtures are removed.
 Loader owns borrowed-VM hosting, weak peer registry/finalization, application
 ClassLoader selection, thread scopes and diagnostics. JavaBinding compiles/caches
-typed delegates, derives descriptors and marshals through upstream value managers.
+typed delegates through JavaMethodBinding; JavaInvocation owns typed argument
+marshaling and calls through upstream value managers.
 Common Android peers adapt Activity, Context, AssetManager and InputStream.
 Advanced Mod bindings use Java.Interop directly within the same host.
 
@@ -96,7 +97,10 @@ Callback argument peers expire with the invocation. Registrations must be dispos
 after Java stops using them; abandoned queued UI work needs caller cancellation.
 Cancellation does not interrupt running actions. Runnable calls after disposal
 are no-ops; other interface calls fail. Proxy Object methods retain identity
-semantics; unimplemented abstract methods are rejected at creation.
+semantics; missing instance handlers, including default methods, are rejected at
+creation. Explicit default overrides avoid API-dependent reflection dispatch on
+the supported API 26 boundary. Argument cleanup attempts every initialized state,
+even when a custom marshaler throws.
 
 JniHost exercises actual peers, arrays, errors, registry/finalization, worker scopes,
 large delegates and real InputStream bounded buffering/seek/release under CheckJNI.

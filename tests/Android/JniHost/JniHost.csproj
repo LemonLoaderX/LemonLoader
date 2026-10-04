@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeIdentifier></RuntimeIdentifier>
     <RuntimeIdentifiers></RuntimeIdentifiers>
-    <DefineConstants>ANDROID</DefineConstants>
+    <DefineConstants>ANDROID;JNI_HOST_FIXTURE</DefineConstants>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

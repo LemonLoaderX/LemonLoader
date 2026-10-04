@@ -15,7 +15,7 @@ public final class NativeCallback implements Runnable, InvocationHandler {
         Class<?> type = Class.forName(name.replace('/', '.'), false, loader);
         if (!type.isInterface()) throw new IllegalArgumentException("Callback target must be an interface.");
         for (Method method : type.getMethods()) {
-            if (!java.lang.reflect.Modifier.isAbstract(method.getModifiers()) || method.getDeclaringClass() == Object.class) continue;
+            if (java.lang.reflect.Modifier.isStatic(method.getModifiers()) || method.getDeclaringClass() == Object.class) continue;
             if (isObjectMethod(member(method))) continue;
             String required = member(method);
             boolean found = false;

@@ -10,6 +10,9 @@ internal static class Hardening
     {
         CheckDefinitions(log);
         CheckUiWork(log);
+#if JNI_HOST_FIXTURE
+        ArgumentCleanup.Run(log);
+#endif
         var length = JavaBinding.BindInstance<Func<JavaObject, int>>("java/lang/StringBuilder", "length");
         using var unrelated = new JavaObject();
         try { length(unrelated); throw new Exception("Unrelated receiver accepted."); }

@@ -1,6 +1,11 @@
 import org.lemonloader.interop.NativeCallback;
 
 public final class NativeCallbackTests {
+    public interface WithDefault {
+        void run();
+        default int defaultValue() { return 42; }
+        static int staticValue() { return 7; }
+    }
     public interface OverloadedEquals {
         int equals(String value);
         boolean equals(Object value);
@@ -9,6 +14,16 @@ public final class NativeCallbackTests {
     }
     public static void main(String[] arguments) throws Exception {
         NativeCallback helper = new NativeCallback(1);
+        try {
+            helper.proxy(WithDefault.class.getName(), new String[] { "run.()V" });
+            throw new AssertionError("Missing default method handler accepted.");
+        } catch (IllegalArgumentException expected) { }
+        WithDefault defaults = (WithDefault)helper.proxy(WithDefault.class.getName(),
+            new String[] { "run.()V", "defaultValue.()I" });
+        try {
+            defaults.defaultValue();
+            throw new AssertionError("Default method did not dispatch to its managed override.");
+        } catch (UnsatisfiedLinkError expected) { }
         try {
             helper.proxy(OverloadedEquals.class.getName(), new String[0]);
             throw new AssertionError("Missing equals overload accepted.");
