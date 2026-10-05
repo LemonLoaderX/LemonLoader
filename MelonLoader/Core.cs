@@ -10,7 +10,6 @@ using MelonLoader.Utils;
 using MelonLoader.InternalUtils;
 using MelonLoader.Melons;
 using MonoMod.RuntimeDetour;
-using MonoMod.RuntimeDetour.Platforms;
 
 [assembly: MelonLoader.PatchShield]
 
@@ -72,10 +71,9 @@ namespace MelonLoader
             if (managedRuntimeBackend == "coreclr" ||
                 (managedRuntimeBackend == null && Type.GetType("Mono.Runtime") == null))
             {
-                // MonoMod 22 only recognizes JIT layouts through .NET 6. Its probe can
-                // recursively enter DetourHelper.Runtime while loading Process support
-                // on Android. Unknown JITs already use this no-JIT-hook fallback.
-                DetourHelper.Runtime = new DetourRuntimeNETCorePlatform();
+                // Initialize the singleton before Harmony patches. Replacing it
+                // afterward would strand detours' static JIT-event subscription.
+                _ = DetourHelper.Runtime;
             }
 #endif
 

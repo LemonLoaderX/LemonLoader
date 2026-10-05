@@ -21,6 +21,16 @@ public sealed class AndroidSmokeMod : MelonMod
     {
         LoggerInstance.Msg("Initialize");
         ProbeManagedRuntimeIdentity();
+        try
+        {
+            LoggerInstance.Msg($"ManagedDetourPlatform {MonoMod.RuntimeDetour.DetourHelper.Runtime.GetType().Name}, recompile={MonoMod.RuntimeDetour.DetourHelper.Runtime.OnMethodCompiledWillBeCalled}");
+            int recompilations = ManagedDetourProbe.Run();
+            LoggerInstance.Msg($"ManagedDetourPass recompilations={recompilations}, patch/original/unpatch/repatch, direct/delegate/reflection/worker/hot calls");
+        }
+        catch (Exception exception)
+        {
+            LoggerInstance.Error($"ManagedDetourFailed {exception}");
+        }
         _ = ProbeJniWorkerAsync();
 
         string probePath = Path.Combine(

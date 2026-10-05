@@ -240,6 +240,7 @@ if (-not [string]::IsNullOrWhiteSpace($SmokeModPath)) {
         "[Android_Smoke_Mod] RuntimeIdentity CoreClr True MonoVm False Maps True"
     foreach ($marker in @(
         "[Android_Smoke_Mod] Initialize",
+        "[Android_Smoke_Mod] ManagedDetourPass",
         $runtimeIdentityMarker,
         "[Android_Smoke_Mod] JniWorker 10006 True",
         "[Android_Smoke_Mod] SceneLoaded",
