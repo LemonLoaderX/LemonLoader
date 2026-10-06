@@ -7,7 +7,7 @@
     <JavaInteropRevision>5b9effb3e32df58a91257f7f92aa595679862a33</JavaInteropRevision>
     <JavaInteropRepositoryUrl>https://github.com/dotnet/android.git</JavaInteropRepositoryUrl>
 
-    <AndroidDobbyRevision>be22f55a2adab028bb2d3264589df1cb3f1aea9f</AndroidDobbyRevision>
+    <AndroidDobbyRevision>a7772c637e0a2711597d3cb87346d201d308b574</AndroidDobbyRevision>
     <AndroidDobbyRepositoryUrl>https://github.com/LemonLoaderX/Dobby.git</AndroidDobbyRepositoryUrl>
     <AndroidIl2CppInteropVersion>1.5.3</AndroidIl2CppInteropVersion>
     <AndroidIl2CppInteropRevision>2a16370dd441c496ca5c99cd61a7af9e87caa5d3</AndroidIl2CppInteropRevision>
