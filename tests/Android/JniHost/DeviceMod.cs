@@ -47,17 +47,35 @@ public sealed class DeviceMod : MelonMod
                     e.Dispose();
                 }
             }
-            using (var comparator = JavaCallbacks.Create<JavaComparator>(new JavaCallbackMethod("compare", (Func<JavaObject, JavaObject, int>)((a, b) => 7))))
+            using (var function = JavaCallbacks.Create<JavaToIntBiFunction>(
+                new JavaCallbackMethod("applyAsInt", (Func<JavaObject, JavaObject, int>)((a, b) => 7))))
             {
-                var compare = JavaBinding.BindInstance<Func<JavaComparator, JavaObject, JavaObject, int>>("java/util/Comparator", "compare");
-                if (compare(comparator.Peer, null!, null!) != 7) throw new Exception("Callback primitive boxing failed.");
+                var apply = JavaBinding.BindInstance<Func<JavaToIntBiFunction, JavaObject, JavaObject, int>>(
+                    "java/util/function/ToIntBiFunction", "applyAsInt");
+                if (apply(function.Peer, null!, null!) != 7) throw new Exception("Callback primitive boxing failed.");
             }
             try
             {
-                using var invalid = JavaCallbacks.Create<JavaComparator>(new JavaCallbackMethod("wrong", (Action)(() => { })));
+                using var invalid = JavaCallbacks.Create<JavaToIntBiFunction>(
+                    new JavaCallbackMethod("wrong", (Action)(() => { })));
                 throw new Exception("Missing interface method accepted.");
             }
-            catch (JavaException e) { e.Dispose(); }
+            catch (JavaException e)
+            {
+                using (e)
+                    if (!e.Message.Contains("Missing callback")) throw;
+            }
+            try
+            {
+                using var incomplete = JavaCallbacks.Create<JavaComparator>(
+                    new JavaCallbackMethod("compare", (Func<JavaObject, JavaObject, int>)((a, b) => 0)));
+                throw new Exception("Missing default method handlers accepted.");
+            }
+            catch (JavaException e)
+            {
+                using (e)
+                    if (!e.Message.Contains("Missing callback")) throw;
+            }
             LoggerInstance.Msg("PASS callbacks/exception containment");
             _ = CheckUiThread();
         }
@@ -96,6 +114,11 @@ public sealed class DeviceMod : MelonMod
 public sealed class JavaComparator : JavaObject
 {
     public JavaComparator(ref JniObjectReference reference, JniObjectReferenceOptions options) : base(ref reference, options) { }
+}
+[JniTypeSignature("java/util/function/ToIntBiFunction", GenerateJavaPeer = false)]
+public sealed class JavaToIntBiFunction : JavaObject
+{
+    public JavaToIntBiFunction(ref JniObjectReference reference, JniObjectReferenceOptions options) : base(ref reference, options) { }
 }
 [JniTypeSignature("android/os/Looper", GenerateJavaPeer = false)]
 public sealed class JavaLooper : JavaObject
