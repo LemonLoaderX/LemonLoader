@@ -20,8 +20,8 @@ arbitrary literal branches or unwrap PInvoke/interpreter/return-buffer adapters.
 Unprepared FixupPrecode triggers one preparation retry; an unchanged target fails
 with a managed exception rather than an unbounded retry or a prestub overwrite.
 
-The known .NET 11 ARM64 JIT GUID selects a dedicated runtime platform. It forwards
-the native compilation request unchanged and reads only its MethodDesc identity
+The known .NET 11 ARM64 JIT GUID selects a dedicated runtime platform. It preserves
+the method-info request and reads only its MethodDesc identity
 to notify detours of recompilation for pinned methods. It does not reconstruct
 private RuntimeAssembly structures or parse legacy generic-signature layouts.
 Callbacks preserve the thread's last P/Invoke error, isolate failing observers,
@@ -41,6 +41,16 @@ exception slot. Loader builds the helper with its pinned NDK and embeds it in
 RuntimeDetour; a unique private runtime file is unlinked immediately after load.
 No installed SO input or separate deployment policy is added. Missing build input
 rejects hook installation; failed installation releases its unpublished resources.
+
+For outer compilations, a native ICorJitInfo forwarding table intercepts allocMem
+to capture the hot code's executable and writable aliases. Its slot count, allocMem
+slot and chunk layout belong to the exact supported JIT GUID, not the runtime's
+display version. NativeDetour patches the RW alias before publication, retains the
+RX address for subsequent changes/Undo, and backs up the original RW bytes.
+Only pinned methods are patched. Nested compilations bypass the proxy and
+the pin-index lock, since a contended Monitor's helpers can themselves need JIT
+compilation. The live pin is read after compilation so pinning during an in-flight
+compile cannot lose its notification or its writable alias.
 
 Modern Unix JIT discovery resolves libclrjit alongside CoreLib, avoiding
 Process.Modules during embedded runtime initialization. Loader initializes the
@@ -69,6 +79,10 @@ retain the existing fallback and do not opt into this layout.
   but POSIX unwinding can terminate the process when the EE throws for a missing
   method. A C# catch cannot handle that boundary. Upstream's native helper retains
   the CLR's original exception instead of translating every failure to invalid IL.
+- Notifying against only the executable buffer keeps the old event shape, but
+  CoreCLR's later publication can overwrite the patch and zero RX bytes are not
+  a usable Undo backup. An internal dual-address notification carries the actual
+  publication contract to NativeDetour without changing the public event.
 
 ## Consequences
 
@@ -92,6 +106,8 @@ evidence belongs in ignored Output.
 The smoke also compiles invalid IL and a synthetic reference to a missing method;
 both must remain ordinary managed errors. A fallback platform cannot satisfy the
 ARM64 smoke verdict merely by passing calls before tiering replaces their bodies.
+The host publication fixture uses production ARM64 patch bytes, a separate RW
+buffer and a simulated RX publication, then verifies Undo restores original code.
 
 The source-resolution policy in
 [independent source resolution](../process/2026-10-02-independent-source-resolution.md)
