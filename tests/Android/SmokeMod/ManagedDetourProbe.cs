@@ -17,12 +17,14 @@ internal static class ManagedDetourProbe
     internal static int Run()
     {
         var harmony = new HarmonyLib.Harmony("LemonLoader.ManagedDetourProbe");
+        ManagedCompilationProbe.Run();
         var target = typeof(ManagedDetourProbe).GetMethod(nameof(Target), BindingFlags.NonPublic | BindingFlags.Static)!;
         var invoke = target.CreateDelegate<Func<int, int>>();
         int recompilations = 0;
         var runtime = DetourHelper.Runtime;
-        if (runtime is DetourRuntimeNET110Platform &&
-            !ReferenceEquals(runtime, DetourRuntimeNETCorePlatform.Create()))
+        if (runtime is not DetourRuntimeNET110Platform)
+            throw new InvalidOperationException("The .NET 11 ARM64 JIT notification platform was not selected.");
+        if (!ReferenceEquals(runtime, DetourRuntimeNETCorePlatform.Create()))
             throw new InvalidOperationException("The .NET 11 JIT hook owner was replaced by a second factory call.");
         OnMethodCompiledEvent compiled = (method, _, _) =>
         {

@@ -10,6 +10,7 @@
     <ItemGroup>
         <Reference Include="0Harmony" HintPath="$([System.IO.Path]::GetDirectoryName('$(MelonLoaderAssemblyPath)'))/0Harmony.dll" Private="false" />
         <Reference Include="MonoMod.RuntimeDetour" HintPath="$([System.IO.Path]::GetDirectoryName('$(MelonLoaderAssemblyPath)'))/MonoMod.RuntimeDetour.dll" Private="false" />
+        <Reference Include="Mono.Cecil" HintPath="$([System.IO.Path]::GetDirectoryName('$(MelonLoaderAssemblyPath)'))/Mono.Cecil.dll" Private="false" />
         <Reference Include="Java.Interop" HintPath="$(JavaInteropAssemblyPath)" Private="false" />
         <Reference Include="MelonLoader">
             <HintPath>$(MelonLoaderAssemblyPath)</HintPath>

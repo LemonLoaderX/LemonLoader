@@ -31,6 +31,17 @@ concurrent Unpin cannot publish a stale record. Delegate thunks and error helper
 are warmed before installing the JIT hook to avoid recursive compilation of
 those helpers.
 
+The vtable is data: Unix writes request RW permissions, avoiding Android's refusal
+to add executable permission to a file-backed RELRO page. The compiler's native
+exceptions use MonoMod upstream's ARM64 POSIX exception helper around both
+transitions. The inner native wrapper saves the unwind exception before returning
+to managed code; the outer wrapper rethrows after managed cleanup. Notifications
+are skipped for failed compilation, and nested callbacks preserve the pending
+exception slot. Loader builds the helper with its pinned NDK and embeds it in
+RuntimeDetour; a unique private runtime file is unlinked immediately after load.
+No installed SO input or separate deployment policy is added. Missing build input
+rejects hook installation; failed installation releases its unpublished resources.
+
 Modern Unix JIT discovery resolves libclrjit alongside CoreLib, avoiding
 Process.Modules during embedded runtime initialization. Loader initializes the
 runtime singleton before installing Harmony patches; replacing it can leave the
@@ -54,6 +65,10 @@ retain the existing fallback and do not opt into this layout.
   already supplies the information detours need.
 - PortableEntryPoint is a data-only WASM contract in the pinned runtime, not the
   Android ARM64 precode contract.
+- Forwarding the native compiler directly through a managed delegate is smaller,
+  but POSIX unwinding can terminate the process when the EE throws for a missing
+  method. A C# catch cannot handle that boundary. Upstream's native helper retains
+  the CLR's original exception instead of translating every failure to invalid IL.
 
 ## Consequences
 
@@ -61,6 +76,8 @@ The adaptation stays in the maintained source fork; Loader keeps the existing
 factory interface. No binary rewriting, global tiering override, runtime-export
 addition or Mod interface change is required. The JIT hook adds a pinned-method
 lookup after successful compilation and remains installed for the process lifetime.
+The embedded native helper adds a bounded per-process load and two small entry
+stubs, with thread-local exception storage owned by upstream's implementation.
 Concurrent mutation/execution of a native patch is still governed by MonoMod's
 existing limitations; this does not establish general concurrent patch safety.
 
@@ -72,6 +89,9 @@ execution, direct/reflection/pre-existing delegate calls, workers, delayed hot
 calls, repeated factory selection and two rounds of unpatch/repatch. Host x64
 fallback tests do not substitute for these Android assertions. Device/build
 evidence belongs in ignored Output.
+The smoke also compiles invalid IL and a synthetic reference to a missing method;
+both must remain ordinary managed errors. A fallback platform cannot satisfy the
+ARM64 smoke verdict merely by passing calls before tiering replaces their bodies.
 
 The source-resolution policy in
 [independent source resolution](../process/2026-10-02-independent-source-resolution.md)

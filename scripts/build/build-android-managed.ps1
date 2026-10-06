@@ -88,6 +88,9 @@ function Invoke-AndroidMonoModBuild {
     $staging = "$output.staging-$([Guid]::NewGuid().ToString('N'))"
     try {
         New-Item -ItemType Directory -Force -Path $staging | Out-Null
+        $nativeHelper = Join-Path $staging 'monomod-exception-helper.so'
+        & (Join-Path $SourceRoot 'scripts/build-android-exception-helper.ps1') `
+            -AndroidNdkRoot $AndroidNdkRoot -OutputPath $nativeHelper
         dotnet build $project `
             --configuration Release `
             --no-incremental `
@@ -101,10 +104,12 @@ function Invoke-AndroidMonoModBuild {
             -p:ImportDirectoryBuildProps=false `
             -p:ImportDirectoryBuildTargets=false `
             -p:GenerateRepositoryUrlAttribute=false `
+            "-p:NativeExceptionHelperPath=$nativeHelper" `
             "-p:PathMap=$SourceRoot=/_/MonoMod"
         if ($LASTEXITCODE -ne 0) {
             throw "Building the Android MonoMod source fork failed with exit code $LASTEXITCODE."
         }
+        Remove-Item -LiteralPath $nativeHelper -Force
 
         foreach ($assembly in @("MonoMod.RuntimeDetour.dll", "MonoMod.Utils.dll")) {
             if (-not (Test-Path -LiteralPath (Join-Path $staging $assembly) -PathType Leaf)) {
@@ -119,7 +124,7 @@ function Invoke-AndroidMonoModBuild {
             sourceRevision = $head
             commonRevision = $commonRevision
             dirty = ($sourceChanges.Count -ne 0 -or $commonChanges.Count -ne 0)
-            buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false -p:GenerateRepositoryUrlAttribute=false -p:PathMap=<source>=/_/MonoMod"
+            buildCommand = "dotnet build MonoMod.RuntimeDetour/MonoMod.RuntimeDetour.csproj -c Release -f net5.0 -p:DebugType=None -p:DebugSymbols=false -p:ContinuousIntegrationBuild=true -p:ImportDirectoryBuildProps=false -p:ImportDirectoryBuildTargets=false -p:GenerateRepositoryUrlAttribute=false -p:NativeExceptionHelperPath=<ndk-built-arm64-helper> -p:PathMap=<source>=/_/MonoMod"
             utilsSha256 = $utilsHash
         } | ConvertTo-Json | Set-Content `
             -LiteralPath (Join-Path $staging "lemonloader-monomod.json") `

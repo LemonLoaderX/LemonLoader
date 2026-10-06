@@ -16,7 +16,7 @@
     <AndroidHarmonyXRevision>e840099c922b9b4c81facd653b1daf84c978ae6a</AndroidHarmonyXRevision>
     <AndroidHarmonyXRepositoryUrl>https://github.com/LemonLoaderX/HarmonyX.git</AndroidHarmonyXRepositoryUrl>
     <AndroidMonoModVersion>22.7.31.1</AndroidMonoModVersion>
-    <AndroidMonoModRevision>58743d026f2239add4116fe414d3478de205b237</AndroidMonoModRevision>
+    <AndroidMonoModRevision>28f100486291991fdb365a2f8b70d988a3a06750</AndroidMonoModRevision>
     <AndroidMonoModRepositoryUrl>https://github.com/LemonLoaderX/MonoMod.git</AndroidMonoModRepositoryUrl>
   </PropertyGroup>
 </Project>

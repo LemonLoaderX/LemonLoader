@@ -79,7 +79,9 @@ Managed builds also run MonoModCoreClrProbe and HarmonyCoreClrProbe.
 The Android smoke Mod includes a managed detour regression:
 prefix/postfix with original execution, direct/reflection/pre-existing delegate
 calls, worker and delayed hot calls, unpatch and repatch. The smoke run requires
-`ManagedDetourPass`; reporting installed Harmony patches alone is insufficient.
+`ManagedDetourPass` from the .NET 11 ARM64 JIT platform, including invalid-IL and
+missing-method compilation exceptions; a fallback without re-JIT notifications
+cannot satisfy the probe. Reporting installed Harmony patches alone is insufficient.
 
 Patcher owns `scripts/test.ps1`, including APK/directory injection, all deployment
 policies, duplicate/path/native-collision safety, runtime completeness and legacy
