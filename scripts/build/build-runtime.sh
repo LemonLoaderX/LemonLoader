@@ -36,6 +36,7 @@ if [[ $policy == development ]]; then
 fi
 args=(clr.runtime+clr.corelib+clr.packages+libs+host.native+packs.product
     -os "$os" -arch arm64 -c Release -p:PublishReadyToRun=false
+    "-p:SourceRevisionId=$actual_revision"
     -p:PrimaryRuntimeFlavor=CoreCLR -p:DebugType=None -p:DebugSymbols=false -p:_BuildBundle=false
     "-p:RestoreConfigFile=$source_root/NuGet.config")
 if [[ $os == linux-bionic ]]; then

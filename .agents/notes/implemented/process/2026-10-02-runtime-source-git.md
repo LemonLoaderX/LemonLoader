@@ -19,6 +19,11 @@ before identity comparison. Clean-source and locked-revision checks remain;
 binary diff evidence is retained without content rewriting. Build isolation,
 the source lock and the Linux toolchain remain unchanged.
 
+The backend also passes the verified checkout HEAD as SourceRevisionId to the
+upstream build. Linux Git cannot reliably interpret Windows worktree metadata;
+implicit upstream revision discovery may otherwise identify a parent repository.
+Development builds use their actual checkout HEAD, not the product's locked pin.
+
 The backend is Loader's scripts/build/build-runtime.sh; see
 [runtime source development](../../../../docs/android/RUNTIME-DEVELOPMENT.md).
 
@@ -29,6 +34,8 @@ The backend is Loader's scripts/build/build-runtime.sh; see
   requested sibling layout and requires another checkout/cache policy.
 - Letting Linux Git finish preserves behavior but adds repeated avoidable scans
   before each RID build.
+- Leaving upstream source identity discovery implicit avoids another argument but
+  can embed an unrelated parent commit in native version and crash-report identity.
 
 ## Consequences
 
@@ -36,3 +43,5 @@ No mandatory machine-specific Git path is recorded. Windows Git and the source
 checkout must be accessible through WSL interop; when unavailable Linux Git may
 still be slow. This does not address compiler filesystem I/O or relax build
 validation. Verify locked/development plan modes and script syntax before use.
+The launcher fixture checks explicit source identity for both profiles and for a
+development checkout whose HEAD differs from the product pin.

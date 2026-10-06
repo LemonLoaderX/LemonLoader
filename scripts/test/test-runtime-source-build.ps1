@@ -86,6 +86,9 @@ try {
         if ($argsText.Contains('FeatureXplatEventSource=false') -ne ($rid -eq 'linux-bionic-arm64')) {
             throw 'Runtime target options mixed.'
         }
+        if (!$argsText.Contains("-p:SourceRevisionId=$revision")) {
+            throw 'Runtime compiler source revision is not explicit.'
+        }
     }
     & (Join-Path $scripts 'setup-runtime.ps1')
     Write-FixtureFile (Join-Path $source 'build.sh') ($body + "`n# tracked local change`n")
@@ -100,6 +103,13 @@ try {
     Invoke-Git @('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'another source revision')
     Reject { & $entry -Distribution $Distribution -RuntimeProfile android -SourceRoot $source -Plan } 'exit code'
     & $entry -Distribution $Distribution -RuntimeProfile android -SourceRoot $source -Plan -Development
+    $actual = (& git -C $source rev-parse HEAD).Trim()
+    & $entry -Distribution $Distribution -RuntimeProfile android -SourceRoot $source -Development
+    $developmentArgs = Get-Content (Join-Path $output "local/$actual/android-arm64/artifacts/build-args.txt") -Raw
+    if (!$developmentArgs.Contains("-p:SourceRevisionId=$actual") -or
+        $developmentArgs.Contains("-p:SourceRevisionId=$revision")) {
+        throw 'Development compiler source revision does not match the selected checkout.'
+    }
     $lockTest = Join-Path $fixture 'lock-test.sh'
     Write-FixtureFile $lockTest ('exec 8>"$1/.lemonloader-runtime-build.lock"; flock -n 8 || exit 9; bash "$2" "$1" "$3" "$4" android-arm64 build development' + "`n")
     $linuxLockTest = ConvertTo-WslPath -Path $lockTest -Distribution $Distribution

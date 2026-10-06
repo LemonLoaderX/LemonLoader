@@ -59,6 +59,9 @@ headers; common options stay identical. Source status/diff, command, log, exit
 code and package checksums remain beside each target's outputs, outside releases.
 Git for Windows is used through WSL interop when available to avoid expensive
 Linux Git stat scans on DrvFS; otherwise Linux Git is used.
+The verified checkout HEAD is passed explicitly as SourceRevisionId, including in
+development mode, so native version identity does not depend on Linux Git reading
+Windows worktree metadata.
 
 An existing non-link source artifacts directory is rejected. Preserve it manually
 outside the checkout before building; do not overwrite it or recursively clean
