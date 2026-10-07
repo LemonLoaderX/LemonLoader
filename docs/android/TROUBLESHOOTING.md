@@ -18,6 +18,10 @@ No report is guaranteed for faults before initialization, SIGKILL/OOM or a repor
 failure. Android may return no historical trace, and native-only CoreCLR reports
 may have incomplete stacks. Retaining a handled fault is not proof of a fatal crash.
 
+ARM64 translation environments must provide coherent signal registers and stacks
+for CoreCLR suspension, GC and crash reporting. Translation defects belong to the
+emulator; Loader does not reconstruct missing contexts or disable GC/JIT to hide them.
+
 ## Bootstrap does not start
 
 Confirm that the APK contains `lib/arm64-v8a/libmain.so`, that Unity loads the

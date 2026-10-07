@@ -122,6 +122,11 @@ logs, Loader.cfg and relevant preference file. Check retained warnings and real
 save outcomes rather than matching historical instrumentation strings.
 [Device acceptance](../maintenance/embedded-crypto-acceptance.md) owns API26 ART,
 TLS, crash coexistence, Activity recreation and physical 16 KiB coverage.
+For system-exit recovery tests, wait for Android to record the target's natural
+exit before force-stopping or relaunching the package. An early force-stop can
+replace a native-crash reason with a user-requested exit and invalidate the test.
+Match reports and exit records to the crashing PID; verify partial recovery by
+comparing the preserved bytes, without requiring interrupted JSON to parse.
 Dobby hook allocator changes also need its test-android-near-hook.ps1 on native
 ARM64 and supported native-bridge devices.
 

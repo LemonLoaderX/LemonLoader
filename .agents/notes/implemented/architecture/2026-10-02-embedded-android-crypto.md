@@ -53,6 +53,11 @@ APK/directory tests preserve game DEX/smali and reject incomplete/mixed inputs.
 Host mocks cannot prove ART or TLS. Initialization is serialized and inherits
 upstream fatal checks for incompatible Java signatures; it is not a general
 concurrent interface. Device coverage and symbols are separate acceptance inputs.
+Client-certificate acceptance checks the negotiated key/certificate and server
+response; mutual-authentication state alone does not prove server acceptance.
+Native-instance evidence uses the actual process maps and exact ELF inputs without
+loading an extra copy for inspection. These checks and endpoint limitations belong
+to the [device procedure](../../../../docs/maintenance/embedded-crypto-acceptance.md).
 
 ## Prior-note Audit
 

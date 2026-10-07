@@ -30,7 +30,13 @@ smoke coverage and must remain without Android helpers.
 1. Cold process startup: Loader reaches managed startup and normal scene/frame
    callbacks; no missing helper, JNI exception or library initialization error.
 2. Repeat process launches and Activity recreation: no ClassLoader/module
-   reinitialization, stale JNI references or unexpected DEX extraction.
+   reinitialization, stale JNI references or unexpected DEX extraction. Confirm
+   the PID stays the same, the old Activity is destroyed and the new object is
+   distinct. Reacquire CurrentActivity and exercise UI callbacks, APK assets and
+   worker-thread crypto after each recreation. A private secondary Activity can
+   isolate reference/lifetime behavior when a game's Unity Activity exits its
+   process; record any fixture-controlled currentActivity assignment. That result
+   does not qualify recreation of the game's Unity Activity or its lifecycle.
 3. Known-answer tests through .NET APIs: SHA-256, HMAC, AES encrypt/decrypt,
    PBKDF2 including empty and arbitrary-byte passwords, RSA sign/verify and RNG
    basic operation. Compare against established vectors, not generated values.
@@ -40,12 +46,22 @@ smoke coverage and must remain without Android helpers.
    and hostname are rejected by default, and managed callback behavior does not
    bypass platform trust rejection. Do not test success using permissive callbacks.
 6. Client-certificate handshake against a controlled endpoint, covering
-   DotnetX509KeyManager rather than only server authentication.
+   DotnetX509KeyManager rather than only server authentication. Include correct,
+   missing and unrelated client certificates through HttpClient and SslStream.
+   Require a successful application response and the expected negotiated local
+   certificate for the positive SslStream case; mutual authentication alone can
+   still accompany a server rejection. Treat unrelated TLS/network exceptions as
+   inconclusive, not successful negative cases. Distinguish certificate-container
+   import failures from handshake failures; do not enable obsolete algorithms just
+   to import a fixture. A re-export must preserve the certificate and private key.
 7. Existing platform trust/network-security-config behavior is preserved.
    Endpoint names, certificates and credentials are private test inputs.
 8. Native module identity: instrument privately or inspect maps to confirm the
    module initialized with the helper loader is the P/Invoke module, not a second
-   namespace-local copy. A library filename alone is not proof of identity.
+   namespace-local copy. A library filename alone is not proof of identity. Match
+   exact native-file hashes and ELF load-segment offsets to same-process maps,
+   checking load instances before and after the operation. Do not load another
+   module merely to inspect its identity.
 9. Existing Mods/Harmony/Interop and a longer session work at least as well as
    the saved baseline; record pre-existing warnings separately from regressions.
 10. Negative package tests reject missing/wrong crypto SO, wrong bootstrap digest,
@@ -60,6 +76,13 @@ smoke coverage and must remain without Android helpers.
 Keep build identities, APK layout verification, known-answer results, startup
 and TLS errors, selected native module evidence and rollback notes together in
 ignored local output. Include the whole session context, not only a success line.
+Identify who controls the TLS endpoint and which server-side observations are
+available; a public test endpoint is narrower evidence than an owned fixture.
+Keep lifecycle and TLS verdicts separate so a network failure does not prevent
+collecting independent lifecycle evidence. Timeout/EOF does not prove certificate
+rejection. An opaque TCP forwarding route can help compare network paths while
+keeping TLS and certificate validation on the device; record that route and do
+not treat its success as proof of direct-network reliability.
 
 Use this matrix to qualify API 26 ART in-memory DEX, native TLS/provider behavior
 and game compatibility. Android profile's upstream synchronous HTTP restriction

@@ -78,6 +78,13 @@ The P/Invoke probe checks the current-process reporting attempt, explicitly
 labels empty/incomplete reports as a coverage limitation and checks next-start
 recovery only when partial bytes exist. It is not a successful-trace assertion.
 
+Device qualification consumes fatal triggers before firing, so an automatic
+restart cannot repeat the crash. It waits for the natural process exit and the
+corresponding Android exit record before cleanup or recovery launch: force-stop
+can otherwise replace the recorded native-crash reason with a user-requested exit.
+An actual interrupted report is identified by its crashing PID and nonempty
+temporary bytes; next-launch preservation compares those bytes without parsing.
+
 ## Prior-note Audit
 
 The broad crash investigation is fully absorbed here: alternatives and native
