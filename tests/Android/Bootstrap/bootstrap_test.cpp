@@ -16,6 +16,13 @@ static bool fail_logger = false;
 static int emergency_logs = 0;
 static int hook_status = 0, destroy_calls = 0;
 static bool throw_destroy = false;
+static void* reservation_target = nullptr;
+static int prepare_calls = 0;
+extern "C" int dobby_reserve_near_trampoline(void* target) { reservation_target = target; return -1; }
+static void* original_init_fixture(const char*) {
+    assert(reservation_target == reinterpret_cast<void*>(&original_init_fixture));
+    return reinterpret_cast<void*>(0x5678);
+}
 extern "C" int DobbyHook(void*, void*, void** original) { *original = reinterpret_cast<void*>(0x7890); return hook_status; }
 extern "C" int DobbyDestroy(void*) {
     ++destroy_calls;
@@ -28,7 +35,7 @@ namespace lemon::bootstrap {
 RuntimePaths runtime_paths;
 JavaVM* java_vm = nullptr;
 void* unity_handle = nullptr;
-bool prepare_android_runtime() { assert(false && "host fixture must not start CoreCLR"); return false; }
+bool prepare_android_runtime() { ++prepare_calls; return false; }
 void log_line(const std::string&) {}
 void log_error(const std::string& message) {
     if (fail_logger) throw std::bad_alloc();
@@ -91,6 +98,12 @@ static jclass find_class(JNIEnv*, const char*) { pending = true; return nullptr;
 int main(int argc, char** argv) {
     assert(argc == 3);
     using namespace lemon::bootstrap;
+    original_il2cpp_init = &original_init_fixture;
+    assert(il2cpp_init_detour("fixture") == reinterpret_cast<void*>(0x5678));
+    assert(reservation_target == reinterpret_cast<void*>(original_il2cpp_init));
+    assert(prepare_calls == 1);
+    original_il2cpp_init = nullptr;
+    std::cout << "PASS near reservation before IL2CPP initialization, failure preserves game and permits runtime preparation\n";
     const std::filesystem::path fixture(argv[1]);
     const auto lock_path = fixture / "runtime.lock";
     {

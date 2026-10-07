@@ -25,6 +25,7 @@ extern "C" {
 int DobbyHook(void* target, void* replacement, void** original);
 int DobbyDestroy(void* target);
 void dobby_set_near_trampoline_required(bool require);
+int dobby_reserve_near_trampoline(void* target);
 
 extern const unsigned char lemon_arm64_return_8[];
 extern const unsigned char lemon_arm64_return_8_end[];
@@ -159,6 +160,12 @@ bool load_and_verify_managed_runtime(const std::filesystem::path& runtime_direct
 }
 
 void* il2cpp_init_detour(const char* domain_name) {
+    // Best-effort capacity preparation before the branch window fills. Only an
+    // actual hook attempt can establish whether its target has usable near storage.
+    native_boundary("IL2CPP near reservation", false, []() {
+        return original_il2cpp_init != nullptr &&
+            dobby_reserve_near_trampoline(reinterpret_cast<void*>(original_il2cpp_init)) == 0;
+    });
     void* domain = original_il2cpp_init == nullptr
         ? nullptr
         : original_il2cpp_init(domain_name);

@@ -109,12 +109,16 @@ Verify that the target address belongs to an executable `libil2cpp.so` segment,
 the selected Unity resolver matches the version family, and the returned
 trampoline is not published after a failed hook.
 
+The bootstrap makes a best-effort request for allocator-owned near capacity before
+IL2CPP initialization. It does not gate managed startup on that request: only the
+actual hook attempt establishes target coverage and available capacity. The Dobby
+fork uses owned pages and unmapped gaps; mapped zero bytes are never free storage.
+
 An x86_64 Android emulator may run an ARM64 application through a native bridge.
-Such bridges can expose guest ARM code as readable, non-executable mappings and
-reserve the nearby guest address space with anonymous `PROT_NONE` mappings. The
-maintained Dobby fork uses one of those reservations only for a translated-code
-target. Run the fork's `scripts/test-android-near-hook.ps1` against the emulator
-to distinguish this layout from a method-resolution failure.
+Such bridges may reserve nearby address space with anonymous `PROT_NONE` mappings.
+Those mappings have no Dobby ownership contract and are never taken over. A full
+branch window can therefore reject a hook; use a supported native ARM64 environment
+when the translator cannot provide usable near storage.
 
 ## APK resources disappear
 
