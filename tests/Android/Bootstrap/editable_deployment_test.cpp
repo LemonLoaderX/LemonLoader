@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdarg>
+#include <cstring>
 #include <deque>
 #include <iostream>
 #include <memory>
