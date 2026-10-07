@@ -53,7 +53,6 @@
         <LinkerArg Include="-Wl,-u,_DlsymHook" />
         <LinkerArg Include="-Wl,-u,_MLRegisterDlsymHook" />
         <LinkerArg Include="-Wl,-u,_MLRealDlsym" />
-        <LinkerArg Include="-Wl,-u,_MLMacOSJitCopy" />
     </ItemGroup>
 
     <!-- Ship the launch wrapper alongside the dylib so end users have a ready-made
@@ -126,7 +125,7 @@
          osxentry.cpp setter the managed dlsym interpose uses. -->
     <Target Name="AddNativeOSXExports" AfterTargets="Replace" BeforeTargets="LinkNative"
             Condition="'$(RuntimeIdentifier.StartsWith(`osx-`))' == 'true'">
-        <WriteLinesToFile File="$(ExportsFile)" Lines="_MLRegisterDlsymHook;_MLRealDlsym;_MLMacOSJitCopy" Overwrite="false" />
+        <WriteLinesToFile File="$(ExportsFile)" Lines="_MLRegisterDlsymHook;_MLRealDlsym" Overwrite="false" />
     </Target>
 
     <Target Name="PublishAfterBuild" AfterTargets="Build" Condition="'$(SkipPublishAfterBuild)' != 'true'">

@@ -10,6 +10,7 @@ using MelonLoader.Utils;
 using MelonLoader.InternalUtils;
 using MelonLoader.Melons;
 using MonoMod.RuntimeDetour;
+using MonoMod.RuntimeDetour.Platforms;
 
 [assembly: MelonLoader.PatchShield]
 
@@ -83,7 +84,7 @@ namespace MelonLoader
             // platform, this causes the unpatched TermInfoReader to kick in before it can be patched and fixed when
             // installing the XTermFix below. To work around this, we can force the platform directly
 #if OSX && ARM64
-            DetourHelper.Native = new Fixes.MonoMod.MacOSArm64NativeDetourPlatform(
+            DetourHelper.Native = new DetourNativeMonoPosixPlatform(
                 new DetourNativeARMPlatform());
 #else
             DetourHelper.Native = new DetourNativeMonoPosixPlatform(new DetourNativeX86Platform());

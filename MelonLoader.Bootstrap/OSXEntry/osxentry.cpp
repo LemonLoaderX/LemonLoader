@@ -1,8 +1,6 @@
 #include <sys/resource.h>
 #include <dlfcn.h>
 #include <string.h>
-#include <pthread.h>
-#include <libkern/OSCacheControl.h>
 
 extern "C"
 {
@@ -10,7 +8,6 @@ extern "C"
     int SetRlimitHook(int resource, rlimit* rlp);
     void MLRegisterDlsymHook(void* detour);
     void* MLRealDlsym(void* handle, const char* symbol);
-    int MLMacOSJitCopy(void* dst, const void* src, size_t len);
     void* DlsymHook(void* handle, const char* symbol);
 }
 
@@ -46,26 +43,6 @@ void MLRegisterDlsymHook(void* detour)
 void* MLRealDlsym(void* handle, const char* symbol)
 {
     return dlsym(handle, symbol);
-}
-
-int MLMacOSJitCopy(void* dst, const void* src, size_t len)
-{
-#if defined(__APPLE__) && defined(__arm64__)
-    if (!pthread_jit_write_protect_supported_np())
-        return 0;
-    if (len == 0)
-        return 1;
-    if (dst == nullptr || src == nullptr)
-        return 0;
-
-    pthread_jit_write_protect_np(0);
-    memcpy(dst, src, len);
-    sys_icache_invalidate(dst, len);
-    pthread_jit_write_protect_np(1);
-    return 1;
-#else
-    return 0;
-#endif
 }
 
 // The game's engine (UnityPlayer.dylib) resolves the mono/il2cpp entry points
