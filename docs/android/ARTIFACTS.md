@@ -82,7 +82,7 @@ emitted. Release validation checks the actual files and rejects game-specific
 Interop or deployment inputs. Installers merge those separately.
 
 Format 3 requires a Patcher supporting that Release format; Patcher 2.0.0 only
-accepts format 2. Current Patcher source accepts both 2 and 3, retaining format-2
+accepts format 2. Patcher 2.1.0 and later accept both 2 and 3, retaining format-2
 consistency checks for already published archives. The installed layout remains 9,
 so this change does not require a native host update or metadata migration on device.
 Build commands and full `runtime-provenance.json` remain in dependency build output;
