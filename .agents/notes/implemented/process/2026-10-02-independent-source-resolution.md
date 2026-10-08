@@ -68,6 +68,18 @@ README links to the products; legal files and historical Git metadata are recove
 material, not another authority. Unrelated private proposals stay outside active
 product docs. Completed broad planning is reduced to remaining qualification gates.
 
+Each maintained repository has a concise root AGENTS.md with its source map,
+selected commands and essential boundaries. Loader and Patcher CONTRIBUTING.md
+own the detailed development/style/testing/output lifecycle rules. Fork instructions
+remain usable without the optional parent container and point to PATCHES.md plus
+upstream guides rather than copying product manuals. Imported upstream instruction
+files retain their owner; eng/common remains Arcade-managed.
+
+Verification follows the changed boundary and reuses evidence for unchanged inputs.
+Output cleanup is part of completing that boundary, with canonical inputs, recovery
+data and necessary symbols retained. Instruction documents describe policy; they do
+not replace tool enforcement, create approval loops or authorize bypassing a denial.
+
 Current facts replace stale overview paragraphs. Scoped decisions preserve useful
 rejected alternatives; overlapping proposals are removed only after their unique
 rationale/limits are absorbed into implemented notes and remaining gates. Private
@@ -97,6 +109,9 @@ through WSL and rebuild into fresh roots rather than reuse absolute-path caches.
   follow actual releases.
 - One combined document avoids links but mixes installation, build, contracts and
   diagnosis. A small task index with topic owners keeps reading selective.
+- A comprehensive manual in every AGENTS.md is self-contained but multiplies stale
+  instructions and context cost. Keep local hard constraints and link detailed topics;
+  no new rule engine or formatter migration is needed to maintain these documents.
 - Retain every historical draft/runner for reproduction: preserves convenient
   history but presents old paths/toolchains as maintained. Preserve unique evidence
   privately and stable causes in their owner; delete redundant instructions.
