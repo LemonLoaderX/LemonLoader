@@ -38,6 +38,16 @@ add_library(main SHARED
     src/system_exit.cpp
     src/runtime.cpp)
 
+# Explicit device regression; excluded from normal bootstrap builds and packages.
+add_executable(lemon_near_capacity_test EXCLUDE_FROM_ALL
+    ../../../../tests/Android/Bootstrap/near_capacity_test.cpp)
+target_compile_features(lemon_near_capacity_test PRIVATE cxx_std_17)
+target_compile_options(lemon_near_capacity_test PRIVATE -ffunction-sections -fdata-sections)
+target_include_directories(lemon_near_capacity_test PRIVATE include src third_party/plthook)
+target_link_options(lemon_near_capacity_test PRIVATE -Wl,--gc-sections -Wl,--wrap=dlsym
+    -Wl,--wrap=dladdr -Wl,--wrap=dobby_reserve_near_trampoline)
+target_link_libraries(lemon_near_capacity_test PRIVATE dobby_static log android dl)
+
 set(LEMON_CRYPTO_DEX "" CACHE FILEPATH "Validated runtime pack crypto helper DEX")
 if(LEMON_CRYPTO_DEX)
     if(ANDROID_PLATFORM_LEVEL LESS 26)

@@ -17,8 +17,13 @@ static int emergency_logs = 0;
 static int hook_status = 0, destroy_calls = 0;
 static bool throw_destroy = false;
 static void* reservation_target = nullptr;
+static std::vector<void*> reservation_targets;
 static int prepare_calls = 0;
-extern "C" int dobby_reserve_near_trampoline(void* target) { reservation_target = target; return -1; }
+extern "C" int dobby_reserve_near_trampoline(void* target) {
+    reservation_target = target;
+    reservation_targets.push_back(target);
+    return -1;
+}
 static void* original_init_fixture(const char*) {
     assert(reservation_target == reinterpret_cast<void*>(&original_init_fixture));
     return reinterpret_cast<void*>(0x5678);
@@ -274,9 +279,19 @@ int main(int argc, char** argv) {
     assert(GetIl2CppLibraryHandle() == unity);
     assert(dlsym_detour(duplicate, "il2cpp_init") == dlsym(duplicate, "il2cpp_init"));
     assert(GetIl2CppLibraryHandle() == unity && original_il2cpp_init == unity_init);
-    assert(unity_init("fixture") != nullptr);
+    reservation_targets.clear();
+    assert(il2cpp_init_detour("fixture") != nullptr);
     il2cpp_code.ranges.clear();
     assert(initialize_module());
+    assert(reservation_targets.size() > 1);
+    for (void* target : reservation_targets) {
+        const auto address = reinterpret_cast<uintptr_t>(target);
+        assert(address % instruction_size == 0);
+        assert(std::any_of(il2cpp_code.ranges.begin(), il2cpp_code.ranges.end(),
+            [address](const auto& range) {
+                return address >= range.begin && address < range.end && range.end - address >= instruction_size;
+            }));
+    }
     auto domain_get = reinterpret_cast<void* (*)()>(get_export("il2cpp_domain_get"));
     assert(domain_get != nullptr);
     pid_t query = fork();
@@ -293,4 +308,5 @@ int main(int argc, char** argv) {
     assert(domain_get == dlsym(unity, "il2cpp_domain_get"));
     assert(!is_executable(reinterpret_cast<uintptr_t>(dlsym(duplicate, "il2cpp_domain_get"))));
     std::cout << "PASS Unity IL2CPP instance survives a duplicate in another linker namespace\n";
+    std::cout << "PASS early near capacity uses Unity's executable ranges despite reservation failures\n";
 }

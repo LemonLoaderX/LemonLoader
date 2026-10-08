@@ -16,6 +16,8 @@
 #include <string>
 #include <vector>
 
+extern "C" int dobby_reserve_near_trampoline(void* target);
+
 namespace lemon::bootstrap {
 namespace {
 
@@ -101,15 +103,15 @@ bool read_instruction(uintptr_t address, uint32_t& instruction) {
     return true;
 }
 
-bool initialize_module() {
-    il2cpp_code.ranges.clear();
-    il2cpp_code.handle = GetIl2CppLibraryHandle();
-    if (il2cpp_code.handle == nullptr) {
+bool read_module_code(module_code& module) {
+    module.ranges.clear();
+    module.handle = GetIl2CppLibraryHandle();
+    if (module.handle == nullptr) {
         log_error("ARM64 IL2CPP resolver has no Unity library handle; refusing to load another instance");
         return false;
     }
     Dl_info info{};
-    void* init = dlsym(il2cpp_code.handle, "il2cpp_init");
+    void* init = dlsym(module.handle, "il2cpp_init");
     if (init == nullptr || dladdr(init, &info) == 0 || info.dli_fbase == nullptr) {
         log_error("ARM64 IL2CPP resolver could not identify Unity's library instance");
         return false;
@@ -177,12 +179,16 @@ bool initialize_module() {
                 code_ranges.push_back({intersection_begin, intersection_end});
         }
     }
-    il2cpp_code.ranges = std::move(code_ranges);
-    if (il2cpp_code.ranges.empty()) {
+    module.ranges = std::move(code_ranges);
+    if (module.ranges.empty()) {
         log_error("ARM64 IL2CPP resolver could not find an executable libil2cpp segment");
         return false;
     }
     return true;
+}
+
+bool initialize_module() {
+    return read_module_code(il2cpp_code);
 }
 
 uintptr_t get_export(const char* name) {
@@ -446,6 +452,27 @@ void initialize_target(uint32_t value, const unity_version& version) {
 }
 
 }  // namespace
+
+void reserve_il2cpp_near_capacity() {
+    module_code module;
+    if (!read_module_code(module)) return;
+    // A page near il2cpp_init can lie outside a late target's branch window in
+    // a large image. Prepare both ends before runtime allocations fill the gaps.
+    // This remains shared, best-effort capacity, not a guarantee for every hook.
+    for (const auto& range : module.ranges) {
+        if (range.end - range.begin < instruction_size) continue;
+        // ELF endpoints need not be instruction-aligned. An unaligned search
+        // boundary can advance Dobby's shared allocator cursor off-alignment.
+        constexpr uintptr_t mask = instruction_size - 1;
+        const uintptr_t begin = (range.begin + mask) & ~mask;
+        const uintptr_t end = range.end & ~mask;
+        if (begin >= end) continue;
+        dobby_reserve_near_trampoline(reinterpret_cast<void*>(begin));
+        if (end - begin > instruction_size)
+            dobby_reserve_near_trampoline(reinterpret_cast<void*>(end - instruction_size));
+    }
+}
+
 }  // namespace lemon::bootstrap
 
 extern "C" LEMON_EXPORT void* ResolveArm64Il2CppInjectionTarget(

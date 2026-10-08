@@ -40,6 +40,7 @@ const void* resolve_android_crypto_pinvoke(
     const char* entrypoint_name);
 
 bool install_symbol_redirect();
+void reserve_il2cpp_near_capacity();
 bool initialize_managed_runtime();
 void start_managed_runtime();
 

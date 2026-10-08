@@ -113,10 +113,14 @@ Verify that the target address belongs to an executable `libil2cpp.so` segment,
 the selected Unity resolver matches the version family, and the returned
 trampoline is not published after a failed hook.
 
-The bootstrap makes a best-effort request for allocator-owned near capacity before
-IL2CPP initialization. It does not gate managed startup on that request: only the
-actual hook attempt establishes target coverage and available capacity. The Dobby
-fork uses owned pages and unmapped gaps; mapped zero bytes are never free storage.
+The bootstrap makes best-effort requests for allocator-owned near capacity before
+IL2CPP initialization: near the init export and both ends of each readable executable
+range in Unity's actual library instance. A page near init alone can be more than
+128 MiB from a late target in a large image. Later runtime allocations can fill that
+target's branch window, causing intermittent SceneManager hook failures even when
+the initial reservation succeeded. Preparation does not gate managed startup or
+guarantee every target: actual hooks still establish coverage and available capacity.
+Dobby uses owned pages and unmapped gaps; mapped zero bytes are never free storage.
 
 An x86_64 Android emulator may run an ARM64 application through a native bridge.
 Such bridges may reserve nearby address space with anonymous `PROT_NONE` mappings.

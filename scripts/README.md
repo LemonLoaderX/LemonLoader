@@ -49,6 +49,7 @@ owners. common/* defines helpers only. No backend owns APK signing/installation.
 | interop/deploy-android-interop.ps1 | Back up/replace device Interop; default Output/DeviceBackups |
 | test/deploy-android-managed-file.ps1 | Back up/replace one device file; Output/DeviceBackups |
 | test/check-android-device.ps1 | ABI/API/page-size/package preflight |
+| test/test-android-near-capacity.ps1 | Run the prebuilt standalone ARM64 near-capacity fixture and remove its device executable |
 | test/build-android-smoke-mod.ps1 | Build the generic lifecycle/host probe |
 | test/smoke-test-android.ps1 | Explicit installed-app smoke; Output/DeviceSmoke |
 

@@ -93,7 +93,27 @@ different build roots when changing path mapping or link flags.
 
 ## Device checks
 
-Devices must already contain the selected application. Use the same signer and
+For the standalone native ARM64 near-capacity regression, first configure the native
+build through [Building](BUILDING.md). With the Android SDK's CMake on PATH, run from
+the repository root in PowerShell:
+
+```powershell
+cmake --build Output/NativeBuild/Release/android-arm64 --target lemon_near_capacity_test
+pwsh -NoProfile -File scripts/test/test-android-near-capacity.ps1 -Serial "<serial>"
+```
+
+Use `-Executable` for a different build output. The runner uploads one temporary
+executable, runs the large-image, unaligned-begin and unaligned-end cases in separate
+processes, then removes it. The fixture models a large ELF image and fills
+its remaining gaps during initialization. It exercises the production startup
+callback and real Dobby hook/original/undo on a late target. ELF and linker inputs are
+synthetic; memory mapping and ARM64 execution are real. Reservation requests must
+identify complete, aligned instructions, including when a short ELF range contains
+no such instruction. The host namespace fixture
+separately verifies that early requests use Unity's instance and remain nonfatal.
+The test target is excluded from normal builds and release payloads.
+
+Application checks require the selected application to be installed. Use the same signer and
 replacement updates; never uninstall, clear app data or change package identity
 as a test setup shortcut. Device scripts are explicit maintainer actions.
 
