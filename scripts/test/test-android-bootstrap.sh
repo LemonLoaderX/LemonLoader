@@ -15,6 +15,11 @@ cp "$jni_header" "$build_root/include/jni.h"
     -I"$native_root/include" -I"$native_root/src" -I"$native_root/third_party/plthook" \
     "$test_root/bootstrap_test.cpp" -Wl,--gc-sections -ldl -pthread -o "$build_root/bootstrap-test"
 fixture=$(mktemp -d "$build_root/run.XXXXXX")
+cleanup() {
+    [[ $fixture == "$build_root"/run.* && ! -L $fixture ]] || return 1
+    rm -rf -- "$fixture"
+}
+trap cleanup EXIT
 "${CXX:-c++}" -shared -fPIC -O0 -Wl,-soname,libil2cpp.so \
     "$test_root/il2cpp_instance_fixture.cpp" -o "$build_root/libil2cpp.so"
 ulimit -c 0

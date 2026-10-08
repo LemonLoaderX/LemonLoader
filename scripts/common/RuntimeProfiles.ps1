@@ -59,6 +59,21 @@ function Get-RuntimeProfileSelection {
     }
 }
 
+function Get-PublicRuntimeProvenance {
+    param([Parameter(Mandatory)]$Provenance, [Parameter(Mandatory)]$Profile, [switch]$Development)
+    return [ordered]@{
+        formatVersion = $Provenance.formatVersion
+        runtimeVersion = $Provenance.runtimeVersion
+        backend = $Provenance.backend
+        hostingModel = $Provenance.hostingModel
+        sourceRevision = $Provenance.sourceRevision
+        engineSha256 = $Provenance.engineSha256
+        runtimeRid = $Profile.rid
+        cryptoBackend = $Profile.cryptoBackend
+        developmentBuild = [bool]($Development -or $Provenance.developmentBuild)
+    }
+}
+
 function Test-RuntimeProfilePack {
     param([Parameter(Mandatory)][string]$Root, [Parameter(Mandatory)]$Profile,
         [switch]$PassThru, [switch]$Development)

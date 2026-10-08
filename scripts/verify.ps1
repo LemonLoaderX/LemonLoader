@@ -61,7 +61,7 @@ if (!$SkipAndroid) {
         -HarmonyXSourceRoot $HarmonyXSourceRoot -MonoModSourceRoot $MonoModSourceRoot `
         -JavaInteropSourceRoot $JavaInteropSourceRoot -Development:$Development
     $manifest = Get-Content -LiteralPath (Join-Path $repositoryRoot 'Output/Release/linux-bionic-arm64/package/lemonloader-release.json') -Raw | ConvertFrom-Json
-    if ($manifest.runtimeProfile -cne $profile.name -or $manifest.runtimeRid -cne $profile.rid -or
+    if ($manifest.runtimeRid -cne $profile.rid -or
         [bool]$manifest.developmentBuild -ne [bool]$Development) {
         throw 'Staged release does not match the selected verification profile/development mode.'
     }

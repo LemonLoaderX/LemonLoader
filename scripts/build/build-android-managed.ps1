@@ -246,6 +246,12 @@ if ($LASTEXITCODE -ne 0) {
     throw "The modified Il2CppInterop build failed with exit code $LASTEXITCODE."
 }
 
+. (Join-Path $PSScriptRoot '../common/Cleanup.ps1')
+$managedTree = Join-Path $outputDirectory 'MelonLoader'
+Assert-GeneratedCleanupPath -Path $managedTree -RepositoryRoot $repositoryRoot
+# A removed package reference must not survive in a reused packaging input tree.
+if (Test-Path -LiteralPath $managedTree) { Remove-Item -LiteralPath $managedTree -Recurse -Force }
+
 $projects = @(
     "MelonLoader.NativeHost\MelonLoader.NativeHost.csproj",
     "Dependencies\SupportModules\Il2Cpp\Il2Cpp.csproj"

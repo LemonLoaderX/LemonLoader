@@ -46,7 +46,7 @@ owners. common/* defines helpers only. No backend owns APK signing/installation.
 | --- | --- |
 | interop/prepare-android-interop-input.ps1 | Normalize decoded game inputs |
 | interop/generate-android-interop.ps1 | Host generation with explicit Unity references or optional Patcher integration |
-| interop/deploy-android-interop.ps1 | Back up/replace device Interop; default Output/DeviceBackups |
+| interop/deploy-android-interop.ps1 | Back up, stage/verify plain DLLs and replace device Interop with rollback; default Output/DeviceBackups |
 | test/deploy-android-managed-file.ps1 | Back up/replace one device file; Output/DeviceBackups |
 | test/check-android-device.ps1 | ABI/API/page-size/package preflight |
 | test/test-android-near-capacity.ps1 | Run the prebuilt standalone ARM64 near-capacity fixture and remove its device executable |
@@ -67,6 +67,8 @@ uninstalling, app-data clearing or signing changes.
 | test/test-source-dependencies.ps1 | Independent pins, sibling/cache selection and setup preservation |
 | test/test-runtime-source-build.ps1 | WSL launcher, output/source protection and failures using fixtures |
 | test/test-runtime-profiles.ps1 | Pack/embedded-byte contracts; optional actual-pack reproducibility |
+| test/test-runtime-preparation.ps1 | Synthetic nupkg import, failure cleanup and existing-pack preservation |
+| test/test-interop-deployment.ps1 | Offline ADB boundary: plain DLLs, backup, hashes and rollback |
 | test/test-cleanup.ps1 | Synthetic cleanup scope and link/repository protection |
 | test/test-publication-scan.ps1 | Preflight fixtures; optional real Gitleaks inputs |
 | test/test-verification-entry.ps1 | Selected sources, skipped boundaries and repack failures |
@@ -80,5 +82,9 @@ uninstalling, app-data clearing or signing changes.
 
 generate-release-notes.sh is the release-note producer used by CI.
 Keep one-off scripts and private diagnostic evidence outside maintained source.
+Preparation removes its temporary extraction/cache tree after success or failure.
+Script tests clean their own unique fixtures through `common/TestFixtures.ps1`,
+including synthetic Git repositories and links without following link targets.
+Product cleanup still rejects repositories and links; it does not sweep old diagnostics.
 Do not delete a narrow entry merely because it is not part of the default test
 command; its independent boundary determines whether it is useful.

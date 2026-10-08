@@ -60,16 +60,33 @@ Output/Releases/LemonLoader-runtime-android-arm64.zip
 Output/Releases/LemonLoader-runtime-bionic-arm64.zip
 ```
 
-The package includes `lemonloader-release.json` with a SHA-256 entry for every
-payload file (the manifest excludes itself), the locked dotnet source revision,
-and the exact managed runtime library SHA-256. It does not publish the build
-command or full `runtime-provenance.json`; those remain in the dependency build
-output. Active layout-9 runtime assets contain no `runtime-identity.json`; the
-Release manifest owns the audit identity. Supported output uses
-`bootstrapFlavor: Ndk`. It is deployable only
-and always records `gameAssembliesIncluded: false`. Game-specific Interop DLLs
-are generated off device and merged by Patcher or another installer. The manifest also records the
-CoreCLR backend and engine provenance.
+The package includes `lemonloader-release.json`. Current producers emit Release
+manifest format 3 with these fields:
+
+| Field | Purpose |
+| --- | --- |
+| `formatVersion` | Release manifest contract; currently `3` |
+| `runtimeRid` | Select Android or Bionic runtime; must match `payload.json` |
+| `managedRuntimeVersion` | Locate the shared CoreCLR runtime directory |
+| `managedRuntimeSourceRevision` | Identify the runtime source used for the pack |
+| `minimumAndroidApi` | Record the bootstrap's minimum Android API, at least 26 |
+| `developmentBuild` | Keep development outputs out of formal release archives |
+| `files` | Exact payload inventory with normalized `path`, `size` and `sha256`; excludes this manifest |
+
+The engine hash appears once, in its `files` entry. Staging checks it against the
+verified runtime pack before publication. `payload.json` owns asset layout 9;
+that layout requires the NDK ARM64 bootstrap and CoreCLR, with embedded JNI crypto
+for Android or private OpenSSL for Bionic. Redundant ABI/profile/backend labels,
+build configuration/channel, engine filename/hash and game-assembly flags are not
+emitted. Release validation checks the actual files and rejects game-specific
+Interop or deployment inputs. Installers merge those separately.
+
+Format 3 requires a Patcher supporting that Release format; Patcher 2.0.0 only
+accepts format 2. Current Patcher source accepts both 2 and 3, retaining format-2
+consistency checks for already published archives. The installed layout remains 9,
+so this change does not require a native host update or metadata migration on device.
+Build commands and full `runtime-provenance.json` remain in dependency build output;
+active runtime assets contain no `runtime-identity.json`.
 Desktop Mono/NetStandard patch directories are excluded, and Release staging
 removes managed PDBs and CoreCLR diagnostic DAC/DBI libraries to avoid paying APK
 and first-extraction cost for files the Android IL2CPP runtime cannot use.
@@ -81,7 +98,7 @@ assemblies, not unrelated NuGet cache files.
 ## Packaging invariants
 
 - The ABI directory is `arm64-v8a`; 32-bit libraries are unsupported.
-- The selected `bootstrapFlavor` must be `Ndk`.
+- The bootstrap is built with the Android NDK.
 - `libmain.so` must not contain `DT_NEEDED libc++_shared.so`; the C++ runtime is
   linked statically so the game's public C++ runtime remains untouched.
 - Every shipped `.so`, including managed runtime dependencies, must support 16 KiB
@@ -107,9 +124,10 @@ assemblies, not unrelated NuGet cache files.
   upgrade, refresh, or enforce managed files. Unknown files are never removed.
 - Active Android Releases contain the Android crypto SO and embed the complete
   verified helper DEX in `libmain.so`; they contain no standalone helper DEX.
-  The Release manifest declares `coreClrCryptoDexMode: embedded` and
-  `minimumAndroidApi` of at least 26; its file inventory verifies `libmain.so`.
-  These build/validation fields are not copied into layout-9 APK configuration.
+  Release format 3 derives the crypto contract from `runtimeRid`; format 2 declares
+  `coreClrCryptoDexMode: embedded`. Both record `minimumAndroidApi` of at least 26,
+  and the file inventory verifies `libmain.so`. These Release fields are not
+  copied into layout-9 APK configuration.
   Patcher adds no DEX entries. Layout 8, external-DEX and MonoVM Releases are
   unsupported; use the corresponding historical tool checkout for old inputs.
 - A Bionic-profile Release has no JNI crypto library or helper DEX. Its shared
@@ -146,6 +164,10 @@ Interop DLLs remain necessary for Mods using their generated surface.
 Active Release configuration contains `formatVersion: 9` and `runtimeRid`.
 Patcher adds only non-seed path/policy overrides; it reads deployment paths
 without reopening their bytes to compute hashes or revisions.
+It omits `deploymentFiles` entirely when no overrides are needed. Present known
+fields must have the expected JSON types; null or mistyped values are not defaults.
+Invalid runtime options reject loading; invalid optional deployment policies disable
+Loader before hooks or Mods run, while leaving the original game available.
 
 The existing extraction marker filenames ending in `-hash` now store the APK
 update token. Historical digest values trigger one replacement extraction. Every

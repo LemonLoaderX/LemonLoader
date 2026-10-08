@@ -395,6 +395,9 @@ function Get-StagedFileHash([string]$Path) {
 if (Test-Path -LiteralPath (Join-Path $melonOutput "Documentation")) {
     throw "Android Release must not contain 'Documentation'."
 }
+if ((Get-StagedFileHash -Path $stagedManagedRuntimeEngine) -cne $managedRuntimeEngineHash) {
+    throw 'The staged CoreCLR engine differs from the verified runtime pack.'
+}
 
 $payloadDescriptor = [ordered]@{ formatVersion = $assetLayoutVersion; runtimeRid = $profile.rid }
 $payloadDescriptor | ConvertTo-Json -Depth 4 |
@@ -410,26 +413,14 @@ $manifestFiles = Get-ChildItem -LiteralPath $packageRoot -File -Recurse |
         }
     }
 $manifest = [ordered]@{
-    formatVersion = 2
-    assetLayoutVersion = $assetLayoutVersion
-    rid = "linux-bionic-arm64"
-    abi = "arm64-v8a"
-    configuration = $Configuration
-    bootstrapFlavor = "Ndk"
+    formatVersion = 3
+    runtimeRid = $profile.rid
     managedRuntimeVersion = $DotnetRuntimeVersion
-    managedRuntimeBackend = $managedRuntimeBackendId
     managedRuntimeSourceRevision = $ManagedRuntimeRevision
-    managedRuntimeEngineFile = "libcoreclr.so"
-    managedRuntimeEngineSha256 = $managedRuntimeEngineHash
-    gameAssembliesIncluded = $false
+    minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
+    developmentBuild = [bool]$DevelopmentBuild
     files = $manifestFiles
 }
-$manifest.runtimeRid = $profile.rid
-$manifest.runtimeProfile = $profile.name
-$manifest.runtimeChannel = $profile.channel
-$manifest.minimumAndroidApi = $bootstrapIdentity.minimumAndroidApi
-if ($embeddedCrypto) { $manifest.coreClrCryptoDexMode = 'embedded' }
-$manifest.developmentBuild = [bool]$DevelopmentBuild
 if ($DevelopmentBuild) {
     $sourceStates = foreach ($source in $dependencySourceRoots.GetEnumerator()) {
         $head = & git -C $source.Value rev-parse HEAD

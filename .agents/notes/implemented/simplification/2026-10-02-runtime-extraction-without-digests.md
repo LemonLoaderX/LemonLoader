@@ -22,6 +22,10 @@ so removed assemblies do not survive a package update.
 
 payload.json is optional configuration. Android is the default RID; Bionic
 selects runtimeRid: linux-bionic-arm64. Optional deploymentFiles supplies policies.
+Known fields distinguish absence from an invalid type. Explicit null, strings in
+place of a numeric layout, and non-array policies cannot silently select defaults.
+Invalid runtime options fail parsing; invalid optional deployment disables Loader
+before hooks and Mods. Unknown additive fields remain tolerated.
 An explicitly unsupported formatVersion or RID is rejected. Declared mixed hashes,
 managedRuntimeIdentitySha256 and backend labels are not admission requirements.
 runtime-identity.json and interop-manifest.json are audit/build artifacts, not

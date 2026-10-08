@@ -231,7 +231,11 @@ public class LoaderConfig
         [TomlPrecedingComment("Only use this if the game freezes when trying to quit. Equivalent to the '--quitfix' launch option")]
         public bool ForceQuit { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("disable_start_screen")]
+#endif
         [TomlPrecedingComment("Disables the start screen. Equivalent to the '--melonloader.disablestartscreen' launch option")]
         public bool DisableStartScreen { get; internal set; }
 
@@ -489,7 +493,11 @@ public class LoaderConfig
         [TomlPrecedingComment("Enables the NativeMethodDetector processor for Cpp2IL. Equivalent to the '--cpp2il.nativemethoddetector' launch option")]
         public bool EnableCpp2ILNativeMethodDetector { get; internal set; }
 
+#if ANDROID
+        [TomlNonSerialized]
+#else
         [TomlProperty("keep_cpp2il_output")]
+#endif
         [TomlPrecedingComment("Keeps the output assemblies from Cpp2IL. Equivalent to the '--cpp2il.keepoutput' launch option")]
         public bool KeepCpp2ILOutput { get; internal set; }
     }

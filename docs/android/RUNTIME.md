@@ -116,10 +116,13 @@ legacy JIT-specific behavior uses MonoMod's existing fallback.
 The source build output keeps full internal provenance, including the build
 command and normalized content hash. Runtime publication creates a minimal
 `runtime-provenance.json` containing only the version, source revision, backend,
-hosting model, engine hash, runtime RID and crypto backend. Staging validates
+hosting model, engine hash, runtime RID, crypto backend and development marker.
+Import and archive packaging construct this public object explicitly; extra input
+fields such as
+build commands and private paths stay out of published packs. Staging validates
 that identity but does not copy the provenance file into the APK.
 
-Active layout-9 Releases record engine/source/profile audit identity in
+Active layout-9 Releases record runtime version/source identity and RID in
 `lemonloader-release.json`, whose file inventory verifies runtime bytes before
 injection. They do not copy identity JSON into the APK. Layout-8 input support is
 retired. Native startup checks

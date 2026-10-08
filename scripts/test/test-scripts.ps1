@@ -52,7 +52,9 @@ try { Get-RuntimeProfileSelection -Name legacy | Out-Null } catch { $rejected = 
 if (!$rejected) { throw 'Retired runtime profile was accepted.' }
 & (Join-Path $PSScriptRoot 'test-cleanup.ps1')
 & (Join-Path $PSScriptRoot 'test-runtime-profiles.ps1')
+& (Join-Path $PSScriptRoot 'test-runtime-preparation.ps1')
 & (Join-Path $PSScriptRoot 'test-publication-scan.ps1')
 & (Join-Path $PSScriptRoot 'test-verification-entry.ps1')
 & (Join-Path $PSScriptRoot 'test-interop-generation.ps1')
+& (Join-Path $PSScriptRoot 'test-interop-deployment.ps1')
 Write-Host "Loader script syntax and helpers passed ($count scripts; SkipBash=$SkipBash)."

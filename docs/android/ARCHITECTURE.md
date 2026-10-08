@@ -62,7 +62,6 @@ The NDK bootstrap provides application paths through:
 ```text
 MELONLOADER_BASE_DIR
 MELONLOADER_DOTNET_ROOT
-MELONLOADER_MANAGED_RUNTIME_BACKEND
 ```
 
 The NDK bootstrap additionally identifies itself with
@@ -102,10 +101,10 @@ All additional native libraries shipped in an APK must be checked separately;
 alignment of `libmain.so` does not make the managed runtime, OpenSSL, Unity, or IL2CPP
 libraries compatible automatically.
 
-`stage-android-package.ps1` records the CoreCLR runtime identity and
-`bootstrapFlavor`, creates the private dotnet layout, adds NDK
-libc++ to `libmain.so` statically, emits a file/hash manifest, and validates every staged `.so`
-as AArch64 with at least `0x4000` segment alignment.
+`stage-android-package.ps1` records the CoreCLR runtime identity, creates the
+private dotnet layout, emits a file/hash manifest, and validates every staged `.so`
+as AArch64 with at least `0x4000` segment alignment. It also checks that the
+bootstrap has statically linked NDK libc++ rather than a public shared dependency.
 
 ## Runtime directories
 

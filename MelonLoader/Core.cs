@@ -67,15 +67,9 @@ namespace MelonLoader
             HarmonyLogger.Setup();
 
 #if ANDROID && NET6_0_OR_GREATER
-            string managedRuntimeBackend =
-                Environment.GetEnvironmentVariable("MELONLOADER_MANAGED_RUNTIME_BACKEND");
-            if (managedRuntimeBackend == "coreclr" ||
-                (managedRuntimeBackend == null && Type.GetType("Mono.Runtime") == null))
-            {
-                // Initialize the singleton before Harmony patches. Replacing it
-                // afterward would strand detours' static JIT-event subscription.
-                _ = DetourHelper.Runtime;
-            }
+            // Initialize the singleton before Harmony patches. Replacing it
+            // afterward would strand detours' static JIT-event subscription.
+            _ = DetourHelper.Runtime;
 #endif
 
 #if !WINDOWS && !NET6_0_OR_GREATER
@@ -176,7 +170,9 @@ namespace MelonLoader
             Fixes.Il2CppInterop.AndroidIl2CppInteropFix.Install();
 #endif
             Fixes.AsmResolver.AsmResolverUtf8StringConcatFix.Install();
+#if !ANDROID
             Fixes.Il2CppInterop.Il2CppInteropUnmangleMethodNameFix.Install();
+#endif
 
 #if OSX
             Fixes.Dotnet.NativeLibraryFix.Install();
@@ -189,7 +185,6 @@ namespace MelonLoader
 #if LINUX || OSX
             Fixes.Il2CppInterop.Il2CppInteropInjectorHelpersSetupFix.Install();
 #endif
-            Fixes.Il2CppInterop.Il2CppInteropGetFieldDefaultValueFix.Install();
 #if !ANDROID
             Fixes.Il2CppInterop.Il2CppICallInjector.Install();
 #endif

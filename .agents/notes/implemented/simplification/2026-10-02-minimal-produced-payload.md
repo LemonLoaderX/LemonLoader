@@ -19,11 +19,41 @@ frozen layout-8 staging below; Loader now produces only layout 9.
 
 Active products produce asset layout 9. Its payload.json contains formatVersion,
 runtimeRid and optional path/policy deploymentFiles overrides. Seed is the native
-default, so Patcher emits only non-seed overrides. Profiles remain packaging
+default, so Patcher emits only non-seed overrides and omits an empty policy list. Profiles remain packaging
 choices; no profile label, declared file size/hash or revision is installed.
 New APKs include actual game Interop DLLs without their generation manifest.
 Active staging does not emit runtime-identity.json: the Release manifest already
-records runtime source, engine identity, profile and cryptography information.
+records runtime source and the verified file inventory.
+
+Release manifest format 3 further removes redundant declarations: old `rid`,
+`abi`, `assetLayoutVersion`, `configuration`, `bootstrapFlavor`, `runtimeProfile`,
+`runtimeChannel`, `managedRuntimeBackend`, `managedRuntimeEngineFile`,
+`managedRuntimeEngineSha256`, `gameAssembliesIncluded` and `coreClrCryptoDexMode`.
+The remaining RID selects the packaging profile and crypto contract; payload.json
+owns layout 9. File paths determine the ABI, required engine and game-independent
+layout. The engine has one hash in the inventory, checked against the verified
+pack at staging. Runtime version/source, minimum API and development isolation
+remain useful identity, compatibility and publication inputs.
+
+The direct development deployment script also consumes ordinary top-level DLLs,
+not the host audit manifest. It backs up the old tree, verifies a separate staged
+tree from actual local hashes, then replaces it with rollback covering both renames.
+An ADB error does not prove the remote rename failed. Recovery checks the actual
+destination before moving the previous tree; uncertain publication or failed recovery
+retains the copies and reports failure instead of nesting a backup in an installed tree.
+Android compilation excludes generator-specific patches and the generator package.
+The managed build recreates its owned packaging input tree so removed references
+cannot survive as stale DLLs from an earlier build.
+Off-device generation and desktop behavior retain their existing owners. Inactive
+start-screen/generator config fields are omitted on Android, and an empty private
+signature-patch framework is removed rather than retained for hypothetical use.
+The retired MonoVM backend selector and unused runtime channel label are no longer
+produced. Shared AsmResolver and native IL2CPP binding still have runtime callers.
+
+This changes the Release envelope, not installed layout 9. Patcher retains the
+format-2 reader checks for published archives. Format 3 is explicit because old
+Patchers require the removed fields; silently deleting them under format 2 would
+misrepresent compatibility. Additive fields alone still do not require a bump.
 
 Release file sizes/hashes, download verification, runtime-pack checks, ABI/path/
 duplicate/native-collision checks and crypto completeness remain. New layout 9
@@ -59,6 +89,8 @@ still omit its format and retain the existing file-layout defaults.
   retirement. Release corruption, collisions and malformed input remain covered.
 - Actual archive validation exercises both profiles; native tests cover minimal
   layout-9 extraction without startup scans.
+- Release validation covers formats 2 and 3 for both RIDs, malformed metadata,
+  missing/empty runtime files, exact inventory and same-length byte corruption.
 - Device smoke consumes loaded maps/exports and lifecycle/JNI markers; it no longer
   reads or hashes runtime-identity.json, which current producers do not install.
 

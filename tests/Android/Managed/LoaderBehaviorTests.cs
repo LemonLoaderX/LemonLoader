@@ -18,6 +18,15 @@ static class LoaderBehaviorTests
             LoaderConfig.InitializeAndroid();
             var path = Path.Combine(root, "UserData", "Loader.cfg");
             Check(File.Exists(path), "Missing configuration must be created.");
+            var configuration = File.ReadAllText(path);
+            Check(!configuration.Contains("keep_cpp2il_output") && !configuration.Contains("disable_start_screen"),
+                "Android configuration must omit inactive generator/start-screen options.");
+            Check(configuration.Contains("capture_player_logs") && configuration.Contains("disable_console_log_cleaner"),
+                "Active Android configuration options must remain available.");
+            File.WriteAllText(path, "[loader]\ndisable_start_screen = true\ncapture_player_logs = true\n[unityengine]\nkeep_cpp2il_output = true\n");
+            LoaderConfig.InitializeAndroid();
+            Check(LoaderConfig.Current.Loader.CapturePlayerLogs && !File.ReadAllText(path).Contains("keep_cpp2il_output") &&
+                !File.ReadAllText(path).Contains("disable_start_screen"), "Saving old configuration must retain active settings and retire inactive ones.");
             File.WriteAllText(path, "[invalid");
             MelonLogger.Warnings.Clear();
             LoaderConfig.InitializeAndroid();

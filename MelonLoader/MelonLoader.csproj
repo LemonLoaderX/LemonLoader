@@ -64,7 +64,8 @@
         <PackageReference Include="Iced" Version="$(IcedVersion)" />
         <PackageReference Include="Il2CppInterop.Common" Version="$(Il2CppInteropVersion)" />
         <PackageReference Include="Il2CppInterop.Runtime" Version="$(Il2CppInteropVersion)" />
-        <PackageReference Include="Il2CppInterop.Generator" Version="$(Il2CppInteropVersion)" />
+        <PackageReference Include="Il2CppInterop.Generator" Version="$(Il2CppInteropVersion)"
+                          Condition="'$(RuntimeIdentifier)' != 'linux-bionic-arm64'" />
         <PackageReference Include="Il2CppInterop.HarmonySupport" Version="$(Il2CppInteropVersion)" />
     </ItemGroup>
     <ItemGroup>

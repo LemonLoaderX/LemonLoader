@@ -27,8 +27,8 @@ assets/bin/Data/globalgamemanagers                 optional
 ```
 
 The normalized files and `interop-input.json` are written to
-`Output/InteropInput`. The manifest records sizes and SHA-256 hashes so a
-desktop generator can cache by actual game content rather than APK filename.
+`Output/InteropInput`. The manifest records sizes and SHA-256 hashes for
+off-device input diagnostics. Interop output is not automatically cached.
 
 ## Generate Interop assemblies
 
@@ -52,14 +52,13 @@ An explicit external checkout can provide its CLI project:
     -Il2CppInteropCliProject "<source-root>/Il2CppInterop.CLI/Il2CppInterop.CLI.csproj"
 ```
 
-The selected source project is recorded in `interop-manifest.json`.
 Published Patcher packages include the fixed Il2CppInterop fork generator and do
 not restore the older NuGet tool. They accept another built source-fork CLI with
 `--il2cppinterop-cli <Il2CppInterop.CLI.dll>` only as an explicit development
 override. The override is executed in place so its adjacent dependencies remain
-available. Patcher manifests record both the main CLI hash and a content hash
-over the adjacent DLL/runtime JSON dependency set and bundled provenance when
-present; do not copy only the CLI DLL away from its build directory.
+available. Patcher's generation record identifies the selected tool version and
+source; it is not an installed identity or a tool-directory digest. Do not copy
+only the CLI DLL away from its build directory.
 
 The script downloads the upstream-pinned Cpp2IL
 `2022.1.0-pre-release.21` Windows host executable and verifies its SHA-256 before
@@ -89,7 +88,8 @@ The maintained generator validates optional-parameter metadata and removes only
 an orphaned `HasDefault` flag if a supplied Cpp2IL assembly lacks the required
 Constant row. Valid constants and `Optional` are unchanged. Generated assemblies
 and their manifest are written to `Output/GeneratedInterop`.
-The manifest records the Unity dependency directory and `unstripping: true`.
+The standalone manifest records Unity/generator versions, `unstripping: true`
+and assembly names/sizes. It is diagnostic output, not an installation input.
 
 ### Unstripped value-type layouts
 
@@ -127,6 +127,30 @@ For active layout 9, interop-manifest.json remains a host-side generation record
 it is not copied into the APK or required for startup. Layout-8 input handling is
 retired. Keep generation evidence
 with the developer outputs when investigating input or tool mismatches.
+
+Android Loader neither packages Il2CppInterop.Generator nor installs its method-name
+patches. Generator behavior belongs to the off-device source fork; runtime libraries
+such as AsmResolver remain where they have other active consumers.
+
+### Refresh an installed development build
+
+After the application has created its Interop directory, run from the Loader root:
+
+```powershell
+./scripts/interop/deploy-android-interop.ps1 -InteropDirectory ./Output/GeneratedInterop `
+    -PackageName <installed-package> -Serial <authorized-device>
+```
+
+This explicit device command stops the application and saves its current Interop
+directory under `Output/DeviceBackups` (or a new `-BackupDirectory`). It stages only
+top-level, nonempty DLLs, verifies their actual SHA-256 values, and replaces the
+Interop tree; a failed publication restores the previous tree when the destination
+is absent. ADB may disconnect after a rename has completed: if restoration cannot
+be confirmed, the script reports failure and retains recovery copies, without
+moving the previous tree into an existing destination. Keep the local backup
+for recovery. Audit JSON and nested files are not deployed. No manifest is required
+and the application is not restarted automatically. The next APK update replaces
+this local development override with its packaged Interop as usual.
 
 Unstripping restores the managed API surface used to compile and run ordinary
 Mods. It does not synthesize native Unity ICalls that were omitted from the

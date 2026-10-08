@@ -12,8 +12,10 @@
 
 namespace {
 struct Node {
+    std::string kind = "org/json/JSONObject";
     std::u16string text;
     std::map<std::string, std::string> fields;
+    std::map<std::string, std::string> types;
     std::vector<Node*> children;
     std::vector<jbyte> bytes;
     std::string digest_input;
@@ -34,7 +36,7 @@ Node* make() { nodes.push_back(std::make_unique<Node>()); return nodes.back().ge
 Node* node(jobject value) { return reinterpret_cast<Node*>(value); }
 jobject object(Node* value) { return reinterpret_cast<jobject>(value); }
 jstring text(const std::string& value) {
-    auto n = make(); n->text.assign(value.begin(), value.end()); return reinterpret_cast<jstring>(n);
+    auto n = make(); n->kind = "java/lang/String"; n->text.assign(value.begin(), value.end()); return reinterpret_cast<jstring>(n);
 }
 std::string string(jstring value) { return lemon::bootstrap::utf16_to_utf8(reinterpret_cast<const uint16_t*>(node(value)->text.data()), node(value)->text.size()); }
 const char* method(jmethodID value) { return reinterpret_cast<const char*>(value); }
@@ -48,6 +50,16 @@ void delete_ref(JNIEnv*, jobject) {}
 jclass find_class(JNIEnv*, const char* name) { return reinterpret_cast<jclass>(const_cast<char*>(name)); }
 jclass object_class(JNIEnv*, jobject) { return find_class(nullptr, "object"); }
 jmethodID get_method(JNIEnv*, jclass, const char* name, const char*) { return reinterpret_cast<jmethodID>(const_cast<char*>(name)); }
+jboolean instance_of(JNIEnv*, jobject value, jclass type) { return value && node(value)->kind == reinterpret_cast<const char*>(type); }
+jboolean bool_call(JNIEnv*, jobject receiver, jmethodID id, va_list args) {
+    assert(std::strcmp(method(id), "has") == 0);
+    const auto key = string(va_arg(args, jstring));
+    return node(receiver)->fields.count(key) || (key == "deploymentFiles" && options);
+}
+jdouble double_call(JNIEnv*, jobject receiver, jmethodID id, va_list) {
+    assert(std::strcmp(method(id), "doubleValue") == 0);
+    return std::stod(string(reinterpret_cast<jstring>(receiver)));
+}
 jobject new_object(JNIEnv*, jclass, jmethodID, va_list) { return object(root); }
 jfieldID get_field(JNIEnv*, jclass, const char*, const char*) { return reinterpret_cast<jfieldID>(1); }
 jobject static_field(JNIEnv*, jclass, jfieldID) { return object(root); }
@@ -61,6 +73,15 @@ jstring new_string(JNIEnv*, const jchar* value, jsize count) {
 }
 jobject object_call(JNIEnv*, jobject receiver, jmethodID id, va_list args) {
     const std::string name = method(id);
+    if (name == "get") {
+        const auto key = string(va_arg(args, jstring));
+        if (key == "deploymentFiles" && options) return object(options);
+        auto value = node(text(node(receiver)->fields.at(key)));
+        const auto type = node(receiver)->types.find(key);
+        value->kind = type != node(receiver)->types.end() ? type->second :
+            (key == "formatVersion" ? "java/lang/Number" : "java/lang/String");
+        return object(value);
+    }
     if (name == "optString" || name == "getString") {
         const auto key = string(va_arg(args, jstring));
         const auto found = node(receiver)->fields.find(key);
@@ -119,7 +140,7 @@ void get_bytes(JNIEnv*, jbyteArray array, jsize start, jsize count, jbyte* value
 jsize array_length(JNIEnv*, jarray array) { return node(array)->bytes.empty() ? node(array)->children.size() : node(array)->bytes.size(); }
 jobject array_element(JNIEnv*, jobjectArray array, jsize index) { return object(node(array)->children.at(index)); }
 void policy(const std::string& path, const std::string& value) {
-    if (!options) options = make();
+    if (!options) { options = make(); options->kind = "org/json/JSONArray"; }
     auto entry = make(); entry->fields = {{"path", path}, {"policy", value}, {"sha256", "stale"}, {"size", "-1"}};
     options->children.push_back(entry);
 }
@@ -158,6 +179,7 @@ int main(int argc, char** argv) {
     table.FindClass = find_class; table.GetObjectClass = object_class; table.GetMethodID = get_method; table.GetStaticMethodID = get_method;
     table.NewObjectV = new_object; table.CallObjectMethodV = object_call; table.CallStaticObjectMethodV = static_call;
     table.CallIntMethodV = int_call; table.CallVoidMethodV = void_call;
+    table.CallBooleanMethodV = bool_call; table.CallDoubleMethodV = double_call; table.IsInstanceOf = instance_of;
     table.GetStaticFieldID = get_field; table.GetFieldID = get_field; table.GetStaticObjectField = static_field; table.GetLongField = long_field;
     table.NewString = new_string; table.GetStringLength = length; table.GetStringChars = chars; table.ReleaseStringChars = release_chars;
     table.NewByteArray = new_bytes; table.SetByteArrayRegion = set_bytes; table.GetByteArrayRegion = get_bytes;
@@ -270,6 +292,24 @@ int main(int argc, char** argv) {
     root->fields["formatVersion"] = "9";
     assert(read_payload_descriptor(payload) && payload.runtime_rid == "android-arm64");
     root->fields.clear();
+    for (const auto* type : {"java/lang/String", "org/json/JSONObject", "org/json/JSONArray", "java/lang/Boolean", "org/json/JSONObject$Null"}) {
+        root->fields = {{"formatVersion", "9"}}; root->types = {{"formatVersion", type}};
+        assert(!read_payload_descriptor(payload) && !pending);
+        root->fields = {{"runtimeRid", "android-arm64"}}; root->types = {{"runtimeRid", type}};
+        if (std::strcmp(type, "java/lang/String") != 0) assert(!read_payload_descriptor(payload) && !pending);
+        root->fields = {{"deploymentFiles", "invalid"}}; root->types = {{"deploymentFiles", type}};
+        if (std::strcmp(type, "org/json/JSONArray") != 0)
+            assert(read_payload_descriptor(payload) && !payload.deployment_valid && !pending);
+    }
+    root->types.clear(); root->fields = {{"formatVersion", "9.5"}};
+    assert(!read_payload_descriptor(payload));
+    root->fields.clear();
+    policy("Mods/a.dll", "enforce"); options->children[0]->types["policy"] = "java/lang/Boolean";
+    assert(read_payload_descriptor(payload) && !payload.deployment_valid && !pending);
+    runtime_paths.loader_disabled = false;
+    assert(extract_runtime_assets() && runtime_paths.loader_disabled && !pending && frames == 0);
+    options = nullptr;
+    std::cout << "PASS explicit wrong option types never become missing/default configuration or deployment policies\n";
     short_read = true; assert(!read_payload_descriptor(payload)); short_read = false;
     assets.erase("LemonLoader/payload.json");
     assert(read_payload_descriptor(payload));

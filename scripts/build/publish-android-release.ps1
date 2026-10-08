@@ -19,19 +19,13 @@ if ($gameAssemblies.Count -ne 0) {
     throw "A LemonLoader Release must not contain game-specific Interop assemblies."
 }
 
-$versionOutput = & dotnet msbuild `
-    (Join-Path $repositoryRoot "MelonLoader\MelonLoader.csproj") `
-    -nologo -getProperty:Version
-if ($LASTEXITCODE -ne 0) {
-    throw "Reading the LemonLoader version failed with exit code $LASTEXITCODE."
-}
-$version = ($versionOutput | Select-Object -Last 1).Trim()
 $releaseRoot = Join-Path $repositoryRoot "Output\Releases"
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 if ($manifest.developmentBuild) { $releaseRoot = Join-Path $repositoryRoot 'Output/DevelopmentReleases' }
 . (Join-Path $PSScriptRoot '../common/RuntimeProfiles.ps1')
-$profile = Get-RuntimeProfile -Name $manifest.runtimeProfile
-if ($manifest.runtimeRid -cne $profile.rid) { throw 'Release profile and RID differ.' }
+$profiles = @(Get-RuntimeProfileSelection -Name all | Where-Object rid -CEQ $manifest.runtimeRid)
+if ($profiles.Count -ne 1) { throw 'Release RID does not identify a supported runtime profile.' }
+$profile = $profiles[0]
 $archiveName = "LemonLoader-runtime-$($profile.name)-arm64.zip"
 $archivePath = Join-Path $releaseRoot $archiveName
 $stagingArchivePath = Join-Path $releaseRoot ".$archiveName.staging"

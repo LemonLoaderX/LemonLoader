@@ -16,34 +16,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "..\common\AndroidToolchain.ps1")
-$adb = Get-AndroidAdb -AndroidSdkRoot $AndroidSdkRoot
-$Serial = Resolve-AndroidDeviceSerial -Adb $adb -Serial $Serial
-
 $source = [System.IO.Path]::GetFullPath($InteropDirectory)
-$manifestPath = Join-Path $source "interop-manifest.json"
 if (-not (Test-Path -LiteralPath $source -PathType Container)) {
     throw "Interop directory does not exist: $source"
 }
-if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
-    throw "Interop manifest does not exist: $manifestPath"
-}
-
-$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-$assemblies = @($manifest.assemblies)
+$assemblies = @(Get-ChildItem -LiteralPath $source -File | Where-Object Extension -IEQ '.dll' | Sort-Object Name)
 if ($assemblies.Count -eq 0) {
-    throw "Interop manifest contains no assemblies."
+    throw 'Interop directory contains no DLLs.'
 }
+$hashes = [Collections.Generic.Dictionary[string,string]]::new([StringComparer]::Ordinal)
 foreach ($assembly in $assemblies) {
-    $path = Join-Path $source $assembly.name
-    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-        throw "Manifest assembly is missing: $path"
+    if ($assembly.Length -eq 0 -or ($assembly.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Interop assembly must be a nonempty ordinary file: $($assembly.FullName)"
     }
-    $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -cne [string]$assembly.sha256) {
-        throw "Interop assembly hash mismatch: $($assembly.name)"
-    }
+    $hashes.Add($assembly.Name, (Get-FileHash -LiteralPath $assembly.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
 }
+function Quote-ShellPath([string]$Path) { "'" + $Path.Replace("'", "'\''") + "'" }
 
+$adb = Get-AndroidAdb -AndroidSdkRoot $AndroidSdkRoot
+$Serial = Resolve-AndroidDeviceSerial -Adb $adb -Serial $Serial
 $deviceState = (@(Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("get-state")) -join "").Trim()
 if ($deviceState -cne "device") {
     throw "ADB target $Serial is not ready."
@@ -55,42 +46,65 @@ if (-not (($packagePath -join "`n") -match "package:")) {
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
 if ([string]::IsNullOrWhiteSpace($BackupDirectory)) {
-    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $stamp = (Get-Date -Format "yyyyMMdd-HHmmss") + '-' + [Guid]::NewGuid().ToString('N')
     $BackupDirectory = Join-Path $repositoryRoot "Output\DeviceBackups\device-interop-backup-$stamp"
 }
 $backup = [System.IO.Path]::GetFullPath($BackupDirectory)
-New-Item -ItemType Directory -Force -Path $backup | Out-Null
+if (Test-Path -LiteralPath $backup) { throw "Use a new backup directory: '$backup'." }
+New-Item -ItemType Directory -Path $backup | Out-Null
 
 $remote = "/sdcard/Android/data/$PackageName/files/MelonLoader/MelonLoader/Il2CppAssemblies"
+$token = [Guid]::NewGuid().ToString('N')
+$staged = "$remote.stage-$token"
+$previous = "$remote.previous-$token"
+$remoteArg = Quote-ShellPath $remote
+$stagedArg = Quote-ShellPath $staged
+$previousArg = Quote-ShellPath $previous
+Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "test -d $remoteArg && test ! -L $remoteArg && test ! -e $stagedArg && test ! -L $stagedArg && test ! -e $previousArg && test ! -L $previousArg") | Out-Null
 Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("shell", "am", "force-stop", $PackageName) | Out-Null
 Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("pull", $remote, $backup) | Out-Null
 
-$sourceTree = Join-Path $source "."
-Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @("push", $sourceTree, "$remote/") | Out-Null
-
-$remoteHashes = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @(
-    "exec-out", "sh", "-c", "cd '$remote' && sha256sum *.dll interop-manifest.json"
-)
-$hashesByName = @{}
-foreach ($line in $remoteHashes) {
-    if ($line -match '^([0-9a-fA-F]{64})\s+\*?(.+)$') {
-        $hashesByName[$Matches[2]] = $Matches[1].ToLowerInvariant()
+$stageCreated = $false
+$installed = $false
+try {
+    Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "mkdir $stagedArg") | Out-Null
+    $stageCreated = $true
+    foreach ($assembly in $assemblies) {
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('push', $assembly.FullName, "$staged/$($assembly.Name)") | Out-Null
+    }
+    $remoteHashes = Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "cd $stagedArg && sha256sum -- *.[dD][lL][lL]")
+    $verified = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($line in $remoteHashes) {
+        if ($line -notmatch '^([0-9a-fA-F]{64})\s+\*?(.+)$' -or
+            !$hashes.ContainsKey($Matches[2]) -or !$verified.Add($Matches[2]) -or
+            $hashes[$Matches[2]] -cne $Matches[1].ToLowerInvariant()) {
+            throw "Device Interop staging hash mismatch: $line"
+        }
+    }
+    if ($verified.Count -ne $assemblies.Count) { throw 'Device Interop staging is incomplete.' }
+    try {
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "mv $remoteArg $previousArg") | Out-Null
+        Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "mv $stagedArg $remoteArg") | Out-Null
+        $installed = $true
+    } catch {
+        # ADB can lose the reply after either rename has already completed.
+        # Restore only into an absent destination; never nest the backup in a new tree.
+        $restore = "if test ! -e $previousArg && test ! -L $previousArg; then " +
+            "test -d $remoteArg && test ! -L $remoteArg; else " +
+            "test -d $previousArg && test ! -L $previousArg && " +
+            "test ! -e $remoteArg && test ! -L $remoteArg && mv $previousArg $remoteArg; fi"
+        try { Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', $restore) | Out-Null }
+        catch { Write-Warning "Could not restore device Interop; recovery copies remain at '$previous' and '$backup': $_" }
+        throw
+    }
+} finally {
+    if ($stageCreated -and !$installed) {
+        try { Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "rm -rf -- $stagedArg") | Out-Null }
+        catch { Write-Warning "Could not remove device Interop staging '$staged': $_" }
     }
 }
-
-foreach ($assembly in $assemblies) {
-    if (-not $hashesByName.ContainsKey([string]$assembly.name)) {
-        throw "Device is missing interop assembly after deployment: $($assembly.name)"
-    }
-    if ($hashesByName[[string]$assembly.name] -cne [string]$assembly.sha256) {
-        throw "Device interop hash mismatch after deployment: $($assembly.name)"
-    }
-}
-
-$localManifestHash = (Get-FileHash -LiteralPath $manifestPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($hashesByName["interop-manifest.json"] -cne $localManifestHash) {
-    throw "Device interop manifest hash mismatch after deployment."
-}
+try { Invoke-AndroidAdb -Adb $adb -Serial $Serial -Arguments @('shell', "rm -rf -- $previousArg") | Out-Null }
+catch { Write-Warning "Interop is installed; could not remove previous device tree '$previous': $_" }
 
 Write-Host "Deployed and verified $($assemblies.Count) Android interop assemblies."
 Write-Host "Device: $Serial"

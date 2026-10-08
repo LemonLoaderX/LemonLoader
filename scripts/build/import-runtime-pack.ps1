@@ -31,10 +31,10 @@ try {
     foreach ($name in @('managed','native','LICENSE.TXT','THIRD-PARTY-NOTICES.TXT')) {
         Copy-Item -LiteralPath (Join-Path $source $name) -Destination $staging -Recurse
     }
-    $provenance | Add-Member -NotePropertyName runtimeRid -NotePropertyValue $profile.rid -Force
-    $provenance | Add-Member -NotePropertyName developmentBuild -NotePropertyValue ([bool]$Development) -Force
-    $provenance | Add-Member -NotePropertyName cryptoBackend -NotePropertyValue $profile.cryptoBackend -Force
-    $provenance | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $staging 'runtime-provenance.json')
+    # Imported build provenance can contain private paths and commands. Publish
+    # only the runtime-pack contract; validate these values before committing it.
+    Get-PublicRuntimeProvenance -Provenance $provenance -Profile $profile -Development:$Development |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $staging 'runtime-provenance.json')
     if ($profile.cryptoBackend -eq 'openssl') {
         New-Item -ItemType Directory -Force -Path (Join-Path $staging 'licenses/OpenSSL') | Out-Null
         Copy-Item -LiteralPath $OpenSslLicense -Destination (Join-Path $staging 'licenses/OpenSSL/LICENSE.txt')

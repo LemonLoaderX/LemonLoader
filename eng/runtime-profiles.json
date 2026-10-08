@@ -9,8 +9,7 @@
       "revision": "b85b9fbd264f0f25ab17f722162813ff7d0a1ea5",
       "tfm": "net11.0",
       "minimumApi": 26,
-      "cryptoBackend": "android-jni",
-      "channel": "development"
+      "cryptoBackend": "android-jni"
     },
     "bionic": {
       "rid": "linux-bionic-arm64",
@@ -18,8 +17,7 @@
       "revision": "b85b9fbd264f0f25ab17f722162813ff7d0a1ea5",
       "tfm": "net11.0",
       "minimumApi": 26,
-      "cryptoBackend": "openssl",
-      "channel": "development"
+      "cryptoBackend": "openssl"
     }
   }
 }

@@ -7,22 +7,39 @@
 #include <map>
 
 namespace lemon::bootstrap {
-bool read_deployment_options(JNIEnv* env, jclass json_class, jobject json, PayloadDescriptor& descriptor) {
-    const auto opt_array = required_method(env, json_class, "optJSONArray", "(Ljava/lang/String;)Lorg/json/JSONArray;");
-    const auto opt_string = required_method(env, json_class, "optString", "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-    const auto read_string = [&](jobject object, const char* key, const char* fallback) {
-        auto name = new_java_string(env, key);
-        auto default_value = new_java_string(env, fallback);
-        auto value = static_cast<jstring>(checked_object_call(env, object, opt_string, name, default_value));
-        const auto text = java_string(env, value);
-        env->DeleteLocalRef(value);
-        env->DeleteLocalRef(default_value);
+namespace {
+jobject read_json_option(JNIEnv* env, jclass json_class, jobject json, const char* key, const char* type) {
+    const auto has = required_method(env, json_class, "has", "(Ljava/lang/String;)Z");
+    const auto get = required_method(env, json_class, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
+    auto name = new_java_string(env, key);
+    const bool present = env->CallBooleanMethod(json, has, name);
+    if (clear_java_exception(env, "Check payload option")) {
         env->DeleteLocalRef(name);
+        throw std::runtime_error("Cannot check payload option");
+    }
+    if (!present) { env->DeleteLocalRef(name); return nullptr; }
+    auto value = checked_object_call(env, json, get, name);
+    env->DeleteLocalRef(name);
+    auto expected = env->FindClass(type);
+    const bool failed = clear_java_exception(env, "Resolve payload option type");
+    const bool valid = !failed && expected && value && env->IsInstanceOf(value, expected);
+    if (expected) env->DeleteLocalRef(expected);
+    if (!valid) {
+        if (value) env->DeleteLocalRef(value);
+        throw std::runtime_error(std::string("Invalid payload option type: ") + key);
+    }
+    return value;
+}
+}  // namespace
+
+bool read_deployment_options(JNIEnv* env, jclass json_class, jobject json, PayloadDescriptor& descriptor) {
+    const auto read_string = [&](jobject object, const char* key, const char* fallback) {
+        auto value = static_cast<jstring>(read_json_option(env, json_class, object, key, "java/lang/String"));
+        const auto text = value ? java_string(env, value) : fallback;
+        if (value) env->DeleteLocalRef(value);
         return text;
     };
-    auto name = new_java_string(env, "deploymentFiles");
-    auto files = checked_object_call(env, json, opt_array, name);
-    env->DeleteLocalRef(name);
+    auto files = read_json_option(env, json_class, json, "deploymentFiles", "org/json/JSONArray");
     descriptor.deployment_files.clear();
     if (!files) return true;
     auto array_class = env->GetObjectClass(files);
@@ -75,10 +92,8 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
     }
     jmethodID constructor = required_method(env,
         json_class, "<init>", "(Ljava/lang/String;)V");
-    jmethodID get_int = required_method(env,
-        json_class, "optInt", "(Ljava/lang/String;I)I");
     const bool method_resolution_failed = clear_java_exception(env, "Resolve JSONObject methods");
-    if (constructor == nullptr || get_int == nullptr ||
+    if (constructor == nullptr ||
         method_resolution_failed) {
         env->DeleteLocalRef(json_class);
         return false;
@@ -93,22 +108,25 @@ bool read_payload_descriptor(PayloadDescriptor& descriptor) {
         return false;
     }
 
-    const auto opt_string = required_method(env, json_class, "optString",
-        "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
-    jstring rid_name = new_java_string(env, "runtimeRid");
-    jstring default_rid = new_java_string(env, "android-arm64");
-    auto rid = static_cast<jstring>(checked_object_call(env, json_object, opt_string, rid_name, default_rid));
-    descriptor.runtime_rid = java_string(env, rid);
-    env->DeleteLocalRef(rid);
-    env->DeleteLocalRef(default_rid);
-    env->DeleteLocalRef(rid_name);
-
-    jstring version_name = new_java_string(env, "formatVersion");
-    const jint format_version = env->CallIntMethod(json_object, get_int, version_name, 9);
-    env->DeleteLocalRef(version_name);
-    bool valid = !clear_java_exception(env, "Read payload manifest version") &&
-        format_version == 9 &&
-        (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64");
+    bool valid = false;
+    try {
+        auto rid = static_cast<jstring>(read_json_option(env, json_class, json_object, "runtimeRid", "java/lang/String"));
+        if (rid) { descriptor.runtime_rid = java_string(env, rid); env->DeleteLocalRef(rid); }
+        auto version = read_json_option(env, json_class, json_object, "formatVersion", "java/lang/Number");
+        jdouble format_version = 9;
+        if (version) {
+            auto number = env->GetObjectClass(version);
+            const auto double_value = required_method(env, number, "doubleValue", "()D");
+            format_version = env->CallDoubleMethod(version, double_value);
+            env->DeleteLocalRef(number);
+            env->DeleteLocalRef(version);
+        }
+        valid = !clear_java_exception(env, "Read payload manifest version") && format_version == 9 &&
+            (descriptor.runtime_rid == "android-arm64" || descriptor.runtime_rid == "linux-bionic-arm64");
+    } catch (const std::exception& error) {
+        if (env->ExceptionCheck()) env->ExceptionClear();
+        log_error(error.what());
+    }
     if (valid) {
         if (env->PushLocalFrame(32) != JNI_OK) {
             clear_java_exception(env, "Prepare optional deployment policy frame");

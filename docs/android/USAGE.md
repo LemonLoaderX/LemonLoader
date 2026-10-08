@@ -61,8 +61,8 @@ Confirm all of the following:
 - the application is Unity IL2CPP and contains `lib/arm64-v8a/libil2cpp.so`;
 - generated Interop assemblies match that exact APK's `libil2cpp.so` and
   `global-metadata.dat`;
-- `lemonloader-release.json` reports `gameAssembliesIncluded: false`;
-- `lemonloader-release.json` reports `bootstrapFlavor: Ndk`;
+- Patcher supports the archive's [Release manifest format](ARTIFACTS.md#release-inputs-and-apk-layout)
+  and validates its inventory and runtime layout before injection;
 - every native library in the final APK is compatible with 16 KiB pages;
 - signing material and package-specific patch files remain outside this repo.
 
@@ -112,6 +112,9 @@ trees keep the standard MelonLoader exclusion behavior.
 `UserData/Loader.cfg` is created and normalized on startup. The default and a
 non-default `theme` value have been validated through an on-device load/save
 cycle. Preserve the file across replacement updates.
+Android does not write `keep_cpp2il_output` or `disable_start_screen`: generation
+runs off device and the Android host has no start screen. Old entries are ignored
+and omitted when the configuration is normalized.
 
 Use `MelonLoader/Latest.log` for the current run, `MelonLoader/Previous.log` for
 the previous nonempty session and `MelonLoader/Logs` for managed history.

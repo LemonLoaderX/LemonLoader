@@ -25,6 +25,8 @@ function Test-PackArchive([string]$Pack, $Profile, [string]$Archives, [switch]$D
     $unpacked = Join-Path $Archives 'unpacked'
     Expand-Archive -LiteralPath $zip -DestinationPath $unpacked
     Test-RuntimeProfilePack -Root $unpacked -Profile $Profile -Development:$Development
+    $identity = Get-Content -LiteralPath (Join-Path $unpacked 'runtime-provenance.json') -Raw | ConvertFrom-Json
+    if (@($identity.PSObject.Properties).Count -ne 9) { throw 'Archive contains non-public runtime provenance fields.' }
 }
 function Reject([scriptblock]$Action) {
     $failed=$false
@@ -76,6 +78,8 @@ try {
         Test-RuntimeProfilePack -Root $pack -Profile $profile
         if ((Test-RuntimeProfilePack -Root $pack -Profile $profile -PassThru).runtimeRid -cne $profile.rid) { throw 'Verified identity was not returned.' }
         $identity = Get-Content "$pack/runtime-provenance.json" -Raw | ConvertFrom-Json
+        $identity | Add-Member -NotePropertyName buildCommand -NotePropertyValue 'private fixture command'
+        $identity | Add-Member -NotePropertyName privateBuildRoot -NotePropertyValue 'private fixture path'
         $identity.sourceRevision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
         $identity | Add-Member -NotePropertyName developmentBuild -NotePropertyValue $true
         $identity | ConvertTo-Json | Set-Content "$pack/runtime-provenance.json"
@@ -90,6 +94,11 @@ try {
         Reject { & $import -RuntimeProfile $profile.name -SourceRoot $pack -Destination $imported -OpenSslLicense $license }
         & $import -RuntimeProfile $profile.name -SourceRoot $pack -Destination $imported -OpenSslLicense $license -Development | Out-Null
         Test-RuntimeProfilePack -Root $imported -Profile $profile -Development
+        $publicIdentity = Get-Content "$imported/runtime-provenance.json" -Raw | ConvertFrom-Json
+        if (@($publicIdentity.PSObject.Properties).Count -ne 9 -or
+            $publicIdentity.PSObject.Properties['buildCommand'] -or $publicIdentity.PSObject.Properties['privateBuildRoot']) {
+            throw 'Runtime import leaked build-only provenance.'
+        }
         Reject { Test-RuntimeProfilePack -Root $imported -Profile $profile }
         $package = Join-Path $PSScriptRoot '../build/package-runtime.ps1'
         $archives = Join-Path $root ('archives-' + $profile.name)
@@ -102,6 +111,9 @@ try {
         ($inventory | Where-Object path -eq 'runtime-provenance.json').sha256 = (Get-FileHash "$pack/runtime-provenance.json").Hash.ToLowerInvariant()
         $inventory | ConvertTo-Json | Set-Content "$pack/pack-files.json"
         $other=if($profile.name -eq 'android'){$bionic}else{$android}
+        $beforeIdentity = [IO.File]::ReadAllText((Join-Path $pack 'runtime-provenance.json'))
+        Test-PackArchive -Pack $pack -Profile $profile -Archives (Join-Path $root ('repack-' + $profile.name))
+        if ([IO.File]::ReadAllText((Join-Path $pack 'runtime-provenance.json')) -cne $beforeIdentity) { throw 'Packaging modified the source pack.' }
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $other }
         Set-Content "$pack/native/unlisted.so" 'unexpected'
         Reject { Test-RuntimeProfilePack -Root $pack -Profile $profile }

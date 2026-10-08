@@ -156,7 +156,6 @@ bool prepare_android_runtime() {
         !set_environment("MELONLOADER_DOTNET_ROOT", runtime_paths.dotnet_directory.c_str()) ||
         !set_environment("MELONLOADER_ANDROID_PACKAGE", runtime_paths.package_name.c_str()) ||
         !set_environment("MELONLOADER_BOOTSTRAP_KIND", "ndk") ||
-        !set_environment("MELONLOADER_MANAGED_RUNTIME_BACKEND", "coreclr") ||
         !set_environment("DOTNET_ROOT", runtime_paths.dotnet_directory.c_str()) ||
         !set_environment("PATH", path.c_str())) return false;
     configure_android_certificate_store();

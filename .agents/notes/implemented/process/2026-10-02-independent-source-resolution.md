@@ -49,6 +49,17 @@ producing sources/final archives; initialized nested repositories use their own
 HEAD. Runtime scanning requires an ancestor base and audits base..HEAD only.
 Private refs and ignored/untracked files are outside Git-history certification.
 
+Runtime import and packaging construct minimal public provenance instead of reserializing
+an arbitrary source object. Private commands/paths remain internal; validators
+still tolerate additive metadata on existing packs. Repacking older packs also
+normalizes the two metadata entries and their inventory hashes without changing
+the source pack or copying its entire tree. Preparation removes its own
+extraction/helper-cache tree after import or failure, retaining original inputs
+and the committed pack. Script tests own unique GUID roots under Output/Tests and
+remove them in finally, including synthetic Git data and test links themselves.
+Their scoped helper never follows a link target or accepts another cleanup root;
+this is separate from product cleanup's repository/link rejection policy.
+
 ## Documentation ownership
 
 [Loader's task index](../../../../docs/README.md) is the primary entry. Build,
