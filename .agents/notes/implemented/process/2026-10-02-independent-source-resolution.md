@@ -24,6 +24,11 @@ and development overrides. Resolution/build is read-only: no fetch, reset or
 branch switch. Setup creates a missing exact clone atomically; existing sources
 are verified without mutation. Matching nested sources must be initialized.
 
+Java.Interop host fixtures use setup's JavaInteropOnly selection. The default
+still prepares every Loader dependency, but a JNI-only check does not clone or
+depend on the availability of unrelated hook/generator forks. The same resolver,
+pin checks and sparse Java source selection apply in both modes.
+
 New Windows clones enable long paths and use short .staging-GUID names; revision
 basenames can still exceed Git's path limit. HTTPS clones may filter blobs;
 local fixtures do not establish filtered remotes to partial source checkouts.

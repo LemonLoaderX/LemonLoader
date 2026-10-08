@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$SourceRoot
+    [string]$SourceRoot,
+    [switch]$JavaInteropOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,15 +36,17 @@ $sources = @(
     }
 )
 
-foreach ($source in $sources) {
-    $destination = if ($SourceRoot) {
-        [IO.Path]::GetFullPath((Join-Path $SourceRoot $source.Name))
-    } else {
-        Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name $source.Name
+if (!$JavaInteropOnly) {
+    foreach ($source in $sources) {
+        $destination = if ($SourceRoot) {
+            [IO.Path]::GetFullPath((Join-Path $SourceRoot $source.Name))
+        } else {
+            Get-AndroidDependencySourceRoot -RepositoryRoot $repositoryRoot -Name $source.Name
+        }
+        Initialize-AndroidSourceCheckout -Path $destination -Url $source.Url `
+            -Revision $source.Revision -Recursive:$source.Recursive
+        Write-Host "$($source.Name) @ $($source.Revision.Substring(0, 12)): $destination"
     }
-    Initialize-AndroidSourceCheckout -Path $destination -Url $source.Url `
-        -Revision $source.Revision -Recursive:$source.Recursive
-    Write-Host "$($source.Name) @ $($source.Revision.Substring(0, 12)): $destination"
 }
 
 $javaDestination = if ($SourceRoot) {

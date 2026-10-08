@@ -52,6 +52,7 @@ Wrong receiver/result and stale-scope cases protect native call boundaries; nest
 callback arrays check independent ownership and partial-failure cleanup. Callback
 Java/build fixtures require the pinned JAVA_HOME and SDK build-tools and test
 Object method dispatch and exclusion of stale classes from repeated DEX builds.
+For JNI host tests, prepare the Java source with `pwsh -NoProfile -File scripts/setup-android-dependencies.ps1 -JavaInteropOnly`.
 The [JNI host regression](../../tests/Android/JniHost/README.md) exercises the
 checked Mod interface with a real JVM; it does not substitute for ART acceptance.
 GameInformation uses real AssetsTools parsing with generated files/bundles and

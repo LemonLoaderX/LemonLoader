@@ -87,7 +87,7 @@ jobs:
         run: dotnet run --project tests/Android/Managed/AndroidManaged.Tests.csproj
       - name: Prepare Java.Interop source
         shell: pwsh
-        run: pwsh -NoProfile -File scripts/setup-android-dependencies.ps1
+        run: pwsh -NoProfile -File scripts/setup-android-dependencies.ps1 -JavaInteropOnly
       - name: Run real JVM peer and marshaling regressions
         run: dotnet run --project tests/Android/JniHost/JniHost.csproj -c Release -- java-interop "$JAVA_HOME/lib/server/libjvm.so"
 

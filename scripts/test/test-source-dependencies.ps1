@@ -95,4 +95,29 @@ Initialize-AndroidSourceCheckout -Path $runtimeCache -Url $origin -Revision $fir
 $runtimeConfig.repositoryUrl = 'http://invalid.example/insecure'
 $runtimeConfig | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $product 'eng/runtime-profiles.json')
 Assert-Rejected { Get-RuntimeRepositoryUrl -RepositoryRoot $product }
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'eng/AndroidDependencies.props') -Destination (Join-Path $product 'eng/AndroidDependencies.props')
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'scripts/setup-android-dependencies.ps1') -Destination $fixtureScripts
+# Exercise the real setup entry's selection without fetching source repositories.
+Add-Content -LiteralPath (Join-Path $fixtureScripts 'common/AndroidDependencies.ps1') -Value @'
+function Initialize-AndroidSourceCheckout {
+    param([string]$Path, [string]$Url, [string]$Revision,
+          [switch]$Recursive, [switch]$AllowUntracked, [string[]]$SparsePaths)
+    [void][IO.Directory]::CreateDirectory($Path)
+    @{ Revision = $Revision; Recursive = [bool]$Recursive; SparsePaths = @($SparsePaths) } |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Path 'prepared.json')
+}
+'@
+$javaOnlyRoot = Join-Path $fixture 'java-only'
+$expectedDependencies = Get-AndroidDependencies -RepositoryRoot $repositoryRoot
+& (Join-Path $fixtureScripts 'setup-android-dependencies.ps1') -SourceRoot $javaOnlyRoot -JavaInteropOnly
+Assert-Equal 'DotnetAndroid' ((Get-ChildItem -LiteralPath $javaOnlyRoot -Directory).Name -join ',')
+$javaPrepared = Get-Content -LiteralPath (Join-Path $javaOnlyRoot 'DotnetAndroid/prepared.json') -Raw | ConvertFrom-Json
+Assert-Equal $expectedDependencies.JavaInteropRevision $javaPrepared.Revision
+Assert-Equal 'external/Java.Interop' ($javaPrepared.SparsePaths -join ',')
+$allSourcesRoot = Join-Path $fixture 'all-sources'
+& (Join-Path $fixtureScripts 'setup-android-dependencies.ps1') -SourceRoot $allSourcesRoot
+Assert-Equal 'Dobby,DotnetAndroid,HarmonyX,Il2CppInterop,MonoMod' ((Get-ChildItem -LiteralPath $allSourcesRoot -Directory | Sort-Object Name).Name -join ',')
+$monoPrepared = Get-Content -LiteralPath (Join-Path $allSourcesRoot 'MonoMod/prepared.json') -Raw | ConvertFrom-Json
+Assert-Equal $true $monoPrepared.Recursive
+Write-Host 'PASS Java.Interop-only setup and unchanged full dependency selection'
 Write-Host 'PASS independent Loader/runtime pins, matching/conflicting siblings, isolated caches, explicit roots and non-mutating setup'

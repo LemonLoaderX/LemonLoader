@@ -10,7 +10,7 @@ to [Building](../docs/android/BUILDING.md), [Runtime development](../docs/androi
 
 | Entry | Purpose |
 | --- | --- |
-| setup-android-dependencies.ps1 | Prepare exact Dobby/Interop/Harmony/MonoMod/Java.Interop source pins |
+| setup-android-dependencies.ps1 | Prepare exact source pins; JavaInteropOnly limits setup to Java.Interop |
 | build.ps1 | Build Android, Bionic or both; explicit development/source/pack inputs |
 | verify.ps1 | Script/source/Interop checks, optional desktop/selected Android build and repack |
 | setup-runtime.ps1 | Prepare exact runtime source without switching existing checkouts |
